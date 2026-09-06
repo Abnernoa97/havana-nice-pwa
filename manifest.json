@@ -1,9 +1,9 @@
 {
   "name": "HAVANA NICE",
   "short_name": "HAVANA NICE",
-  "id": "/app-hn",
-  "start_url": "/app-hn",
-  "scope": "/app-hn",
+  "id": "https://www.havananice.com/app-hn",
+  "start_url": "https://www.havananice.com/app-hn",
+  "scope": "https://www.havananice.com/app-hn",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#020403",
