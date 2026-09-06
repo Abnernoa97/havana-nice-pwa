@@ -1,0 +1,12 @@
+{
+  "name": "HAVANA NICE",
+  "short_name": "HAVANA NICE",
+  "id": "/app-hn",
+  "start_url": "/app-hn",
+  "scope": "/app-hn",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#020403",
+  "theme_color": "#020403",
+  "description": "HAVANA NICE MEMBERS"
+}
