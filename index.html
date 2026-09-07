@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>HAVANA NICE APP</title>
+
+  <meta name="theme-color" content="#020403">
+  <meta name="mobile-web-app-capable" content="yes">
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      min-height: 100%;
+      background: #020403;
+      color: white;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    body {
+      min-height: 100vh;
+    }
+
+    .app {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background:
+        radial-gradient(circle at 50% 20%, rgba(22,75,55,.25), transparent 45%),
+        #020403;
+    }
+
+    .login {
+      width: 100%;
+      max-width: 390px;
+      text-align: center;
+    }
+
+    .small {
+      font-size: 10px;
+      letter-spacing: 4px;
+      opacity: .6;
+      margin-bottom: 14px;
+    }
+
+    .logo {
+      color: #d9bd72;
+      font-size: 34px;
+      letter-spacing: 5px;
+      font-weight: 300;
+      margin-bottom: 45px;
+    }
+
+    input {
+      width: 100%;
+      height: 52px;
+      padding: 0 18px;
+      margin-bottom: 12px;
+      border: 1px solid rgba(217,189,114,.35);
+      border-radius: 2px;
+      background: rgba(255,255,255,.04);
+      color: white;
+      outline: none;
+      text-align: center;
+      font-size: 15px;
+    }
+
+    input::placeholder {
+      color: rgba(255,255,255,.45);
+    }
+
+    button {
+      width: 100%;
+      height: 52px;
+      border: 1px solid rgba(217,189,114,.65);
+      border-radius: 2px;
+      background: rgba(0,0,0,.25);
+      color: #e4cc8b;
+      font-size: 11px;
+      letter-spacing: 3px;
+      cursor: pointer;
+    }
+
+    button:active {
+      transform: scale(.98);
+    }
+
+    .mensaje {
+      min-height: 20px;
+      margin-top: 18px;
+      font-size: 11px;
+      opacity: .7;
+    }
+  </style>
+</head>
+
+<body>
+
+  <main class="app">
+
+    <section class="login">
+
+      <div class="small">WELCOME TO</div>
+
+      <div class="logo">HAVANA NICE</div>
+
+      <input
+        id="usuario"
+        type="text"
+        placeholder="USUARIO"
+        autocomplete="username"
+      >
+
+      <input
+        id="contrasena"
+        type="password"
+        placeholder="CONTRASEÑA"
+        autocomplete="current-password"
+      >
+
+      <button onclick="entrar()">
+        ENTRAR
+      </button>
+
+      <div class="mensaje" id="mensaje"></div>
+
+    </section>
+
+  </main>
+
+  <script>
+
+    function entrar() {
+
+      const usuario =
+        document.getElementById("usuario").value.trim();
+
+      const contrasena =
+        document.getElementById("contrasena").value;
+
+      const mensaje =
+        document.getElementById("mensaje");
+
+      if (!usuario || !contrasena) {
+        mensaje.textContent =
+          "Escribe tu usuario y contraseña.";
+        return;
+      }
+
+      mensaje.textContent =
+        "Conectando...";
+
+    }
+
+  </script>
+
+</body>
+</html>
