@@ -115,8 +115,8 @@
 
       <input
         id="usuario"
-        type="text"
-        placeholder="USUARIO"
+        type="email"
+        placeholder="EMAIL"
         autocomplete="username"
       >
 
@@ -137,9 +137,24 @@
 
   </main>
 
-  <script>
+  <script type="module">
 
-    function entrar() {
+    import { createClient } from
+      "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+
+    const SUPABASE_URL =
+      "https://xzfradccsxonmauinecl.supabase.co";
+
+    const SUPABASE_PUBLISHABLE_KEY =
+      sb_publishable_Ip5rGK0UVXIfOjs_RQ_LhA_c14foHN9
+
+    const supabase =
+      createClient(
+        SUPABASE_URL,
+        SUPABASE_PUBLISHABLE_KEY
+      );
+
+    window.entrar = async function () {
 
       const usuario =
         document.getElementById("usuario").value.trim();
@@ -152,14 +167,52 @@
 
       if (!usuario || !contrasena) {
         mensaje.textContent =
-          "Escribe tu usuario y contraseña.";
+          "Escribe tu email y contraseña.";
         return;
       }
 
       mensaje.textContent =
-        "Conectando...";
+        "CONECTANDO...";
 
-    }
+      const { data, error } =
+        await supabase.auth.signInWithPassword({
+          email: usuario,
+          password: contrasena
+        });
+
+      if (error) {
+        mensaje.textContent =
+          "Email o contraseña incorrectos.";
+        return;
+      }
+
+      const { data: perfil, error: perfilError } =
+        await supabase
+          .from("profiles")
+          .select("username, role, active")
+          .eq("id", data.user.id)
+          .single();
+
+      if (perfilError || !perfil) {
+        await supabase.auth.signOut();
+
+        mensaje.textContent =
+          "No se encontró el perfil.";
+        return;
+      }
+
+      if (!perfil.active) {
+        await supabase.auth.signOut();
+
+        mensaje.textContent =
+          "Este usuario está desactivado.";
+        return;
+      }
+
+      mensaje.textContent =
+        "BIENVENIDO " + perfil.username;
+
+    };
 
   </script>
 
