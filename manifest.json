@@ -1,9 +1,9 @@
 {
   "name": "HAVANA NICE",
   "short_name": "HAVANA NICE",
-  "id": "https://www.havananice.com/app-hn",
-  "start_url": "https://www.havananice.com/app-hn",
-  "scope": "https://www.havananice.com/app-hn",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#020403",
@@ -11,12 +11,12 @@
   "description": "HAVANA NICE MEMBERS",
   "icons": [
     {
-      "src": "https://raw.githubusercontent.com/Abnernoa97/havana-nice-pwa/refs/heads/main/havana-nice-icon-192.png",
+      "src": "./havana-nice-icon-192.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "https://raw.githubusercontent.com/Abnernoa97/havana-nice-pwa/refs/heads/main/havana-nice-icon-512.png",
+      "src": "./havana-nice-icon-512.png",
       "sizes": "512x512",
       "type": "image/png"
     }
