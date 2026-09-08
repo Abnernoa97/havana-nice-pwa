@@ -3,11 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
   <title>HAVANA NICE APP</title>
 
   <meta name="theme-color" content="#020403">
   <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+
+  <link rel="manifest" href="./manifest.json">
 
   <style>
     * {
@@ -26,79 +28,120 @@
 
     body {
       min-height: 100vh;
-    }
-
-    .app {
-      min-height: 100vh;
       display: flex;
       align-items: center;
       justify-content: center;
       padding: 24px;
-      background:
-        radial-gradient(circle at 50% 20%, rgba(22,75,55,.25), transparent 45%),
-        #020403;
     }
 
-    .login {
+    .app {
       width: 100%;
-      max-width: 390px;
+      max-width: 420px;
       text-align: center;
     }
 
-    .small {
-      font-size: 10px;
-      letter-spacing: 4px;
-      opacity: .6;
-      margin-bottom: 14px;
+    .logo {
+      width: 110px;
+      height: 110px;
+      margin: 0 auto 28px;
+      object-fit: contain;
     }
 
-    .logo {
-      color: #d9bd72;
-      font-size: 34px;
-      letter-spacing: 5px;
-      font-weight: 300;
-      margin-bottom: 45px;
+    .eyebrow {
+      color: #b99a4a;
+      font-size: 12px;
+      letter-spacing: 4px;
+      margin-bottom: 10px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 30px;
+      letter-spacing: 3px;
+      font-weight: 500;
+    }
+
+    .subtitle {
+      color: #999;
+      font-size: 13px;
+      margin-bottom: 36px;
+    }
+
+    .login-box {
+      width: 100%;
+    }
+
+    label {
+      display: block;
+      text-align: left;
+      color: #b99a4a;
+      font-size: 11px;
+      letter-spacing: 2px;
+      margin-bottom: 9px;
     }
 
     input {
       width: 100%;
-      height: 52px;
-      padding: 0 18px;
-      margin-bottom: 12px;
-      border: 1px solid rgba(217,189,114,.35);
-      border-radius: 2px;
-      background: rgba(255,255,255,.04);
+      height: 54px;
+      background: #0b0e0d;
+      border: 1px solid #333936;
+      border-radius: 4px;
       color: white;
+      padding: 0 16px;
+      font-size: 16px;
       outline: none;
-      text-align: center;
-      font-size: 15px;
+      text-transform: uppercase;
     }
 
-    input::placeholder {
-      color: rgba(255,255,255,.45);
+    input:focus {
+      border-color: #b99a4a;
     }
 
     button {
       width: 100%;
-      height: 52px;
-      border: 1px solid rgba(217,189,114,.65);
-      border-radius: 2px;
-      background: rgba(0,0,0,.25);
-      color: #e4cc8b;
-      font-size: 11px;
+      height: 54px;
+      margin-top: 18px;
+      border: 0;
+      border-radius: 4px;
+      background: #b99a4a;
+      color: #020403;
+      font-size: 12px;
+      font-weight: bold;
       letter-spacing: 3px;
       cursor: pointer;
     }
 
-    button:active {
-      transform: scale(.98);
+    button:disabled {
+      opacity: 0.6;
     }
 
-    .mensaje {
-      min-height: 20px;
-      margin-top: 18px;
-      font-size: 11px;
-      opacity: .7;
+    .message {
+      min-height: 22px;
+      margin-top: 16px;
+      font-size: 13px;
+      color: #aaa;
+    }
+
+    .welcome {
+      display: none;
+    }
+
+    .welcome-name {
+      font-size: 28px;
+      letter-spacing: 3px;
+      margin: 12px 0;
+    }
+
+    .welcome-text {
+      color: #aaa;
+      font-size: 14px;
+      margin-bottom: 30px;
+    }
+
+    .logout {
+      background: transparent;
+      border: 1px solid #555;
+      color: #aaa;
     }
   </style>
 </head>
@@ -107,31 +150,57 @@
 
   <main class="app">
 
-    <section class="login">
+    <img
+      class="logo"
+      src="./havana-nice-icon-192.png"
+      alt="HAVANA NICE"
+    >
 
-      <div class="small">WELCOME TO</div>
+    <section id="loginSection">
 
-      <div class="logo">HAVANA NICE</div>
+      <div class="eyebrow">HAVANA NICE</div>
 
-      <input
-        id="usuario"
-        type="email"
-        placeholder="EMAIL"
-        autocomplete="username"
-      >
+      <h1>MEMBERS</h1>
 
-      <input
-        id="contrasena"
-        type="password"
-        placeholder="CONTRASEÑA"
-        autocomplete="current-password"
-      >
+      <div class="subtitle">
+        PRIVATE ACCESS
+      </div>
 
-      <button onclick="entrar()">
-        ENTRAR
+      <div class="login-box">
+
+        <label for="username">MÚSICO</label>
+
+        <input
+          id="username"
+          type="text"
+          placeholder="ESCRIBE TU NOMBRE"
+          autocomplete="off"
+          autocapitalize="characters"
+        >
+
+        <button id="loginButton">
+          ENTRAR
+        </button>
+
+        <div id="message" class="message"></div>
+
+      </div>
+
+    </section>
+
+    <section id="welcomeSection" class="welcome">
+
+      <div class="eyebrow">WELCOME BACK</div>
+
+      <div id="welcomeName" class="welcome-name"></div>
+
+      <div class="welcome-text">
+        Tu acceso está activo.
+      </div>
+
+      <button id="logoutButton" class="logout">
+        CERRAR SESIÓN
       </button>
-
-      <div class="mensaje" id="mensaje"></div>
 
     </section>
 
@@ -139,80 +208,126 @@
 
   <script type="module">
 
-    import { createClient } from
-      "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+    import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
-    const SUPABASE_URL =
-      "https://xzfradccsxonmauinecl.supabase.co";
+    const SUPABASE_URL = "https://xzfradccsxonmauinecl.supabase.co";
 
-    const SUPABASE_PUBLISHABLE_KEY =
-      sb_publishable_Ip5rGK0UVXIfOjs_RQ_LhA_c14foHN9
+    const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_Ip5rGK0UVXIfOjs_RQ_LhA_c14foHN9";
 
-    const supabase =
-      createClient(
-        SUPABASE_URL,
-        SUPABASE_PUBLISHABLE_KEY
+    const supabase = createClient(
+      SUPABASE_URL,
+      SUPABASE_PUBLISHABLE_KEY
+    );
+
+    const loginSection = document.getElementById("loginSection");
+    const welcomeSection = document.getElementById("welcomeSection");
+    const usernameInput = document.getElementById("username");
+    const loginButton = document.getElementById("loginButton");
+    const logoutButton = document.getElementById("logoutButton");
+    const message = document.getElementById("message");
+    const welcomeName = document.getElementById("welcomeName");
+
+    function showWelcome(username) {
+      loginSection.style.display = "none";
+      welcomeSection.style.display = "block";
+      welcomeName.textContent = username;
+    }
+
+    function showLogin() {
+      loginSection.style.display = "block";
+      welcomeSection.style.display = "none";
+      usernameInput.value = "";
+    }
+
+    async function login() {
+
+      const username = usernameInput.value.trim();
+
+      if (!username) {
+        message.textContent = "ESCRIBE TU NOMBRE";
+        return;
+      }
+
+      loginButton.disabled = true;
+      message.textContent = "VERIFICANDO...";
+
+      const { data, error } = await supabase.rpc(
+        "login_by_username",
+        {
+          p_username: username
+        }
       );
 
-    window.entrar = async function () {
-
-      const usuario =
-        document.getElementById("usuario").value.trim();
-
-      const contrasena =
-        document.getElementById("contrasena").value;
-
-      const mensaje =
-        document.getElementById("mensaje");
-
-      if (!usuario || !contrasena) {
-        mensaje.textContent =
-          "Escribe tu email y contraseña.";
-        return;
-      }
-
-      mensaje.textContent =
-        "CONECTANDO...";
-
-      const { data, error } =
-        await supabase.auth.signInWithPassword({
-          email: usuario,
-          password: contrasena
-        });
+      loginButton.disabled = false;
 
       if (error) {
-        mensaje.textContent =
-          "Email o contraseña incorrectos.";
+        console.error(error);
+        message.textContent = "ERROR DE CONEXIÓN";
         return;
       }
 
-      const { data: perfil, error: perfilError } =
-        await supabase
-          .from("profiles")
-          .select("username, role, active")
-          .eq("id", data.user.id)
-          .single();
-
-      if (perfilError || !perfil) {
-        await supabase.auth.signOut();
-
-        mensaje.textContent =
-          "No se encontró el perfil.";
+      if (!data || data.length === 0) {
+        message.textContent = "ACCESO NO DISPONIBLE";
         return;
       }
 
-      if (!perfil.active) {
-        await supabase.auth.signOut();
+      const profile = data[0];
 
-        mensaje.textContent =
-          "Este usuario está desactivado.";
+      sessionStorage.setItem("hn_profile_id", profile.id);
+      sessionStorage.setItem("hn_username", profile.username);
+      sessionStorage.setItem("hn_role", profile.role);
+
+      message.textContent = "";
+
+      showWelcome(profile.username);
+    }
+
+    async function restoreSession() {
+
+      const username = sessionStorage.getItem("hn_username");
+
+      if (!username) {
         return;
       }
 
-      mensaje.textContent =
-        "BIENVENIDO " + perfil.username;
+      const { data, error } = await supabase.rpc(
+        "login_by_username",
+        {
+          p_username: username
+        }
+      );
 
-    };
+      if (
+        error ||
+        !data ||
+        data.length === 0
+      ) {
+        sessionStorage.clear();
+        showLogin();
+        return;
+      }
+
+      showWelcome(data[0].username);
+    }
+
+    loginButton.addEventListener("click", login);
+
+    usernameInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        login();
+      }
+    });
+
+    logoutButton.addEventListener("click", () => {
+      sessionStorage.clear();
+      showLogin();
+    });
+
+    restoreSession();
+
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("./sw.js");
+    }
 
   </script>
 
