@@ -6,11 +6,12 @@
   var started = false;
   var reconnectTimer = null;
   var sessionPollTimer = null;
+  var notificationPollTimer = null;
   var notifications = [];
   var seenIds = new Set();
-  var notificationButton = null;
-  var notificationSubtitle = null;
   var notificationModule = null;
+  var notificationSubtitle = null;
+  var STORAGE_KEY = 'hn_notifications_cache_v1';
 
   function isLoggedIn() {
     return !!sessionStorage.getItem('hn_profile');
@@ -48,13 +49,13 @@
   }
 
   function findNotificationModule() {
-    if (notificationModule) return notificationModule;
+    if (notificationModule && document.body.contains(notificationModule)) return notificationModule;
+    notificationModule = null;
     var modules = document.querySelectorAll('.module');
     for (var i = 0; i < modules.length; i++) {
       var title = modules[i].querySelector('.module-title');
       if (title && title.textContent.trim().toUpperCase() === 'NOTIFICACIONES') {
         notificationModule = modules[i];
-        notificationButton = modules[i];
         notificationSubtitle = modules[i].querySelector('.module-subtitle');
         break;
       }
@@ -91,6 +92,32 @@
     }, 3200);
   }
 
+  function saveCache() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(notifications.slice(0, 50)));
+    } catch (_) {}
+  }
+
+  function loadCache() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      var cached = JSON.parse(raw);
+      if (!Array.isArray(cached)) return;
+      notifications = [];
+      seenIds.clear();
+      cached.forEach(function (item) {
+        if (!item || !item.id || seenIds.has(item.id)) return;
+        seenIds.add(item.id);
+        notifications.push(item);
+      });
+      notifications.sort(function (a, b) {
+        return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+      });
+      updateModule();
+    } catch (_) {}
+  }
+
   function renderNotificationScreen() {
     var screen = document.getElementById('moduleScreen');
     if (!screen) return;
@@ -99,7 +126,6 @@
 
     inner.className = 'screen-inner coming-screen hn-notify-screen';
     inner.innerHTML = '';
-
     inner.appendChild(makeElement('p', 'brand metallic-gold', 'HAVANA NICE'));
     inner.appendChild(makeElement('div', 'brand-line'));
     inner.appendChild(makeElement('div', 'hn-n-head', 'Notifications'));
@@ -142,9 +168,9 @@
 
   function bindModule() {
     findNotificationModule();
-    if (!notificationButton || notificationButton.dataset.hnNotifyBound === 'true') return;
-    notificationButton.dataset.hnNotifyBound = 'true';
-    notificationButton.addEventListener('click', function (event) {
+    if (!notificationModule || notificationModule.dataset.hnNotifyBound === 'true') return;
+    notificationModule.dataset.hnNotifyBound = 'true';
+    notificationModule.addEventListener('click', function (event) {
       event.preventDefault();
       event.stopImmediatePropagation();
       playClickSoundIfAvailable();
@@ -159,23 +185,26 @@
   }
 
   function mergeItems(items, showFlash) {
-    if (!Array.isArray(items)) return;
+    if (!Array.isArray(items)) return false;
     var added = [];
     items.forEach(function (item) {
       if (!item || !item.id || seenIds.has(item.id)) return;
       seenIds.add(item.id);
       added.push(item);
     });
-    if (!added.length) return;
+    if (!added.length) return false;
     notifications = notifications.concat(added);
     notifications.sort(function (a, b) {
       return new Date(b.created_at || 0) - new Date(a.created_at || 0);
     });
+    notifications = notifications.slice(0, 50);
+    saveCache();
     updateModule();
     if (showFlash) flashModule();
+    return true;
   }
 
-  async function syncRecent() {
+  async function syncRecent(showFlash) {
     if (!client || !isLoggedIn()) return;
     try {
       var result = await client
@@ -187,11 +216,18 @@
         console.error('[HN-Notifications] sync error:', result.error);
         return;
       }
-      mergeItems(result.data || [], false);
+      mergeItems(result.data || [], !!showFlash);
       bindModule();
     } catch (error) {
       console.error('[HN-Notifications] sync exception:', error);
     }
+  }
+
+  function startPolling() {
+    if (notificationPollTimer) return;
+    notificationPollTimer = setInterval(function () {
+      if (isLoggedIn()) syncRecent(false);
+    }, 5000);
   }
 
   function scheduleReconnect() {
@@ -223,7 +259,7 @@
       .subscribe(function (status, error) {
         console.log('[HN-Notifications] Realtime:', status);
         if (error) console.error('[HN-Notifications] Realtime error:', error);
-        if (status === 'SUBSCRIBED') syncRecent();
+        if (status === 'SUBSCRIBED') syncRecent(false);
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') scheduleReconnect();
       });
   }
@@ -257,10 +293,12 @@
     if (!nextClient) return;
     client = nextClient;
     addStyle();
+    loadCache();
     bindModule();
+    startPolling();
     if (!started) {
       started = true;
-      await syncRecent();
+      await syncRecent(false);
     }
     ensureRealtime();
   }
@@ -276,13 +314,13 @@
   function setupLifecycle() {
     document.addEventListener('visibilitychange', function () {
       if (document.visibilityState === 'visible' && isLoggedIn()) {
-        syncRecent();
+        syncRecent(false);
         ensureRealtime();
       }
     });
     window.addEventListener('online', function () {
       if (isLoggedIn()) {
-        syncRecent();
+        syncRecent(false);
         ensureRealtime();
       }
     });
