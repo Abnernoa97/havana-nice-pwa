@@ -19,17 +19,17 @@ jobs:
           from pathlib import Path
           p=Path('index.html')
           s=p.read_text(encoding='utf-8')
-          old='<script type="module" src="./notifications.js"></script>'
-          new='<script type="module" src="./notifications-v2.js?v=2"></script>'
-          s=s.replace(old,new)
-          if new not in s:
-              s=s.replace('</body>', f'{new}\n</body>')
-          p.write_text(s, encoding='utf-8')
+          import re
+          tag='<script src="./notifications-v3.js?v=3"></script>'
+          s=re.sub(r'<script type="module" src="\./notifications(?:-v2)?\.js(?:\?v=\d+)?"></script>',tag,s)
+          if tag not in s:
+              s=s.replace('</body>',f'{tag}\n</body>')
+          p.write_text(s,encoding='utf-8')
           PY
       - name: Commit
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add index.html
-          git diff --cached --quiet || git commit -m "Connect musician app to reliable notifications"
+          git diff --cached --quiet || git commit -m "Use reliable musician notifications sync"
           git push
