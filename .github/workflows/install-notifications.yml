@@ -13,6 +13,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Sync with latest main before generating bridge
+        run: |
+          git fetch origin main
+          git reset --hard origin/main
 
       - name: Inject PWA and musician realtime bridges
         run: |
@@ -77,4 +84,49 @@ jobs:
             exit 0
           fi
           git commit -m "fix: update musician realtime bridges"
-          git push || (git pull --rebase origin main && git push)
+          for attempt in 1 2 3; do
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+            echo "Push conflict on attempt $attempt; syncing with latest main and regenerating..."
+            git fetch origin main
+            git reset --hard origin/main
+            python - <<'PY'
+          from pathlib import Path
+          import re
+          import os
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          s = re.sub(r'\s*<link[^>]+rel=["\']manifest["\'][^>]*>', '', s, flags=re.I)
+          s = re.sub(r'\s*<script>\s*if\s*\(\s*["\']serviceWorker["\']\s+in\s+navigator\s*\)[\s\S]*?</script>', '', s, flags=re.I)
+          s = s.replace('</head>', '  <link rel="manifest" href="./manifest.json" />\n</head>', 1)
+          pwa_registration = '''<script>
+          if ("serviceWorker" in navigator) {
+            window.addEventListener("load", () => {
+              navigator.serviceWorker.register("./sw.js", { scope: "./" }).catch((error) => {
+                console.warn("HAVANA NICE service worker registration failed:", error);
+              });
+            });
+          }
+          </script>
+          '''
+          s = re.sub(r'\s*<script>\s*if\s*\(\s*["\']serviceWorker["\']', '', s) if False else s
+          s = s.replace('</body>', pwa_registration + '</body>', 1)
+          s = re.sub(r'\s*<script(?: type="module")? src="\./notifications-v(?:2|3|4)\.js(?:\?v=[^"\']+)?"></script>', '', s)
+          s = re.sub(r'\s*<script src="\./repertoire-v1\.js(?:\?v=[^"\']+)?"></script>', '', s)
+          s = re.sub(r'^\s*window\.hnSupabase\s*=\s*supabase;\s*$', '', s, flags=re.M)
+          marker = '  restoreSession();'
+          bridge = '  restoreSession();\n\n  // Bridge the existing Supabase client to the isolated musician realtime clients.\n  window.hnSupabase = supabase;'
+          if marker not in s:
+              raise SystemExit('Could not find restoreSession() marker during retry')
+          s = s.replace(marker, bridge, 1)
+          sha = os.environ.get('GITHUB_SHA', '4')
+          tags = f'<script src="./notifications-v4.js?v={sha}"></script>\n<script src="./repertoire-v1.js?v={sha}"></script>\n'
+          s = s.replace('</body>', tags + '</body>', 1)
+          p.write_text(s, encoding='utf-8')
+          PY
+            git add index.html
+            git commit -m "fix: update musician realtime bridges" || true
+          done
+          echo "Could not publish generated bridge after 3 attempts."
+          exit 1
