@@ -52,8 +52,8 @@
   function findNotificationModule() {
     if (notificationModule && document.body.contains(notificationModule)) return notificationModule;
     notificationModule = null;
-    var modules = document.querySelectorAll('.module');
-    for (var i = 0; i < modules.length; i++) {
+    for (var i = 0; i < document.querySelectorAll('.module').length; i++) {
+      var modules = document.querySelectorAll('.module');
       var title = modules[i].querySelector('.module-title');
       if (title && title.textContent.trim().toUpperCase() === 'NOTIFICACIONES') {
         notificationModule = modules[i];
@@ -72,9 +72,7 @@
       notificationSubtitle.classList.remove('hn-notify-new');
       return;
     }
-    notificationSubtitle.textContent = notifications.length === 1
-      ? '1 notificación'
-      : notifications.length + ' notificaciones';
+    notificationSubtitle.textContent = notifications.length === 1 ? '1 notificación' : notifications.length + ' notificaciones';
   }
 
   function setAppBadge(value) {
@@ -83,9 +81,7 @@
         navigator.clearAppBadge();
         return;
       }
-      if (typeof navigator.setAppBadge === 'function') {
-        navigator.setAppBadge(value > 0 ? value : 0);
-      }
+      if (typeof navigator.setAppBadge === 'function') navigator.setAppBadge(value > 0 ? value : 0);
     } catch (_) {}
   }
 
@@ -113,9 +109,7 @@
   }
 
   function saveCache() {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(notifications.slice(0, 50)));
-    } catch (_) {}
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(notifications.slice(0, 50))); } catch (_) {}
   }
 
   function loadCache() {
@@ -131,9 +125,7 @@
         seenIds.add(item.id);
         notifications.push(item);
       });
-      notifications.sort(function (a, b) {
-        return new Date(b.created_at || 0) - new Date(a.created_at || 0);
-      });
+      notifications.sort(function (a, b) { return new Date(b.created_at || 0) - new Date(a.created_at || 0); });
       updateModule();
     } catch (_) {}
   }
@@ -170,8 +162,16 @@
       event.preventDefault();
       event.stopPropagation();
       clearAppBadge();
-      var originalBack = document.getElementById('backButton');
-      if (originalBack) originalBack.click();
+
+      // Return directly to the app Home. Do not use browser history.
+      var screen = document.getElementById('moduleScreen');
+      var home = document.getElementById('homeScreen');
+      var login = document.getElementById('loginScreen');
+      var repertoire = document.getElementById('repertoireScreen');
+      if (screen) screen.classList.remove('is-active');
+      if (repertoire) repertoire.classList.remove('is-active');
+      if (login) login.classList.remove('is-active');
+      if (home) home.classList.add('is-active');
     });
     inner.appendChild(back);
   }
@@ -203,9 +203,7 @@
   }
 
   function playClickSoundIfAvailable() {
-    try {
-      if (typeof window.playClickSound === 'function') window.playClickSound();
-    } catch (_) {}
+    try { if (typeof window.playClickSound === 'function') window.playClickSound(); } catch (_) {}
   }
 
   function mergeItems(items, showFlash, showBadge) {
@@ -218,37 +216,26 @@
     });
     if (!added.length) return false;
     notifications = notifications.concat(added);
-    notifications.sort(function (a, b) {
-      return new Date(b.created_at || 0) - new Date(a.created_at || 0);
-    });
+    notifications.sort(function (a, b) { return new Date(b.created_at || 0) - new Date(a.created_at || 0); });
     notifications = notifications.slice(0, 50);
     saveCache();
     updateModule();
     if (showFlash) flashModule();
-    if (showBadge) {
-      var badgeCount = Math.min(99, added.length);
-      setAppBadge(badgeCount);
-    }
+    if (showBadge) setAppBadge(Math.min(99, added.length));
     return true;
   }
 
   async function syncRecent(showFlash, showBadge) {
     if (!client || !isLoggedIn()) return;
     try {
-      var result = await client
-        .from('notifications')
-        .select('id,title,message,created_at')
-        .order('created_at', { ascending: false })
-        .limit(50);
+      var result = await client.from('notifications').select('id,title,message,created_at').order('created_at', { ascending: false }).limit(50);
       if (result.error) {
         console.error('[HN-Notifications] sync error:', result.error);
         return;
       }
       mergeItems(result.data || [], !!showFlash, !!showBadge);
       bindModule();
-    } catch (error) {
-      console.error('[HN-Notifications] sync exception:', error);
-    }
+    } catch (error) { console.error('[HN-Notifications] sync exception:', error); }
   }
 
   function startPolling() {
@@ -273,23 +260,17 @@
       try { client.removeChannel(channel); } catch (_) {}
       channel = null;
     }
-
-    channel = client
-      .channel('hn_realtime_notifications')
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'notifications'
-      }, function (payload) {
-        if (!isLoggedIn() || !payload || !payload.new) return;
-        mergeItems([payload.new], true, true);
-      })
-      .subscribe(function (status, error) {
-        console.log('[HN-Notifications] Realtime:', status);
-        if (error) console.error('[HN-Notifications] Realtime error:', error);
-        if (status === 'SUBSCRIBED') syncRecent(false, false);
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') scheduleReconnect();
-      });
+    channel = client.channel('hn_realtime_notifications').on('postgres_changes', {
+      event: 'INSERT', schema: 'public', table: 'notifications'
+    }, function (payload) {
+      if (!isLoggedIn() || !payload || !payload.new) return;
+      mergeItems([payload.new], true, true);
+    }).subscribe(function (status, error) {
+      console.log('[HN-Notifications] Realtime:', status);
+      if (error) console.error('[HN-Notifications] Realtime error:', error);
+      if (status === 'SUBSCRIBED') syncRecent(false, false);
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') scheduleReconnect();
+    });
   }
 
   function ensureRealtime() {
@@ -298,13 +279,8 @@
   }
 
   function stop() {
-    if (reconnectTimer) {
-      clearTimeout(reconnectTimer);
-      reconnectTimer = null;
-    }
-    if (channel && client) {
-      try { client.removeChannel(channel); } catch (_) {}
-    }
+    if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+    if (channel && client) { try { client.removeChannel(channel); } catch (_) {} }
     channel = null;
     started = false;
     notifications = [];
@@ -363,9 +339,6 @@
     setupLifecycle();
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init, { once: true });
-  } else {
-    init();
-  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
+  else init();
 })();
