@@ -2691,8 +2691,10 @@
 
   restoreSession();
 
-  // Bridge the existing Supabase client to the isolated notifications client.
+  // Bridge the existing Supabase client to the isolated musician realtime clients.
   window.hnSupabase = supabase;
+
+  // Bridge the existing Supabase client to the isolated notifications client.
 
   // Bridge the existing Supabase client to the isolated notifications client.
 
@@ -2726,6 +2728,7 @@ if ("serviceWorker" in navigator) {
   });
 }
 </script>
-<script src="./notifications-v4.js?v=8ed249f6b393c3d5a85ed09daee965343106c8f6"></script>
+<script src="./notifications-v4.js?v=61131bab11ce6c52bbb2a4fd54d9a04cceafb354"></script>
+<script src="./repertoire-v1.js?v=61131bab11ce6c52bbb2a4fd54d9a04cceafb354"></script>
 </body>
 </html>
