@@ -17,11 +17,11 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
+          import re
           p=Path('index.html')
           s=p.read_text(encoding='utf-8')
-          import re
-          tag='<script src="./notifications-v3.js?v=3"></script>'
-          s=re.sub(r'<script type="module" src="\./notifications(?:-v2)?\.js(?:\?v=\d+)?"></script>',tag,s)
+          tag='<script src="./notifications-v4.js?v=4"></script>'
+          s=re.sub(r'<script(?: type="module")? src="\./notifications(?:-v2|-v3|-v4)?\.js(?:\?v=\d+)?"></script>',tag,s)
           if tag not in s:
               s=s.replace('</body>',f'{tag}\n</body>')
           p.write_text(s,encoding='utf-8')
@@ -31,5 +31,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add index.html
-          git diff --cached --quiet || git commit -m "Use reliable musician notifications sync"
+          git diff --cached --quiet || git commit -m "Use robust musician notifications client"
           git push
