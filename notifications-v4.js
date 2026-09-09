@@ -8,15 +8,16 @@
   var sessionPollTimer = null;
   var notifications = [];
   var seenIds = new Set();
+  var notificationButton = null;
+  var notificationSubtitle = null;
+  var notificationModule = null;
 
   function isLoggedIn() {
     return !!sessionStorage.getItem('hn_profile');
   }
 
   function getClient() {
-    if (window.hnSupabase && typeof window.hnSupabase.channel === 'function') {
-      return window.hnSupabase;
-    }
+    if (window.hnSupabase && typeof window.hnSupabase.channel === 'function') return window.hnSupabase;
     return null;
   }
 
@@ -24,7 +25,18 @@
     if (document.getElementById('hnNotifyStyle')) return;
     var style = document.createElement('style');
     style.id = 'hnNotifyStyle';
-    style.textContent = '#hnNotificationsRoot{position:fixed;right:18px;top:74px;z-index:99999;font-family:Arial,sans-serif}#hnNotifyButton{width:46px;height:46px;border:1px solid rgba(229,189,98,.72);background:rgba(0,0,0,.82);color:#fff1a8;border-radius:50%;font-size:20px;position:relative;cursor:pointer;box-shadow:0 8px 30px rgba(0,0,0,.35)}#hnNotifyCount{position:absolute;right:-3px;top:-4px;min-width:17px;height:17px;padding:0 4px;border-radius:10px;background:#e5bd62;color:#020302;font:700 9px/17px Arial;text-align:center;display:none}#hnNotifyPanel{position:fixed;right:18px;top:132px;width:min(350px,calc(100vw - 36px));max-height:65vh;overflow:auto;border:1px solid rgba(229,189,98,.65);background:rgba(2,3,2,.97);display:none;box-shadow:0 18px 60px rgba(0,0,0,.55)}#hnNotifyPanel.open{display:block}.hn-n-head{padding:18px;border-bottom:1px solid rgba(229,189,98,.22);font:14px Georgia,serif;letter-spacing:.18em;color:#fff1a8;text-transform:uppercase}.hn-n-item{padding:17px 18px;border-bottom:1px solid rgba(255,255,255,.08)}.hn-n-title{color:#f4f1e8;font-size:12px;letter-spacing:.12em;text-transform:uppercase}.hn-n-message{margin-top:8px;color:rgba(244,241,232,.72);font-size:12px;line-height:1.5}.hn-n-date{margin-top:9px;color:rgba(244,241,232,.36);font-size:8px;letter-spacing:.12em;text-transform:uppercase}.hn-n-empty{padding:24px 18px;color:rgba(244,241,232,.42);font-size:10px;letter-spacing:.12em;text-transform:uppercase;text-align:center}#hnNotifyToasts{position:fixed;right:18px;top:132px;z-index:100000;display:flex;flex-direction:column;gap:10px;pointer-events:none;width:min(350px,calc(100vw - 36px))}.hn-n-toast{pointer-events:auto;border:1px solid rgba(229,189,98,.72);background:rgba(2,3,2,.97);box-shadow:0 12px 40px rgba(0,0,0,.55);padding:14px 16px;color:#f4f1e8;transform:translateY(-8px);opacity:0;transition:opacity .25s ease,transform .25s ease}.hn-n-toast.show{opacity:1;transform:translateY(0)}.hn-n-toast-title{color:#fff1a8;font:12px Arial,sans-serif;letter-spacing:.12em;text-transform:uppercase}.hn-n-toast-message{margin-top:7px;color:rgba(244,241,232,.78);font:12px/1.45 Arial,sans-serif}';
+    style.textContent = [
+      '.hn-notify-flash{animation:hnNotifyFlash 1.2s ease-in-out 0s 2}',
+      '@keyframes hnNotifyFlash{0%,100%{box-shadow:0 0 0 rgba(229,189,98,0)}50%{box-shadow:0 0 28px rgba(229,189,98,.5),inset 0 0 20px rgba(229,189,98,.08)}}',
+      '.hn-notify-new{color:#fff1a8!important;opacity:1!important}',
+      '.hn-notify-screen .hn-n-head{margin-top:24px;padding:0 0 18px;border-bottom:1px solid rgba(229,189,98,.25);font:14px Georgia,serif;letter-spacing:.18em;color:#fff1a8;text-transform:uppercase}',
+      '.hn-notify-screen .hn-n-item{padding:19px 0;border-bottom:1px solid rgba(255,255,255,.09)}',
+      '.hn-notify-screen .hn-n-title{color:#f4f1e8;font-size:12px;letter-spacing:.12em;text-transform:uppercase}',
+      '.hn-notify-screen .hn-n-message{margin-top:9px;color:rgba(244,241,232,.78);font-size:13px;line-height:1.55}',
+      '.hn-notify-screen .hn-n-date{margin-top:9px;color:rgba(244,241,232,.38);font-size:8px;letter-spacing:.12em;text-transform:uppercase}',
+      '.hn-notify-screen .hn-n-empty{padding:34px 0;color:rgba(244,241,232,.42);font-size:10px;letter-spacing:.12em;text-transform:uppercase;text-align:center}',
+      '.hn-notify-screen .hn-n-back{margin-top:28px}'
+    ].join('');
     document.head.appendChild(style);
   }
 
@@ -35,145 +47,152 @@
     return node;
   }
 
-  function buildUI() {
-    if (document.getElementById('hnNotificationsRoot')) return;
-    addStyle();
-
-    var root = makeElement('div');
-    root.id = 'hnNotificationsRoot';
-    root.style.display = 'none';
-
-    var button = makeElement('button');
-    button.id = 'hnNotifyButton';
-    button.type = 'button';
-    button.setAttribute('aria-label', 'Notifications');
-    button.textContent = '♢';
-
-    var count = makeElement('span');
-    count.id = 'hnNotifyCount';
-    button.appendChild(count);
-
-    var panel = makeElement('div');
-    panel.id = 'hnNotifyPanel';
-
-    var header = makeElement('div', 'hn-n-head', 'Notifications');
-    var list = makeElement('div');
-    list.id = 'hnNotifyList';
-    list.appendChild(makeElement('div', 'hn-n-empty', 'No notifications'));
-
-    panel.appendChild(header);
-    panel.appendChild(list);
-
-    var toasts = makeElement('div');
-    toasts.id = 'hnNotifyToasts';
-
-    root.appendChild(button);
-    root.appendChild(panel);
-    document.body.appendChild(root);
-    document.body.appendChild(toasts);
-
-    button.addEventListener('click', function () {
-      panel.classList.toggle('open');
-      if (panel.classList.contains('open')) {
-        count.style.display = 'none';
+  function findNotificationModule() {
+    if (notificationModule) return notificationModule;
+    var modules = document.querySelectorAll('.module');
+    for (var i = 0; i < modules.length; i++) {
+      var title = modules[i].querySelector('.module-title');
+      if (title && title.textContent.trim().toUpperCase() === 'NOTIFICACIONES') {
+        notificationModule = modules[i];
+        notificationButton = modules[i];
+        notificationSubtitle = modules[i].querySelector('.module-subtitle');
+        break;
       }
-    });
-  }
-
-  function showRoot(visible) {
-    var root = document.getElementById('hnNotificationsRoot');
-    if (root) root.style.display = visible ? 'block' : 'none';
-    if (!visible) {
-      var panel = document.getElementById('hnNotifyPanel');
-      if (panel) panel.classList.remove('open');
-      var count = document.getElementById('hnNotifyCount');
-      if (count) count.style.display = 'none';
     }
+    return notificationModule;
   }
 
-  function render() {
-    var list = document.getElementById('hnNotifyList');
-    var count = document.getElementById('hnNotifyCount');
-    if (!list || !count) return;
+  function updateModule() {
+    findNotificationModule();
+    if (!notificationSubtitle) return;
+    if (!notifications.length) {
+      notificationSubtitle.textContent = 'Sin notificaciones';
+      notificationSubtitle.classList.remove('hn-notify-new');
+      return;
+    }
+    notificationSubtitle.textContent = notifications.length === 1
+      ? '1 notificación'
+      : notifications.length + ' notificaciones';
+  }
 
-    list.innerHTML = '';
-    count.textContent = notifications.length > 99 ? '99+' : String(notifications.length);
-    count.style.display = notifications.length ? 'block' : 'none';
+  function flashModule() {
+    findNotificationModule();
+    if (!notificationModule) return;
+    notificationModule.classList.remove('hn-notify-flash');
+    void notificationModule.offsetWidth;
+    notificationModule.classList.add('hn-notify-flash');
+    if (notificationSubtitle) {
+      notificationSubtitle.textContent = 'NUEVA NOTIFICACIÓN';
+      notificationSubtitle.classList.add('hn-notify-new');
+    }
+    setTimeout(function () {
+      if (notificationSubtitle) notificationSubtitle.classList.remove('hn-notify-new');
+      updateModule();
+    }, 3200);
+  }
+
+  function renderNotificationScreen() {
+    var screen = document.getElementById('moduleScreen');
+    if (!screen) return;
+    var inner = screen.querySelector('.screen-inner');
+    if (!inner) return;
+
+    inner.className = 'screen-inner coming-screen hn-notify-screen';
+    inner.innerHTML = '';
+
+    var brand = makeElement('p', 'brand metallic-gold', 'HAVANA NICE');
+    var line = makeElement('div', 'brand-line');
+    var head = makeElement('div', 'hn-n-head', 'Notifications');
+    var list = makeElement('div');
 
     if (!notifications.length) {
       list.appendChild(makeElement('div', 'hn-n-empty', 'No notifications'));
-      return;
+    } else {
+      notifications.forEach(function (item) {
+        var article = makeElement('article', 'hn-n-item');
+        article.appendChild(makeElement('div', 'hn-n-title', String(item.title || 'Notification')));
+        article.appendChild(makeElement('div', 'hn-n-message', String(item.message || '')));
+        article.appendChild(makeElement('div', 'hn-n-date', item.created_at ? new Date(item.created_at).toLocaleString() : ''));
+        list.appendChild(article);
+      });
     }
 
-    notifications.forEach(function (item) {
-      var article = makeElement('article', 'hn-n-item');
-      article.appendChild(makeElement('div', 'hn-n-title', String(item.title || 'Notification')));
-      article.appendChild(makeElement('div', 'hn-n-message', String(item.message || '')));
-      article.appendChild(makeElement('div', 'hn-n-date', item.created_at ? new Date(item.created_at).toLocaleString() : ''));
-      list.appendChild(article);
+    var back = makeElement('button', 'back-button hn-n-back', 'Volver');
+    back.type = 'button';
+    back.addEventListener('click', function () {
+      var originalBack = document.getElementById('backButton');
+      if (originalBack) originalBack.click();
     });
+
+    inner.appendChild(brand);
+    inner.appendChild(line);
+    inner.appendChild(head);
+    inner.appendChild(list);
+    inner.appendChild(back);
   }
 
-  function mergeItems(items, showNewToast) {
+  function openNotifications() {
+    if (!isLoggedIn()) return;
+    renderNotificationScreen();
+    var originalBack = document.getElementById('backButton');
+    var screen = document.getElementById('moduleScreen');
+    var home = document.getElementById('homeScreen');
+    if (home) home.classList.remove('active');
+    if (screen) screen.classList.add('active');
+    if (originalBack) originalBack.dataset.hnNotifications = 'true';
+  }
+
+  function bindModule() {
+    findNotificationModule();
+    if (!notificationButton || notificationButton.dataset.hnNotifyBound === 'true') return;
+    notificationButton.dataset.hnNotifyBound = 'true';
+    notificationButton.addEventListener('click', function (event) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      playClickSoundIfAvailable();
+      openNotifications();
+    }, true);
+  }
+
+  function playClickSoundIfAvailable() {
+    try {
+      if (typeof window.playClickSound === 'function') window.playClickSound();
+    } catch (_) {}
+  }
+
+  function mergeItems(items, showFlash) {
     if (!Array.isArray(items)) return;
     var added = [];
-
     items.forEach(function (item) {
       if (!item || !item.id || seenIds.has(item.id)) return;
       seenIds.add(item.id);
       added.push(item);
     });
-
     if (!added.length) return;
-
     notifications = notifications.concat(added);
     notifications.sort(function (a, b) {
       return new Date(b.created_at || 0) - new Date(a.created_at || 0);
     });
-    render();
-
-    if (showNewToast) {
-      added.sort(function (a, b) {
-        return new Date(a.created_at || 0) - new Date(b.created_at || 0);
-      }).forEach(showToast);
-    }
-  }
-
-  function showToast(item) {
-    var container = document.getElementById('hnNotifyToasts');
-    if (!container) return;
-
-    var toast = makeElement('div', 'hn-n-toast');
-    toast.appendChild(makeElement('div', 'hn-n-toast-title', '🔔 ' + String(item.title || 'Notification')));
-    toast.appendChild(makeElement('div', 'hn-n-toast-message', String(item.message || '')));
-    container.appendChild(toast);
-
-    requestAnimationFrame(function () { toast.classList.add('show'); });
-
-    setTimeout(function () {
-      toast.classList.remove('show');
-      setTimeout(function () { toast.remove(); }, 300);
-    }, 8000);
+    updateModule();
+    if (showFlash) flashModule();
   }
 
   async function syncRecent() {
     if (!client || !isLoggedIn()) return;
-
     try {
       var result = await client
         .from('notifications')
         .select('id,title,message,created_at')
         .order('created_at', { ascending: false })
         .limit(50);
-
       if (result.error) {
-        console.error('[HN-Notifications] REST sync error:', result.error);
+        console.error('[HN-Notifications] sync error:', result.error);
         return;
       }
-
       mergeItems(result.data || [], false);
+      bindModule();
     } catch (error) {
-      console.error('[HN-Notifications] REST sync exception:', error);
+      console.error('[HN-Notifications] sync exception:', error);
     }
   }
 
@@ -187,9 +206,7 @@
 
   function subscribe() {
     if (!client || !isLoggedIn()) return;
-
     if (channel && (channel.state === 'joined' || channel.state === 'joining')) return;
-
     if (channel) {
       try { client.removeChannel(channel); } catch (_) {}
       channel = null;
@@ -208,11 +225,8 @@
       .subscribe(function (status, error) {
         console.log('[HN-Notifications] Realtime:', status);
         if (error) console.error('[HN-Notifications] Realtime error:', error);
-        if (status === 'SUBSCRIBED') {
-          syncRecent();
-        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-          scheduleReconnect();
-        }
+        if (status === 'SUBSCRIBED') syncRecent();
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') scheduleReconnect();
       });
   }
 
@@ -233,8 +247,7 @@
     started = false;
     notifications = [];
     seenIds.clear();
-    render();
-    showRoot(false);
+    updateModule();
   }
 
   async function start() {
@@ -242,19 +255,15 @@
       if (started) stop();
       return;
     }
-
     var nextClient = getClient();
     if (!nextClient) return;
-
     client = nextClient;
-    buildUI();
-    showRoot(true);
-
+    addStyle();
+    bindModule();
     if (!started) {
       started = true;
       await syncRecent();
     }
-
     ensureRealtime();
   }
 
@@ -273,7 +282,6 @@
         ensureRealtime();
       }
     });
-
     window.addEventListener('online', function () {
       if (isLoggedIn()) {
         syncRecent();
@@ -283,7 +291,8 @@
   }
 
   function init() {
-    buildUI();
+    addStyle();
+    bindModule();
     start();
     watchSession();
     setupLifecycle();
