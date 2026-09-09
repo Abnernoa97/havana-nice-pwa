@@ -10,6 +10,7 @@
   var module = null;
   var subtitle = null;
   var badge = null;
+  var seenKey = 'hn_repertoire_seen_v1';
 
   function isLoggedIn() {
     return !!sessionStorage.getItem('hn_profile');
@@ -24,6 +25,28 @@
     var node = document.createElement('div');
     node.textContent = String(value == null ? '' : value);
     return node.innerHTML;
+  }
+
+  function getSeenIds() {
+    try {
+      var raw = localStorage.getItem(seenKey);
+      var list = raw ? JSON.parse(raw) : [];
+      return Array.isArray(list) ? list : [];
+    } catch (_) { return []; }
+  }
+
+  function setSeenIds(ids) {
+    try { localStorage.setItem(seenKey, JSON.stringify(ids)); } catch (_) {}
+  }
+
+  function markAllSeen() {
+    setSeenIds(songs.map(function (song) { return String(song.id); }));
+    updateModule();
+  }
+
+  function getUnseenSongs() {
+    var seen = getSeenIds();
+    return songs.filter(function (song) { return seen.indexOf(String(song.id)) === -1; });
   }
 
   function addStyle() {
@@ -69,7 +92,7 @@
         badge = module.querySelector('.hn-rep-badge');
         if (!badge) {
           badge = makeElement('span', 'hn-rep-badge');
-          badge.setAttribute('aria-label', 'Canciones en repertorio');
+          badge.setAttribute('aria-label', 'Nuevas canciones en repertorio');
           module.appendChild(badge);
         }
         break;
@@ -80,10 +103,11 @@
 
   function updateModule() {
     findModule();
-    if (subtitle) subtitle.textContent = songs.length ? (songs.length === 1 ? '1 canción' : songs.length + ' canciones') : 'Sin canciones';
+    if (subtitle) subtitle.textContent = 'Ver repertorio';
+    var unseen = getUnseenSongs();
     if (badge) {
-      badge.textContent = songs.length > 99 ? '99+' : String(songs.length);
-      badge.classList.toggle('hn-rep-badge-visible', songs.length > 0);
+      badge.textContent = unseen.length > 99 ? '99+' : String(unseen.length);
+      badge.classList.toggle('hn-rep-badge-visible', unseen.length > 0);
     }
   }
 
@@ -94,7 +118,7 @@
     void module.offsetWidth;
     module.classList.add('hn-rep-flash');
     if (subtitle) {
-      subtitle.textContent = 'REPERTORIO ACTUALIZADO';
+      subtitle.textContent = 'NUEVA CANCIÓN';
       subtitle.style.color = '#fff1a8';
       setTimeout(function () {
         if (subtitle) subtitle.style.color = '';
@@ -176,6 +200,7 @@
   function openRepertoire() {
     if (!isLoggedIn()) return;
     render();
+    markAllSeen();
     var screen = document.getElementById('moduleScreen');
     var home = document.getElementById('homeScreen');
     var login = document.getElementById('loginScreen');
@@ -204,13 +229,21 @@
       var result = await client.from('repertoire_songs').select('id,title,artist,category,position,active,updated_at').eq('active', true).order('position', { ascending: true }).order('title', { ascending: true });
       if (result.error) { console.error('[HN-Repertoire] sync error:', result.error); return; }
       var next = result.data || [];
+      var previousIds = songs.map(function (song) { return String(song.id); });
       var changed = JSON.stringify(next) !== JSON.stringify(songs);
+      var newSongs = next.filter(function (song) { return previousIds.indexOf(String(song.id)) === -1; });
       songs = next;
-      updateModule();
+
+      if (!getSeenIds().length && next.length && previousIds.length === 0) {
+        markAllSeen();
+      } else {
+        updateModule();
+      }
+
       if (changed) {
         var screen = document.getElementById('moduleScreen');
         if (screen && screen.classList.contains('is-active') && screen.querySelector('.hn-rep-screen')) render();
-        if (showFlash) flashModule();
+        if (showFlash && newSongs.length) flashModule();
       }
     } catch (error) { console.error('[HN-Repertoire] sync exception:', error); }
   }
