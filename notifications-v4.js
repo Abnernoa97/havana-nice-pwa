@@ -1,210 +1,418 @@
 (function () {
   'use strict';
 
-  // Notification runtime is intentionally isolated from the musician login flow.
-  // It uses the existing Supabase client exposed by index.html as window.hnSupabase.
-  var CACHE_KEY = 'hn_notifications_cache_v1';
-  var MAX_ITEMS = 50;
-  var items = [];
-  var unread = 0;
-  var pollTimer = null;
-  var realtimeChannel = null;
+  var client = null;
+  var channel = null;
+  var started = false;
+  var reconnectTimer = null;
+  var sessionPollTimer = null;
+  var notificationPollTimer = null;
+  var notifications = [];
+  var seenIds = new Set();
+  var readIds = new Set();
+  var notificationModule = null;
+  var notificationSubtitle = null;
+  var STORAGE_KEY = 'hn_notifications_cache_v1';
+  var READ_STORAGE_KEY = 'hn_notifications_read_v1';
 
-  function client() {
-    return window.hnSupabase || null;
+  function isLoggedIn() {
+    return !!sessionStorage.getItem('hn_profile');
   }
 
-  function safeParse(value, fallback) {
-    try { return JSON.parse(value); } catch (_) { return fallback; }
-  }
-
-  function loadCache() {
-    var raw = localStorage.getItem(CACHE_KEY);
-    var cached = raw ? safeParse(raw, []) : [];
-    if (!Array.isArray(cached)) cached = [];
-    items = cached.filter(function (x) { return x && x.id; }).slice(0, MAX_ITEMS);
-    items.sort(function (a, b) { return new Date(b.created_at) - new Date(a.created_at); });
-  }
-
-  function saveCache() {
-    try { localStorage.setItem(CACHE_KEY, JSON.stringify(items.slice(0, MAX_ITEMS))); } catch (_) {}
-  }
-
-  function esc(value) {
-    return String(value == null ? '' : value).replace(/[&<>'"]/g, function (c) {
-      return ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' })[c];
-    });
-  }
-
-  function mergeItems(incoming, markUnread) {
-    var changed = false;
-    (incoming || []).forEach(function (n) {
-      if (!n || !n.id) return;
-      var exists = items.some(function (x) { return x.id === n.id; });
-      if (!exists) {
-        items.push(n);
-        changed = true;
-        if (markUnread) unread += 1;
-      }
-    });
-    items.sort(function (a, b) { return new Date(b.created_at) - new Date(a.created_at); });
-    items = items.slice(0, MAX_ITEMS);
-    if (changed) saveCache();
-    renderList();
-    updateBadge();
-    if (changed && markUnread) flashModule();
-  }
-
-  function updateBadge() {
-    try {
-      if (unread > 0 && 'setAppBadge' in navigator) navigator.setAppBadge(unread);
-      else if (unread === 0 && 'clearAppBadge' in navigator) navigator.clearAppBadge();
-    } catch (_) {}
-  }
-
-  function findModule() {
-    var modules = document.querySelectorAll('.module');
-    for (var i = 0; i < modules.length; i++) {
-      var text = (modules[i].textContent || '').toUpperCase();
-      if (text.indexOf('NOTIFICACIONES') !== -1) return modules[i];
-    }
+  function getClient() {
+    if (window.hnSupabase && typeof window.hnSupabase.channel === 'function') return window.hnSupabase;
     return null;
   }
 
-  function flashModule() {
-    var module = findModule();
-    if (!module) return;
-    module.classList.remove('hn-notify-flash');
-    void module.offsetWidth;
-    module.classList.add('hn-notify-flash');
-    var sub = module.querySelector('.module-sub');
-    if (sub) {
-      var original = sub.getAttribute('data-hn-original') || sub.textContent;
-      sub.setAttribute('data-hn-original', original);
-      sub.textContent = 'NUEVA NOTIFICACIÓN';
-      setTimeout(function () {
-        if (sub) sub.textContent = original;
-      }, 3500);
-    }
-  }
-
-  function renderList() {
-    var screen = document.querySelector('.hn-notify-screen');
-    if (!screen) return;
-    var list = screen.querySelector('.hn-notify-list');
-    if (!list) return;
-    list.innerHTML = items.length ? items.map(function (n) {
-      return '<article class="hn-notify-item">' +
-        '<div class="hn-notify-title">' + esc(n.title) + '</div>' +
-        '<div class="hn-notify-message">' + esc(n.message) + '</div>' +
-        '<div class="hn-notify-date">' + esc(new Date(n.created_at).toLocaleString()) + '</div>' +
-      '</article>';
-    }).join('') : '<div class="hn-notify-empty">NO HAY NOTIFICACIONES</div>';
-  }
-
-  function ensureStyles() {
-    if (document.getElementById('hn-notify-runtime-style')) return;
+  function addStyle() {
+    if (document.getElementById('hnNotifyStyle')) return;
     var style = document.createElement('style');
-    style.id = 'hn-notify-runtime-style';
-    style.textContent =
-      '.hn-notify-screen{position:fixed;inset:0;z-index:9999;background:#020403;overflow:auto;padding:90px 20px 40px}' +
-      '.hn-notify-list{max-width:720px;margin:0 auto}' +
-      '.hn-notify-item{border-top:1px solid rgba(229,189,98,.35);padding:18px 0}' +
-      '.hn-notify-title{font:20px Georgia,serif;color:#fff1a8;margin-bottom:8px}' +
-      '.hn-notify-message{color:#f4f1e8;line-height:1.5;white-space:pre-wrap}' +
-      '.hn-notify-date{font-size:10px;color:#9b9b96;margin-top:8px}' +
-      '.hn-notify-empty{color:#777;text-align:center;padding:40px 0;font-size:10px;letter-spacing:.15em}' +
-      '.hn-n-back{position:fixed;top:25px;left:20px;z-index:10000;border:1px solid rgba(229,189,98,.45);background:#050605;color:#fff1a8;padding:11px 15px;font-size:10px;letter-spacing:.12em;text-transform:uppercase}' +
-      '.hn-notify-flash{animation:hnNotifyFlash .9s ease-in-out 2}' +
-      '@keyframes hnNotifyFlash{0%,100%{transform:scale(1);filter:none}50%{transform:scale(1.018);filter:brightness(1.45);box-shadow:0 0 28px rgba(229,189,98,.42)}}';
+    style.id = 'hnNotifyStyle';
+    style.textContent = [
+      '.hn-notify-flash{animation:hnNotifyFlash 1.2s ease-in-out 0s 2}',
+      '@keyframes hnNotifyFlash{0%,100%{box-shadow:0 0 0 rgba(229,189,98,0)}50%{box-shadow:0 0 28px rgba(229,189,98,.5),inset 0 0 20px rgba(229,189,98,.08)}}',
+      '.hn-notify-new{color:#fff1a8!important;opacity:1!important}',
+      '.hn-notify-screen{height:100%!important;max-height:100%;overflow-y:auto!important;overflow-x:hidden!important;-webkit-overflow-scrolling:touch!important;box-sizing:border-box;padding-bottom:110px!important}',
+      '.hn-notify-screen .hn-n-head{margin-top:24px;padding:0 0 18px;border-bottom:1px solid rgba(229,189,98,.25);font:14px Georgia,serif;letter-spacing:.18em;color:#fff1a8;text-transform:uppercase}',
+      '.hn-notify-screen .hn-n-item{padding:19px 0;border-bottom:1px solid rgba(255,255,255,.09);border-left:2px solid transparent;padding-left:12px;margin-left:-14px;transition:background .25s ease,border-color .25s ease}',
+      '.hn-notify-screen .hn-n-item.hn-n-unread{border-left-color:#e5bd62;background:linear-gradient(90deg,rgba(229,189,98,.10),transparent 75%)}',
+      '.hn-notify-screen .hn-n-item.hn-n-unread .hn-n-title{text-decoration:underline;text-decoration-color:#e5bd62;text-decoration-thickness:1px;text-underline-offset:5px}',
+      '.hn-notify-screen .hn-n-item.hn-n-unread .hn-n-date{color:rgba(229,189,98,.72)}',
+      '.hn-notify-screen .hn-n-title{color:#f4f1e8;font-size:12px;letter-spacing:.12em;text-transform:uppercase}',
+      '.hn-notify-screen .hn-n-message{margin-top:9px;color:rgba(244,241,232,.78);font-size:13px;line-height:1.55}',
+      '.hn-notify-screen .hn-n-date{margin-top:9px;color:rgba(244,241,232,.38);font-size:8px;letter-spacing:.12em;text-transform:uppercase}',
+      '.hn-notify-screen .hn-n-empty{padding:34px 0;color:rgba(244,241,232,.42);font-size:10px;letter-spacing:.12em;text-transform:uppercase;text-align:center}',
+      '.hn-notify-screen .hn-n-back{display:block;margin:28px 0 20px;position:relative;z-index:5;pointer-events:auto}'
+    ].join('');
     document.head.appendChild(style);
   }
 
-  function openScreen() {
-    ensureStyles();
-    var screen = document.querySelector('.hn-notify-screen');
-    if (!screen) {
-      screen = document.createElement('section');
-      screen.className = 'hn-notify-screen';
-      screen.innerHTML = '<button type="button" class="hn-n-back">Volver</button><div class="hn-notify-list"></div>';
-      document.body.appendChild(screen);
-      screen.querySelector('.hn-n-back').addEventListener('click', function (event) {
-        event.preventDefault();
-        event.stopPropagation();
-        clearAppBadge();
-        var activeScreen = document.getElementById('moduleScreen');
-        var home = document.getElementById('homeScreen');
-        var login = document.getElementById('loginScreen');
-        var repertoire = document.getElementById('repertoireScreen');
-        if (activeScreen) activeScreen.classList.remove('is-active');
-        if (repertoire) repertoire.classList.remove('is-active');
-        if (login) login.classList.remove('is-active');
-        if (home) home.classList.add('is-active');
-        screen.remove();
-      }, true);
+  function makeElement(tag, className, text) {
+    var node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  }
+
+  function findNotificationModule() {
+    if (notificationModule && document.body.contains(notificationModule)) return notificationModule;
+    notificationModule = null;
+    for (var i = 0; i < document.querySelectorAll('.module').length; i++) {
+      var modules = document.querySelectorAll('.module');
+      var title = modules[i].querySelector('.module-title');
+      if (title && title.textContent.trim().toUpperCase() === 'NOTIFICACIONES') {
+        notificationModule = modules[i];
+        notificationSubtitle = modules[i].querySelector('.module-subtitle');
+        break;
+      }
     }
-    renderList();
-    unread = 0;
-    updateBadge();
+    return notificationModule;
+  }
+
+  function updateModule() {
+    findNotificationModule();
+    if (!notificationSubtitle) return;
+    if (!notifications.length) {
+      notificationSubtitle.textContent = 'Sin notificaciones';
+      notificationSubtitle.classList.remove('hn-notify-new');
+      return;
+    }
+    notificationSubtitle.textContent = notifications.length === 1 ? '1 notificación' : notifications.length + ' notificaciones';
+  }
+
+  function setAppBadge(value) {
+    try {
+      if (document.visibilityState === 'visible' && typeof navigator.clearAppBadge === 'function' && value === 0) {
+        navigator.clearAppBadge();
+        return;
+      }
+      if (typeof navigator.setAppBadge === 'function') navigator.setAppBadge(value > 0 ? value : 0);
+    } catch (_) {}
   }
 
   function clearAppBadge() {
-    try { if ('clearAppBadge' in navigator) navigator.clearAppBadge(); } catch (_) {}
+    try {
+      if (typeof navigator.clearAppBadge === 'function') navigator.clearAppBadge();
+      else if (typeof navigator.setAppBadge === 'function') navigator.setAppBadge(0);
+    } catch (_) {}
+  }
+
+  function flashModule() {
+    findNotificationModule();
+    if (!notificationModule) return;
+    notificationModule.classList.remove('hn-notify-flash');
+    void notificationModule.offsetWidth;
+    notificationModule.classList.add('hn-notify-flash');
+    if (notificationSubtitle) {
+      notificationSubtitle.textContent = 'NUEVA NOTIFICACIÓN';
+      notificationSubtitle.classList.add('hn-notify-new');
+    }
+    setTimeout(function () {
+      if (notificationSubtitle) notificationSubtitle.classList.remove('hn-notify-new');
+      updateModule();
+    }, 3200);
+  }
+
+  function saveCache() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(notifications.slice(0, 50))); } catch (_) {}
+  }
+
+  function saveReadIds() {
+    try { localStorage.setItem(READ_STORAGE_KEY, JSON.stringify(Array.from(readIds))); } catch (_) {}
+  }
+
+  function loadCache() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      var cached = JSON.parse(raw);
+      if (!Array.isArray(cached)) return;
+      notifications = [];
+      seenIds.clear();
+      cached.forEach(function (item) {
+        if (!item || !item.id || seenIds.has(item.id)) return;
+        seenIds.add(item.id);
+        notifications.push(item);
+      });
+      notifications.sort(function (a, b) { return new Date(b.created_at || 0) - new Date(a.created_at || 0); });
+      updateModule();
+    } catch (_) {}
+  }
+
+  function loadReadIds() {
+    try {
+      var raw = localStorage.getItem(READ_STORAGE_KEY);
+      if (!raw) return;
+      var stored = JSON.parse(raw);
+      if (!Array.isArray(stored)) return;
+      readIds = new Set(stored);
+    } catch (_) {}
+  }
+
+  function markAllRead() {
+    notifications.forEach(function (item) {
+      if (item && item.id) readIds.add(item.id);
+    });
+    saveReadIds();
+  }
+
+  function renderNotificationScreen() {
+    var screen = document.getElementById('moduleScreen');
+    if (!screen) return;
+    var inner = screen.querySelector('.screen-inner');
+    if (!inner) return;
+
+    inner.className = 'screen-inner coming-screen hn-notify-screen';
+    inner.innerHTML = '';
+    inner.appendChild(makeElement('p', 'brand metallic-gold', 'HAVANA NICE'));
+    inner.appendChild(makeElement('div', 'brand-line'));
+    inner.appendChild(makeElement('div', 'hn-n-head', 'Notifications'));
+
+    var list = makeElement('div');
+    if (!notifications.length) {
+      list.appendChild(makeElement('div', 'hn-n-empty', 'No notifications'));
+    } else {
+      notifications.forEach(function (item) {
+        var isUnread = !readIds.has(item.id);
+        var article = makeElement('article', 'hn-n-item' + (isUnread ? ' hn-n-unread' : ''));
+        article.appendChild(makeElement('div', 'hn-n-title', String(item.title || 'Notification')));
+        article.appendChild(makeElement('div', 'hn-n-message', String(item.message || '')));
+        article.appendChild(makeElement('div', 'hn-n-date', item.created_at ? new Date(item.created_at).toLocaleString() : ''));
+        list.appendChild(article);
+      });
+    }
+    inner.appendChild(list);
+
+    var back = makeElement('button', 'back-button hn-n-back', 'Volver');
+    back.type = 'button';
+    back.addEventListener('click', function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      clearAppBadge();
+
+      var screen = document.getElementById('moduleScreen');
+      var home = document.getElementById('homeScreen');
+      var login = document.getElementById('loginScreen');
+      var repertoire = document.getElementById('repertoireScreen');
+      if (screen) screen.classList.remove('is-active');
+      if (repertoire) repertoire.classList.remove('is-active');
+      if (login) login.classList.remove('is-active');
+      if (home) home.classList.add('is-active');
+    });
+    inner.appendChild(back);
+  }
+
+  function openNotifications() {
+    if (!isLoggedIn()) return;
+    clearAppBadge();
+    renderNotificationScreen();
+    markAllRead();
+    renderNotificationScreen();
+    var screen = document.getElementById('moduleScreen');
+    var home = document.getElementById('homeScreen');
+    var login = document.getElementById('loginScreen');
+    var repertoire = document.getElementById('repertoireScreen');
+    if (login) login.classList.remove('is-active');
+    if (home) home.classList.remove('is-active');
+    if (repertoire) repertoire.classList.remove('is-active');
+    if (screen) screen.classList.add('is-active');
   }
 
   function bindModule() {
-    var module = findModule();
-    if (!module || module.getAttribute('data-hn-notify-bound') === '1') return;
-    module.setAttribute('data-hn-notify-bound', '1');
-    module.addEventListener('click', function (event) {
+    findNotificationModule();
+    if (!notificationModule || notificationModule.dataset.hnNotifyBound === 'true') return;
+    notificationModule.dataset.hnNotifyBound = 'true';
+    notificationModule.addEventListener('click', function (event) {
       event.preventDefault();
-      event.stopPropagation();
       event.stopImmediatePropagation();
-      openScreen();
+      playClickSoundIfAvailable();
+      openNotifications();
     }, true);
   }
 
-  async function syncRecent(markUnread, flash) {
-    var c = client();
-    if (!c) return;
+  function playClickSoundIfAvailable() {
+    try { if (typeof window.playClickSound === 'function') window.playClickSound(); } catch (_) {}
+  }
+
+  function mergeItems(items, showFlash, showBadge) {
+    if (!Array.isArray(items)) return false;
+    var added = [];
+    items.forEach(function (item) {
+      if (!item || !item.id || seenIds.has(item.id)) return;
+      seenIds.add(item.id);
+      added.push(item);
+    });
+    if (!added.length) return false;
+    notifications = notifications.concat(added);
+    notifications.sort(function (a, b) { return new Date(b.created_at || 0) - new Date(a.created_at || 0); });
+    notifications = notifications.slice(0, 50);
+    saveCache();
+    updateModule();
+    if (showFlash) flashModule();
+    if (showBadge) setAppBadge(Math.min(99, added.length));
+    return true;
+  }
+
+  function reconcileWithServer(serverItems) {
+    if (!Array.isArray(serverItems)) return false;
+    var serverIds = new Set(serverItems.map(function (item) { return item && item.id; }).filter(Boolean));
+    var before = notifications.length;
+    notifications = notifications.filter(function (item) { return item && serverIds.has(item.id); });
+    if (notifications.length === before) return false;
+    seenIds.clear();
+    notifications.forEach(function (item) { seenIds.add(item.id); });
+    saveCache();
+    renderNotificationScreenIfOpen();
+    updateModule();
+    return true;
+  }
+
+  function removeNotification(id) {
+    if (!id) return;
+    var changed = false;
+    var next = notifications.filter(function (item) {
+      if (item && item.id === id) { changed = true; return false; }
+      return true;
+    });
+    if (!changed) return;
+    notifications = next;
+    seenIds.delete(id);
+    readIds.delete(id);
+    saveCache();
+    saveReadIds();
+    renderNotificationScreenIfOpen();
+    updateModule();
+  }
+
+  function renderNotificationScreenIfOpen() {
+    var screen = document.getElementById('moduleScreen');
+    if (screen && screen.classList.contains('is-active') && screen.querySelector('.hn-notify-screen')) {
+      renderNotificationScreen();
+    }
+  }
+
+  async function syncRecent(showFlash, showBadge) {
+    if (!client || !isLoggedIn()) return;
     try {
-      var result = await c.from('notifications').select('id,title,message,created_at').order('created_at', { ascending: false }).limit(MAX_ITEMS);
-      if (result && !result.error) mergeItems(result.data || [], !!markUnread);
-    } catch (_) {}
+      var result = await client.from('notifications').select('id,title,message,created_at').order('created_at', { ascending: false }).limit(50);
+      if (result.error) {
+        console.error('[HN-Notifications] sync error:', result.error);
+        return;
+      }
+      reconcileWithServer(result.data || []);
+      mergeItems(result.data || [], !!showFlash, !!showBadge);
+      bindModule();
+    } catch (error) { console.error('[HN-Notifications] sync exception:', error); }
   }
 
   function startPolling() {
-    if (pollTimer) return;
-    pollTimer = setInterval(function () { syncRecent(true, true); }, 5000);
+    if (notificationPollTimer) return;
+    notificationPollTimer = setInterval(function () {
+      if (isLoggedIn()) syncRecent(true, true);
+    }, 5000);
   }
 
-  function startRealtime() {
-    var c = client();
-    if (!c || !c.channel) return;
-    try {
-      realtimeChannel = c.channel('hn-notifications-live')
-        .on('postgres_changes', { event:'INSERT', schema:'public', table:'notifications' }, function (payload) {
-          mergeItems([payload.new], true);
-        })
-        .subscribe();
-    } catch (_) {}
+  function scheduleReconnect() {
+    if (reconnectTimer || !isLoggedIn()) return;
+    reconnectTimer = setTimeout(function () {
+      reconnectTimer = null;
+      ensureRealtime();
+    }, 1000);
   }
 
-  function boot() {
-    loadCache();
-    ensureStyles();
-    bindModule();
-    renderList();
-    syncRecent(false, false);
-    startRealtime();
-    startPolling();
-    window.addEventListener('online', function () { syncRecent(false, false); });
-    document.addEventListener('visibilitychange', function () {
-      if (!document.hidden) syncRecent(false, false);
+  function subscribe() {
+    if (!client || !isLoggedIn()) return;
+    if (channel && (channel.state === 'joined' || channel.state === 'joining')) return;
+    if (channel) {
+      try { client.removeChannel(channel); } catch (_) {}
+      channel = null;
+    }
+    channel = client.channel('hn_realtime_notifications').on('postgres_changes', {
+      event: 'INSERT', schema: 'public', table: 'notifications'
+    }, function (payload) {
+      if (!isLoggedIn() || !payload || !payload.new) return;
+      mergeItems([payload.new], true, true);
+    }).on('postgres_changes', {
+      event: 'DELETE', schema: 'public', table: 'notifications'
+    }, function (payload) {
+      if (!isLoggedIn() || !payload || !payload.old) return;
+      removeNotification(payload.old.id);
+    }).subscribe(function (status, error) {
+      console.log('[HN-Notifications] Realtime:', status);
+      if (error) console.error('[HN-Notifications] Realtime error:', error);
+      if (status === 'SUBSCRIBED') syncRecent(false, false);
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') scheduleReconnect();
     });
-    setInterval(bindModule, 1000);
   }
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
-  else boot();
+  function ensureRealtime() {
+    if (!client || !isLoggedIn()) return;
+    subscribe();
+  }
+
+  function stop() {
+    if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+    if (channel && client) { try { client.removeChannel(channel); } catch (_) {} }
+    channel = null;
+    started = false;
+    notifications = [];
+    seenIds.clear();
+    readIds.clear();
+    clearAppBadge();
+    updateModule();
+  }
+
+  async function start() {
+    if (!isLoggedIn()) {
+      if (started) stop();
+      return;
+    }
+    var nextClient = getClient();
+    if (!nextClient) return;
+    client = nextClient;
+    addStyle();
+    loadCache();
+    loadReadIds();
+    bindModule();
+    startPolling();
+    if (!started) {
+      started = true;
+      await syncRecent(false, false);
+    }
+    ensureRealtime();
+  }
+
+  function watchSession() {
+    if (sessionPollTimer) return;
+    sessionPollTimer = setInterval(function () {
+      if (isLoggedIn()) start();
+      else if (started) stop();
+    }, 1000);
+  }
+
+  function setupLifecycle() {
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'visible' && isLoggedIn()) {
+        syncRecent(false, false);
+        ensureRealtime();
+      }
+    });
+    window.addEventListener('online', function () {
+      if (isLoggedIn()) {
+        syncRecent(false, false);
+        ensureRealtime();
+      }
+    });
+  }
+
+  function init() {
+    addStyle();
+    bindModule();
+    start();
+    watchSession();
+    setupLifecycle();
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
+  else init();
 })();
