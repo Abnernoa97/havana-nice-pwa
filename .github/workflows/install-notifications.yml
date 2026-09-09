@@ -68,5 +68,9 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add index.html
-          git diff --cached --quiet || git commit -m "fix: make musician PWA installable"
-          git push
+          if git diff --cached --quiet; then
+            echo "No generated changes to commit."
+            exit 0
+          fi
+          git commit -m "fix: update musician app bridge"
+          git push || (git pull --rebase origin main && git push)
