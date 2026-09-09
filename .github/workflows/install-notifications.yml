@@ -14,14 +14,36 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Inject notifications bridge and script
+      - name: Inject PWA and notifications bridge
         run: |
           python - <<'PY'
           from pathlib import Path
           import re
+          import os
 
           p = Path('index.html')
           s = p.read_text(encoding='utf-8')
+
+          # Keep exactly one manifest link and one service-worker registration.
+          s = re.sub(r'\s*<link[^>]+rel=["\']manifest["\'][^>]*>', '', s, flags=re.I)
+          s = re.sub(r'\s*<script>\s*if\s*\(\s*["\']serviceWorker["\']\s+in\s+navigator\s*\)[\s\S]*?</script>', '', s, flags=re.I)
+
+          pwa_head = '  <link rel="manifest" href="./manifest.json" />\n'
+          if '</head>' not in s:
+              raise SystemExit('Could not find </head>; refusing to modify index.html')
+          s = s.replace('</head>', pwa_head + '</head>', 1)
+
+          pwa_registration = '''<script>
+          if ("serviceWorker" in navigator) {
+            window.addEventListener("load", () => {
+              navigator.serviceWorker.register("./sw.js", { scope: "./" }).catch((error) => {
+                console.warn("HAVANA NICE service worker registration failed:", error);
+              });
+            });
+          }
+          </script>
+          '''
+          s = s.replace('</body>', pwa_registration + '</body>', 1)
 
           # Remove any previous notification script and bridge line.
           s = re.sub(r'\s*<script(?: type="module")? src="\./notifications-v(?:2|3|4)\.js(?:\?v=[^"\']+)?"></script>', '', s)
@@ -35,9 +57,6 @@ jobs:
           s = s.replace(marker, bridge, 1)
 
           # Cache-bust the notification script per source commit.
-          tag = f'<script src="./notifications-v4.js?v={Path(".git/HEAD").read_text().strip()}"></script>'
-          # Use the GitHub SHA exposed by Actions when available.
-          import os
           tag = f'<script src="./notifications-v4.js?v={os.environ.get("GITHUB_SHA", "4")}"></script>'
           s = s.replace('</body>', tag + '\n</body>', 1)
 
@@ -49,5 +68,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add index.html
-          git diff --cached --quiet || git commit -m "wire existing Supabase client to realtime notifications"
+          git diff --cached --quiet || git commit -m "fix: make musician PWA installable"
           git push
