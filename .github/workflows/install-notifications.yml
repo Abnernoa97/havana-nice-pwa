@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Inject PWA and notifications bridge
+      - name: Inject PWA and musician realtime bridges
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -45,20 +45,24 @@ jobs:
           '''
           s = s.replace('</body>', pwa_registration + '</body>', 1)
 
-          # Remove any previous notification script and bridge line.
+          # Remove previous realtime scripts and bridge lines before adding the current versions.
           s = re.sub(r'\s*<script(?: type="module")? src="\./notifications-v(?:2|3|4)\.js(?:\?v=[^"\']+)?"></script>', '', s)
+          s = re.sub(r'\s*<script src="\./repertoire-v1\.js(?:\?v=[^"\']+)?"></script>', '', s)
           s = re.sub(r'^\s*window\.hnSupabase\s*=\s*supabase;\s*$', '', s, flags=re.M)
 
           # Expose the EXISTING Supabase client created inside the module.
           marker = '  restoreSession();'
-          bridge = '  restoreSession();\n\n  // Bridge the existing Supabase client to the isolated notifications client.\n  window.hnSupabase = supabase;'
+          bridge = '  restoreSession();\n\n  // Bridge the existing Supabase client to the isolated musician realtime clients.\n  window.hnSupabase = supabase;'
           if marker not in s:
               raise SystemExit('Could not find restoreSession() marker; refusing to modify index.html')
           s = s.replace(marker, bridge, 1)
 
-          # Cache-bust the notification script per source commit.
-          tag = f'<script src="./notifications-v4.js?v={os.environ.get("GITHUB_SHA", "4")}"></script>'
-          s = s.replace('</body>', tag + '\n</body>', 1)
+          sha = os.environ.get('GITHUB_SHA', '4')
+          tags = (
+              f'<script src="./notifications-v4.js?v={sha}"></script>\n'
+              f'<script src="./repertoire-v1.js?v={sha}"></script>\n'
+          )
+          s = s.replace('</body>', tags + '</body>', 1)
 
           p.write_text(s, encoding='utf-8')
           PY
@@ -72,5 +76,5 @@ jobs:
             echo "No generated changes to commit."
             exit 0
           fi
-          git commit -m "fix: update musician app bridge"
+          git commit -m "fix: update musician realtime bridges"
           git push || (git pull --rebase origin main && git push)
