@@ -2690,8 +2690,10 @@
 
   restoreSession();
 
-</script>
+  // Bridge the existing Supabase client to the isolated notifications client.
+  window.hnSupabase = supabase;
 
-<script src="./notifications-v4.js?v=4"></script>
+</script>
+<script src="./notifications-v4.js?v=96b2c300a7454093dbc0c4d01583f07d803624e4"></script>
 </body>
 </html>
