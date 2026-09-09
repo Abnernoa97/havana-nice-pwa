@@ -100,11 +100,11 @@
     inner.className = 'screen-inner coming-screen hn-notify-screen';
     inner.innerHTML = '';
 
-    var brand = makeElement('p', 'brand metallic-gold', 'HAVANA NICE');
-    var line = makeElement('div', 'brand-line');
-    var head = makeElement('div', 'hn-n-head', 'Notifications');
-    var list = makeElement('div');
+    inner.appendChild(makeElement('p', 'brand metallic-gold', 'HAVANA NICE'));
+    inner.appendChild(makeElement('div', 'brand-line'));
+    inner.appendChild(makeElement('div', 'hn-n-head', 'Notifications'));
 
+    var list = makeElement('div');
     if (!notifications.length) {
       list.appendChild(makeElement('div', 'hn-n-empty', 'No notifications'));
     } else {
@@ -116,6 +116,7 @@
         list.appendChild(article);
       });
     }
+    inner.appendChild(list);
 
     var back = makeElement('button', 'back-button hn-n-back', 'Volver');
     back.type = 'button';
@@ -123,23 +124,20 @@
       var originalBack = document.getElementById('backButton');
       if (originalBack) originalBack.click();
     });
-
-    inner.appendChild(brand);
-    inner.appendChild(line);
-    inner.appendChild(head);
-    inner.appendChild(list);
     inner.appendChild(back);
   }
 
   function openNotifications() {
     if (!isLoggedIn()) return;
     renderNotificationScreen();
-    var originalBack = document.getElementById('backButton');
     var screen = document.getElementById('moduleScreen');
     var home = document.getElementById('homeScreen');
-    if (home) home.classList.remove('active');
-    if (screen) screen.classList.add('active');
-    if (originalBack) originalBack.dataset.hnNotifications = 'true';
+    var login = document.getElementById('loginScreen');
+    var repertoire = document.getElementById('repertoireScreen');
+    if (login) login.classList.remove('is-active');
+    if (home) home.classList.remove('is-active');
+    if (repertoire) repertoire.classList.remove('is-active');
+    if (screen) screen.classList.add('is-active');
   }
 
   function bindModule() {
