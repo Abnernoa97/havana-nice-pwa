@@ -30,13 +30,14 @@
       '.hn-notify-flash{animation:hnNotifyFlash 1.2s ease-in-out 0s 2}',
       '@keyframes hnNotifyFlash{0%,100%{box-shadow:0 0 0 rgba(229,189,98,0)}50%{box-shadow:0 0 28px rgba(229,189,98,.5),inset 0 0 20px rgba(229,189,98,.08)}}',
       '.hn-notify-new{color:#fff1a8!important;opacity:1!important}',
+      '.hn-notify-screen{height:100%!important;max-height:100%;overflow-y:auto!important;overflow-x:hidden!important;-webkit-overflow-scrolling:touch!important;touch-action:pan-y!important;box-sizing:border-box;padding-bottom:110px!important}',
       '.hn-notify-screen .hn-n-head{margin-top:24px;padding:0 0 18px;border-bottom:1px solid rgba(229,189,98,.25);font:14px Georgia,serif;letter-spacing:.18em;color:#fff1a8;text-transform:uppercase}',
       '.hn-notify-screen .hn-n-item{padding:19px 0;border-bottom:1px solid rgba(255,255,255,.09)}',
       '.hn-notify-screen .hn-n-title{color:#f4f1e8;font-size:12px;letter-spacing:.12em;text-transform:uppercase}',
       '.hn-notify-screen .hn-n-message{margin-top:9px;color:rgba(244,241,232,.78);font-size:13px;line-height:1.55}',
       '.hn-notify-screen .hn-n-date{margin-top:9px;color:rgba(244,241,232,.38);font-size:8px;letter-spacing:.12em;text-transform:uppercase}',
       '.hn-notify-screen .hn-n-empty{padding:34px 0;color:rgba(244,241,232,.42);font-size:10px;letter-spacing:.12em;text-transform:uppercase;text-align:center}',
-      '.hn-notify-screen .hn-n-back{margin-top:28px}'
+      '.hn-notify-screen .hn-n-back{display:block;margin:28px 0 20px;position:relative;z-index:5;pointer-events:auto}'
     ].join('');
     document.head.appendChild(style);
   }
@@ -74,6 +75,25 @@
     notificationSubtitle.textContent = notifications.length === 1
       ? '1 notificación'
       : notifications.length + ' notificaciones';
+  }
+
+  function setAppBadge(value) {
+    try {
+      if (document.visibilityState === 'visible' && typeof navigator.clearAppBadge === 'function' && value === 0) {
+        navigator.clearAppBadge();
+        return;
+      }
+      if (typeof navigator.setAppBadge === 'function') {
+        navigator.setAppBadge(value > 0 ? value : 0);
+      }
+    } catch (_) {}
+  }
+
+  function clearAppBadge() {
+    try {
+      if (typeof navigator.clearAppBadge === 'function') navigator.clearAppBadge();
+      else if (typeof navigator.setAppBadge === 'function') navigator.setAppBadge(0);
+    } catch (_) {}
   }
 
   function flashModule() {
@@ -146,7 +166,10 @@
 
     var back = makeElement('button', 'back-button hn-n-back', 'Volver');
     back.type = 'button';
-    back.addEventListener('click', function () {
+    back.addEventListener('click', function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      clearAppBadge();
       var originalBack = document.getElementById('backButton');
       if (originalBack) originalBack.click();
     });
@@ -155,6 +178,7 @@
 
   function openNotifications() {
     if (!isLoggedIn()) return;
+    clearAppBadge();
     renderNotificationScreen();
     var screen = document.getElementById('moduleScreen');
     var home = document.getElementById('homeScreen');
@@ -184,7 +208,7 @@
     } catch (_) {}
   }
 
-  function mergeItems(items, showFlash) {
+  function mergeItems(items, showFlash, showBadge) {
     if (!Array.isArray(items)) return false;
     var added = [];
     items.forEach(function (item) {
@@ -201,10 +225,14 @@
     saveCache();
     updateModule();
     if (showFlash) flashModule();
+    if (showBadge) {
+      var badgeCount = Math.min(99, added.length);
+      setAppBadge(badgeCount);
+    }
     return true;
   }
 
-  async function syncRecent(showFlash) {
+  async function syncRecent(showFlash, showBadge) {
     if (!client || !isLoggedIn()) return;
     try {
       var result = await client
@@ -216,7 +244,7 @@
         console.error('[HN-Notifications] sync error:', result.error);
         return;
       }
-      mergeItems(result.data || [], !!showFlash);
+      mergeItems(result.data || [], !!showFlash, !!showBadge);
       bindModule();
     } catch (error) {
       console.error('[HN-Notifications] sync exception:', error);
@@ -226,7 +254,7 @@
   function startPolling() {
     if (notificationPollTimer) return;
     notificationPollTimer = setInterval(function () {
-      if (isLoggedIn()) syncRecent(false);
+      if (isLoggedIn()) syncRecent(true, true);
     }, 5000);
   }
 
@@ -254,12 +282,12 @@
         table: 'notifications'
       }, function (payload) {
         if (!isLoggedIn() || !payload || !payload.new) return;
-        mergeItems([payload.new], true);
+        mergeItems([payload.new], true, true);
       })
       .subscribe(function (status, error) {
         console.log('[HN-Notifications] Realtime:', status);
         if (error) console.error('[HN-Notifications] Realtime error:', error);
-        if (status === 'SUBSCRIBED') syncRecent(false);
+        if (status === 'SUBSCRIBED') syncRecent(false, false);
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') scheduleReconnect();
       });
   }
@@ -281,6 +309,7 @@
     started = false;
     notifications = [];
     seenIds.clear();
+    clearAppBadge();
     updateModule();
   }
 
@@ -298,7 +327,7 @@
     startPolling();
     if (!started) {
       started = true;
-      await syncRecent(false);
+      await syncRecent(false, false);
     }
     ensureRealtime();
   }
@@ -314,13 +343,13 @@
   function setupLifecycle() {
     document.addEventListener('visibilitychange', function () {
       if (document.visibilityState === 'visible' && isLoggedIn()) {
-        syncRecent(false);
+        syncRecent(false, false);
         ensureRealtime();
       }
     });
     window.addEventListener('online', function () {
       if (isLoggedIn()) {
-        syncRecent(false);
+        syncRecent(false, false);
         ensureRealtime();
       }
     });
