@@ -1120,6 +1120,7 @@
       }
     }
   </style>
+  <link rel="manifest" href="./manifest.json" />
 </head>
 
 <body>
@@ -2699,7 +2700,18 @@
 
   // Bridge the existing Supabase client to the isolated notifications client.
 
+  // Bridge the existing Supabase client to the isolated notifications client.
+
 </script>
-<script src="./notifications-v4.js?v=1b4cbdf1fb8a1c0816bb47c1cb8095e57e7c3723"></script>
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js", { scope: "./" }).catch((error) => {
+      console.warn("HAVANA NICE service worker registration failed:", error);
+    });
+  });
+}
+</script>
+<script src="./notifications-v4.js?v=14f5a899629e8f5626a305bb7ed9457dba7b6b15"></script>
 </body>
 </html>
