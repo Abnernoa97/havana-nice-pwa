@@ -13,23 +13,41 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Inject notifications script
+
+      - name: Inject notifications bridge and script
         run: |
           python - <<'PY'
           from pathlib import Path
           import re
-          p=Path('index.html')
-          s=p.read_text(encoding='utf-8')
-          tag='<script src="./notifications-v4.js?v=4"></script>'
-          s=re.sub(r'<script(?: type="module")? src="\./notifications(?:-v2|-v3|-v4)?\.js(?:\?v=\d+)?"></script>',tag,s)
-          if tag not in s:
-              s=s.replace('</body>',f'{tag}\n</body>')
-          p.write_text(s,encoding='utf-8')
+
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+
+          # Remove any previous notification script and bridge line.
+          s = re.sub(r'\s*<script(?: type="module")? src="\./notifications-v(?:2|3|4)\.js(?:\?v=[^"\']+)?"></script>', '', s)
+          s = re.sub(r'^\s*window\.hnSupabase\s*=\s*supabase;\s*$', '', s, flags=re.M)
+
+          # Expose the EXISTING Supabase client created inside the module.
+          marker = '  restoreSession();'
+          bridge = '  restoreSession();\n\n  // Bridge the existing Supabase client to the isolated notifications client.\n  window.hnSupabase = supabase;'
+          if marker not in s:
+              raise SystemExit('Could not find restoreSession() marker; refusing to modify index.html')
+          s = s.replace(marker, bridge, 1)
+
+          # Cache-bust the notification script per source commit.
+          tag = f'<script src="./notifications-v4.js?v={Path(".git/HEAD").read_text().strip()}"></script>'
+          # Use the GitHub SHA exposed by Actions when available.
+          import os
+          tag = f'<script src="./notifications-v4.js?v={os.environ.get("GITHUB_SHA", "4")}"></script>'
+          s = s.replace('</body>', tag + '\n</body>', 1)
+
+          p.write_text(s, encoding='utf-8')
           PY
+
       - name: Commit
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add index.html
-          git diff --cached --quiet || git commit -m "Use robust musician notifications client"
+          git diff --cached --quiet || git commit -m "wire existing Supabase client to realtime notifications"
           git push
