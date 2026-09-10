@@ -35,14 +35,14 @@ jobs:
           s=s.replace('</head>','  <link rel="manifest" href="./manifest.json" />\n</head>',1)
           pwa='''<script>if ("serviceWorker" in navigator) { window.addEventListener("load", () => { navigator.serviceWorker.register("./sw.js", { scope: "./" }).catch((error) => console.warn("HAVANA NICE service worker registration failed:", error)); }); }</script>'''
           s=s.replace('</body>',pwa+'</body>',1)
-          for pattern in [r'\s*<script(?: type="module")? src="\./notifications-v(?:2|3|4)\.js(?:\?v=[^"\']+)?"></script>',r'\s*<script src="\./repertoire-v1\.js(?:\?v=[^"\']+)?"></script>',r'\s*<script src="\./calendar-v1\.js(?:\?v=[^"\']+)?"></script>',r'\s*<script src="\./calendar-navigation-fix\.js(?:\?v=[^"\']+)?"></script>',r'\s*<script src="\./family-v1\.js(?:\?v=[^"\']+)?"></script>',r'\s*<script src="\./operations-v1\.js(?:\?v=[^"\']+)?"></script>',r'\s*<script src="\./operations-fix\.js(?:\?v=[^"\']+)?"></script>',r'\s*<script src="\./chat-v1\.js(?:\?v=[^"\']+)?"></script>',r'\s*<script src="\./navigation-fix\.js(?:\?v=[^"\']+)?"></script>']:
+          for pattern in [r'\s*<script(?: type="module")? src="\./notifications-v(?:2|3|4)\.js(?:\?v=[^"\']+)?"></script>',r'\s*<script src="\./repertoire-v1\.js(?:\?v=[^"\']+)?"></script>',r'\s*<script src="\./calendar-v1\.js(?:\?v=[^"\']+)?"></script>',r'\s*<script src="\./calendar-navigation\.js(?:\?v=[^"\']+)?"></script>',r'\s*<script src="\./calendar-navigation-fix\.js(?:\?v=[^"\']+)?"></script>',r'\s*<script src="\./family-v1\.js(?:\?v=[^"\']+)?"></script>',r'\s*<script src="\./operations-v1\.js(?:\?v=[^"\']+)?"></script>',r'\s*<script src="\./operations-fix\.js(?:\?v=[^"\']+)?"></script>',r'\s*<script src="\./chat-v1\.js(?:\?v=[^"\']+)?"></script>',r'\s*<script src="\./navigation-fix\.js(?:\?v=[^"\']+)?"></script>']:
             s=re.sub(pattern,'',s)
           s=re.sub(r'^\s*window\.hnSupabase\s*=\s*supabase;\s*$','',s,flags=re.M)
           marker='  restoreSession();'
           bridge='  restoreSession();\n\n  window.hnSupabase = supabase;'
           if marker not in s: raise SystemExit('Could not find restoreSession() marker')
           s=s.replace(marker,bridge,1)
-          tags=f'<script src="./notifications-v4.js?v={sha}"></script>\n<script src="./repertoire-v1.js?v={sha}"></script>\n<script src="./calendar-v1.js?v={sha}"></script>\n<script src="./family-v1.js?v={sha}"></script>\n<script src="./operations-v1.js?v={sha}"></script>\n<script src="./operations-fix.js?v={sha}"></script>\n<script src="./chat-v1.js?v={sha}"></script>\n'
+          tags=f'<script src="./notifications-v4.js?v={sha}"></script>\n<script src="./repertoire-v1.js?v={sha}"></script>\n<script src="./calendar-v1.js?v={sha}"></script>\n<script src="./calendar-navigation.js?v={sha}"></script>\n<script src="./family-v1.js?v={sha}"></script>\n<script src="./operations-v1.js?v={sha}"></script>\n<script src="./operations-fix.js?v={sha}"></script>\n<script src="./chat-v1.js?v={sha}"></script>\n'
           s=s.replace('</body>',tags+'</body>',1);p.write_text(s,encoding='utf-8')
 
           a=Path('admin.html'); h=a.read_text(encoding='utf-8')
