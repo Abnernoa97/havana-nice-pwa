@@ -3,7 +3,7 @@
 
   const FAMILY = [
     { name: 'FER & NOA', role: 'HAVANA NICE' },
-    { name: 'ORLY CHO', role: 'MÚSICO' },
+    { name: 'ORLYS SHOW', role: 'MÚSICO' },
     { name: 'JALI', role: 'MÚSICO' },
     { name: 'RAFA', role: 'MÚSICO' },
     { name: 'ANDY REY', role: 'MÚSICO' }
@@ -25,7 +25,7 @@
     const title = module.querySelector('.module-title');
     const subtitle = module.querySelector('.module-subtitle');
     if (title) title.textContent = 'Familia';
-    if (subtitle) subtitle.textContent = 'Familia de HAVANA NICE';
+    if (subtitle) subtitle.textContent = 'Familia HAVANA NICE';
 
     const screen = document.createElement('section');
     screen.id = 'familyScreen';
@@ -35,7 +35,6 @@
         <div class="family-header">
           <p class="brand metallic-gold">HAVANA NICE</p>
           <div class="brand-line"></div>
-          <h2 class="family-heading metallic-gold">Familia de HAVANA NICE</h2>
           <p class="family-caption">The Family</p>
         </div>
         <div class="family-list">
@@ -64,8 +63,7 @@
       .family-screen { padding-bottom: max(76px, env(safe-area-inset-bottom)); }
       .family-inner { width: min(100%, 650px); height: 100%; margin: 0 auto; display: flex; flex-direction: column; padding-top: 5px; }
       .family-header { flex: 0 0 auto; text-align: center; margin-bottom: 22px; }
-      .family-heading { margin: 20px 0 0; font-family: Georgia, "Times New Roman", serif; font-size: clamp(31px, 8.8vw, 58px); font-weight: 400; line-height: .92; letter-spacing: -.035em; text-transform: uppercase; }
-      .family-caption { margin: 12px 0 0; color: rgba(244,241,232,.56); font-size: 8px; letter-spacing: .30em; text-transform: uppercase; }
+      .family-caption { margin: 20px 0 0; color: rgba(244,241,232,.56); font-size: 8px; letter-spacing: .30em; text-transform: uppercase; }
       .family-list { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 3px 28px 0; scrollbar-width: thin; scrollbar-color: rgba(229,189,98,.55) transparent; }
       .family-list::-webkit-scrollbar { width: 3px; }
       .family-list::-webkit-scrollbar-track { background: transparent; }
