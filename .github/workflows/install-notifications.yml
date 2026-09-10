@@ -19,7 +19,7 @@ jobs:
         run: |
           git fetch origin main
           git reset --hard origin/main
-      - name: Inject PWA, realtime bridges and multi-image notifications
+      - name: Inject PWA, realtime bridges and app modules
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -41,17 +41,21 @@ jobs:
           </script>
           '''
           s = s.replace('</body>', pwa_registration + '</body>', 1)
-          s = re.sub(r'\s*<script(?: type="module")? src="\./notifications-v(?:2|3|4)\.js(?:\?v=[^"\']+)?"></script>', '', s)
-          s = re.sub(r'\s*<script src="\./repertoire-v1\.js(?:\?v=[^"\']+)?"></script>', '', s)
-          s = re.sub(r'\s*<script src="\./calendar-v1\.js(?:\?v=[^"\']+)?"></script>', '', s)
-          s = re.sub(r'\s*<script src="\./family-v1\.js(?:\?v=[^"\']+)?"></script>', '', s)
+          for pattern in [
+            r'\s*<script(?: type="module")? src="\./notifications-v(?:2|3|4)\.js(?:\?v=[^"\']+)?"></script>',
+            r'\s*<script src="\./repertoire-v1\.js(?:\?v=[^"\']+)?"></script>',
+            r'\s*<script src="\./calendar-v1\.js(?:\?v=[^"\']+)?"></script>',
+            r'\s*<script src="\./family-v1\.js(?:\?v=[^"\']+)?"></script>',
+            r'\s*<script src="\./operations-v1\.js(?:\?v=[^"\']+)?"></script>'
+          ]:
+            s = re.sub(pattern, '', s)
           s = re.sub(r'^\s*window\.hnSupabase\s*=\s*supabase;\s*$', '', s, flags=re.M)
           marker = '  restoreSession();'
           bridge = '  restoreSession();\n\n  // Bridge the existing Supabase client to the isolated musician realtime clients.\n  window.hnSupabase = supabase;'
           if marker not in s: raise SystemExit('Could not find restoreSession() marker')
           s = s.replace(marker, bridge, 1)
           sha = os.environ.get('GITHUB_SHA', '4')
-          tags = f'<script src="./notifications-v4.js?v={sha}"></script>\n<script src="./repertoire-v1.js?v={sha}"></script>\n<script src="./calendar-v1.js?v={sha}"></script>\n<script src="./family-v1.js?v={sha}"></script>\n'
+          tags = f'<script src="./notifications-v4.js?v={sha}"></script>\n<script src="./repertoire-v1.js?v={sha}"></script>\n<script src="./calendar-v1.js?v={sha}"></script>\n<script src="./family-v1.js?v={sha}"></script>\n<script src="./operations-v1.js?v={sha}"></script>\n'
           s = s.replace('</body>', tags + '</body>', 1)
           p.write_text(s, encoding='utf-8')
 
@@ -92,5 +96,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add index.html admin.html notifications-v4.js
           if git diff --cached --quiet; then echo "No generated changes to commit."; exit 0; fi
-          git commit -m "feat: update app notification image support"
+          git commit -m "feat: update app modules"
           git push origin HEAD:main
