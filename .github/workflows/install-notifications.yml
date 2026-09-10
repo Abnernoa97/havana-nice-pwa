@@ -44,13 +44,14 @@ jobs:
           s = re.sub(r'\s*<script(?: type="module")? src="\./notifications-v(?:2|3|4)\.js(?:\?v=[^"\']+)?"></script>', '', s)
           s = re.sub(r'\s*<script src="\./repertoire-v1\.js(?:\?v=[^"\']+)?"></script>', '', s)
           s = re.sub(r'\s*<script src="\./calendar-v1\.js(?:\?v=[^"\']+)?"></script>', '', s)
+          s = re.sub(r'\s*<script src="\./family-v1\.js(?:\?v=[^"\']+)?"></script>', '', s)
           s = re.sub(r'^\s*window\.hnSupabase\s*=\s*supabase;\s*$', '', s, flags=re.M)
           marker = '  restoreSession();'
           bridge = '  restoreSession();\n\n  // Bridge the existing Supabase client to the isolated musician realtime clients.\n  window.hnSupabase = supabase;'
           if marker not in s: raise SystemExit('Could not find restoreSession() marker')
           s = s.replace(marker, bridge, 1)
           sha = os.environ.get('GITHUB_SHA', '4')
-          tags = f'<script src="./notifications-v4.js?v={sha}"></script>\n<script src="./repertoire-v1.js?v={sha}"></script>\n<script src="./calendar-v1.js?v={sha}"></script>\n'
+          tags = f'<script src="./notifications-v4.js?v={sha}"></script>\n<script src="./repertoire-v1.js?v={sha}"></script>\n<script src="./calendar-v1.js?v={sha}"></script>\n<script src="./family-v1.js?v={sha}"></script>\n'
           s = s.replace('</body>', tags + '</body>', 1)
           p.write_text(s, encoding='utf-8')
 
