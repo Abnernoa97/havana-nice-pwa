@@ -22,7 +22,7 @@
     dashboard.insertBefore(card,systemCard);
     const s=await loadSupabase();
     const {data:{session}}=await s.auth.getSession();
-    if(!session){$('calendarAdminCard')?.remove();return;}
+    if(!session){document.getElementById('calendarAdminCard')?.remove();return;}
     let events=[],editingId=null;
     const $=id=>document.getElementById(id);
     async function load(){const{data,error}=await s.rpc('admin_list_calendar_events');if(error){$('cMsg').textContent='Error al cargar calendario';return}events=data||[];render();}
