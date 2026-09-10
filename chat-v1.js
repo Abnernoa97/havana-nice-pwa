@@ -1,4 +1,4 @@
-/* HAVANA NICE — CHAT DE INFORMACIÓN / REAL TIME V1 */
+/* HAVANA NICE — CHAT DE INFORMACIÓN / REAL TIME V2 */
 (() => {
   'use strict';
 
@@ -12,19 +12,18 @@
   let listEl = null;
   let inputEl = null;
   let sendEl = null;
-  let badgeEl = null;
   let initialized = false;
+  let replyTarget = null;
+  let historyArmed = false;
+  let previousScreen = null;
+  let videoWasMuted = true;
 
   const esc = (value) => String(value ?? '').replace(/[&<>'"]/g, ch => ({ '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;' }[ch]));
   const session = () => {
     try { return JSON.parse(sessionStorage.getItem('hn_profile') || 'null'); } catch (_) { return null; }
   };
   const client = () => window.hnSupabase || window.supabaseClient || window.supabase || null;
-
-  function currentProfile() {
-    const p = session();
-    return p && p.id ? p : null;
-  }
+  const currentProfile = () => { const p = session(); return p && p.id ? p : null; };
 
   function formatTime(ts) {
     try { return new Intl.DateTimeFormat('es-MX', { hour:'2-digit', minute:'2-digit' }).format(new Date(ts)); }
@@ -40,10 +39,6 @@
     return new Intl.DateTimeFormat('es-MX', { day:'2-digit', month:'short', year:'numeric' }).format(d).toUpperCase();
   }
 
-  function findHomeModules() {
-    return [...document.querySelectorAll('.module')];
-  }
-
   function ensureHomeModule() {
     const modules = document.querySelector('.modules');
     if (!modules) return null;
@@ -52,14 +47,9 @@
       existing = document.createElement('button');
       existing.type = 'button';
       existing.className = 'module hn-chat-module';
-      existing.innerHTML = `
-        <span class="module-number">05</span>
-        <span class="module-copy"><span class="module-title">CHAT DE INFORMACIÓN</span><span class="module-subtitle">MENSAJES DEL EQUIPO</span></span>
-        <span class="module-arrow">›</span>
-      `;
+      existing.innerHTML = `<span class="module-number">05</span><span class="module-copy"><span class="module-title">CHAT DE INFORMACIÓN</span><span class="module-subtitle">MENSAJES DEL EQUIPO</span></span><span class="module-arrow">›</span>`;
       const family = [...modules.querySelectorAll('.module')].find(el => /FAMILIA/i.test(el.textContent || ''));
-      if (family && family.nextSibling) modules.insertBefore(existing, family.nextSibling);
-      else modules.appendChild(existing);
+      if (family && family.nextSibling) modules.insertBefore(existing, family.nextSibling); else modules.appendChild(existing);
     }
     return existing;
   }
@@ -70,8 +60,9 @@
     style.id = 'hn-chat-styles';
     style.textContent = `
       .hn-chat-module { position:relative; }
-      .hn-chat-unread { position:absolute; top:10px; right:48px; min-width:19px; height:19px; padding:0 5px; border-radius:12px; display:flex; align-items:center; justify-content:center; background:#e5bd62; color:#020302; font-size:9px; font-weight:700; }
       .hn-chat-screen { padding-bottom:max(24px, env(safe-area-inset-bottom)); }
+      .hn-chat-screen.is-active ~ .controls { display:none !important; }
+      .experience:has(#hn-chat-screen.is-active) .controls { display:none !important; }
       .hn-chat-wrap { width:min(100%,720px); height:100%; margin:0 auto; display:flex; flex-direction:column; min-height:0; }
       .hn-chat-head { flex:0 0 auto; text-align:center; padding:4px 0 18px; }
       .hn-chat-head-title { margin:0; font-family:Georgia,"Times New Roman",serif; font-size:clamp(25px,7vw,38px); font-weight:400; letter-spacing:.04em; text-transform:uppercase; }
@@ -81,11 +72,19 @@
       .hn-chat-day { text-align:center; margin:13px 0 10px; color:rgba(244,241,232,.35); font-size:8px; letter-spacing:.22em; }
       .hn-chat-row { display:flex; margin:7px 0; }
       .hn-chat-row.mine { justify-content:flex-end; }
-      .hn-chat-bubble { max-width:min(82%,560px); padding:10px 12px 8px; border:1px solid rgba(229,189,98,.28); background:rgba(0,0,0,.46); backdrop-filter:blur(7px); }
+      .hn-chat-bubble { max-width:min(82%,560px); padding:10px 12px 8px; border:1px solid rgba(229,189,98,.28); background:rgba(0,0,0,.46); backdrop-filter:blur(7px); cursor:pointer; transition:border-color .2s ease, box-shadow .2s ease, transform .15s ease; }
       .hn-chat-row.mine .hn-chat-bubble { border-color:rgba(229,189,98,.55); background:rgba(75,52,15,.25); }
+      .hn-chat-bubble.hn-chat-selected { border-color:#fff1a8 !important; box-shadow:0 0 0 1px rgba(229,189,98,.35), 0 0 18px rgba(229,189,98,.10); transform:translateY(-1px); }
       .hn-chat-sender { margin-bottom:5px; color:#e5bd62; font-size:8px; font-weight:600; letter-spacing:.16em; text-transform:uppercase; }
       .hn-chat-text { color:#f4f1e8; font-size:14px; line-height:1.42; white-space:pre-wrap; overflow-wrap:anywhere; }
       .hn-chat-time { margin-top:5px; color:rgba(244,241,232,.34); font-size:8px; text-align:right; letter-spacing:.08em; }
+      .hn-chat-reply { flex:0 0 auto; display:none; align-items:stretch; border-top:1px solid rgba(229,189,98,.18); background:rgba(0,0,0,.22); }
+      .hn-chat-reply.is-visible { display:flex; }
+      .hn-chat-reply-line { width:2px; flex:0 0 2px; background:#e5bd62; }
+      .hn-chat-reply-copy { flex:1; min-width:0; padding:8px 10px; }
+      .hn-chat-reply-label { color:#e5bd62; font-size:8px; font-weight:600; letter-spacing:.16em; text-transform:uppercase; }
+      .hn-chat-reply-text { margin-top:4px; color:rgba(244,241,232,.60); font-size:11px; line-height:1.3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+      .hn-chat-reply-close { width:42px; border:0; background:transparent; color:rgba(244,241,232,.60); font-size:18px; }
       .hn-chat-compose { flex:0 0 auto; display:flex; gap:8px; padding-top:8px; border-top:1px solid rgba(229,189,98,.18); }
       .hn-chat-input { flex:1; min-width:0; min-height:48px; max-height:110px; resize:none; padding:13px 12px; border:1px solid rgba(229,189,98,.45); border-radius:0; outline:none; background:rgba(0,0,0,.42); color:#f4f1e8; font-size:14px; line-height:1.35; }
       .hn-chat-input::placeholder { color:rgba(244,241,232,.35); }
@@ -96,6 +95,28 @@
       @media (max-height:700px) { .hn-chat-head { padding-bottom:10px; } .hn-chat-bubble { padding:8px 10px 7px; } }
     `;
     document.head.appendChild(style);
+  }
+
+  function closeReply() {
+    replyTarget = null;
+    chatScreen?.querySelector('.hn-chat-reply')?.classList.remove('is-visible');
+    chatScreen?.querySelectorAll('.hn-chat-bubble.hn-chat-selected').forEach(el => el.classList.remove('hn-chat-selected'));
+  }
+
+  function selectMessage(id) {
+    const message = messages.find(m => m.id === id);
+    if (!message) return;
+    replyTarget = message;
+    chatScreen?.querySelectorAll('.hn-chat-bubble').forEach(el => el.classList.toggle('hn-chat-selected', el.dataset.messageId === id));
+    const reply = chatScreen?.querySelector('.hn-chat-reply');
+    if (reply) {
+      reply.classList.add('is-visible');
+      const who = reply.querySelector('.hn-chat-reply-label');
+      const text = reply.querySelector('.hn-chat-reply-text');
+      if (who) who.textContent = `RESPONDER A ${message.sender_name || 'MIEMBRO'}`;
+      if (text) text.textContent = message.message || '';
+    }
+    inputEl?.focus();
   }
 
   function buildScreen() {
@@ -111,6 +132,11 @@
           <div class="hn-chat-head-sub">COMUNICACIÓN INTERNA · TIEMPO REAL</div>
         </div>
         <div class="hn-chat-list" aria-live="polite"></div>
+        <div class="hn-chat-reply">
+          <div class="hn-chat-reply-line"></div>
+          <div class="hn-chat-reply-copy"><div class="hn-chat-reply-label">RESPONDER</div><div class="hn-chat-reply-text"></div></div>
+          <button class="hn-chat-reply-close" type="button" aria-label="Cerrar respuesta">×</button>
+        </div>
         <form class="hn-chat-compose">
           <textarea class="hn-chat-input" rows="1" maxlength="1000" placeholder="Escribe un mensaje..."></textarea>
           <button class="hn-chat-send" type="submit">ENVIAR</button>
@@ -123,11 +149,8 @@
     inputEl = chatScreen.querySelector('.hn-chat-input');
     sendEl = chatScreen.querySelector('.hn-chat-send');
     chatScreen.querySelector('.hn-chat-compose').addEventListener('submit', sendMessage);
-    chatScreen.querySelector('.hn-chat-back').addEventListener('click', () => {
-      chatScreen.classList.remove('is-active');
-      const active = document.querySelector('.screen:not(#hn-chat-screen).is-active');
-      if (!active) document.querySelector('.screen')?.classList.add('is-active');
-    });
+    chatScreen.querySelector('.hn-chat-reply-close').addEventListener('click', closeReply);
+    chatScreen.querySelector('.hn-chat-back').addEventListener('click', () => closeChat(true));
     inputEl.addEventListener('input', () => { inputEl.style.height='auto'; inputEl.style.height=Math.min(inputEl.scrollHeight,110)+'px'; });
     inputEl.addEventListener('keydown', e => {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); chatScreen.querySelector('.hn-chat-compose').requestSubmit(); }
@@ -144,40 +167,34 @@
       const day = dayLabel(m.created_at), mine = me && m.profile_id === me.id;
       let html = '';
       if (day !== lastDay) { html += `<div class="hn-chat-day">${esc(day)}</div>`; lastDay = day; }
-      html += `<div class="hn-chat-row ${mine?'mine':''}"><div class="hn-chat-bubble"><div class="hn-chat-sender">${esc(m.sender_name || 'MIEMBRO')}</div><div class="hn-chat-text">${esc(m.message)}</div><div class="hn-chat-time">${esc(formatTime(m.created_at))}</div></div></div>`;
+      html += `<div class="hn-chat-row ${mine?'mine':''}"><div class="hn-chat-bubble" data-message-id="${esc(m.id)}"><div class="hn-chat-sender">${esc(m.sender_name || 'MIEMBRO')}</div><div class="hn-chat-text">${esc(m.message)}</div><div class="hn-chat-time">${esc(formatTime(m.created_at))}</div></div></div>`;
       return html;
     }).join('');
+    listEl.querySelectorAll('.hn-chat-bubble').forEach(bubble => bubble.addEventListener('click', () => selectMessage(bubble.dataset.messageId)));
+    if (replyTarget) {
+      const current = messages.find(m => m.id === replyTarget.id);
+      if (current) selectMessage(current.id); else closeReply();
+    }
     requestAnimationFrame(() => { listEl.scrollTop = listEl.scrollHeight; });
   }
 
-  function setUnread(count) {
+  function updateUnread() {
     const module = ensureHomeModule();
     if (!module) return;
-    badgeEl = module.querySelector('.hn-chat-unread');
-    if (!badgeEl) { badgeEl = document.createElement('span'); badgeEl.className='hn-chat-unread'; module.appendChild(badgeEl); }
-    if (count > 0) { badgeEl.textContent = count > 99 ? '99+' : String(count); badgeEl.hidden=false; }
-    else { badgeEl.hidden=true; }
-  }
-
-  function markRead() {
-    localStorage.setItem(READ_KEY, new Date().toISOString());
-    setUnread(0);
-  }
-
-  function updateUnread() {
+    let badge = module.querySelector('.hn-chat-unread');
+    if (!badge) { badge = document.createElement('span'); badge.className='hn-chat-unread'; badge.style.cssText='position:absolute;top:10px;right:48px;min-width:19px;height:19px;padding:0 5px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:#e5bd62;color:#020302;font-size:9px;font-weight:700;'; module.appendChild(badge); }
     const last = localStorage.getItem(READ_KEY);
-    if (!last) { setUnread(messages.length); return; }
-    const t = Date.parse(last);
-    setUnread(messages.filter(m => Date.parse(m.created_at) > t).length);
+    const count = !last ? messages.length : messages.filter(m => Date.parse(m.created_at) > Date.parse(last)).length;
+    badge.textContent = count > 99 ? '99+' : String(count); badge.hidden = count <= 0;
   }
+
+  function markRead() { localStorage.setItem(READ_KEY, new Date().toISOString()); updateUnread(); }
 
   async function loadMessages() {
-    const sb = client();
-    if (!sb) return;
+    const sb = client(); if (!sb) return;
     const { data, error } = await sb.from(CHAT_TABLE).select('id,profile_id,sender_name,message,created_at').order('created_at', { ascending:true }).limit(200);
     if (error) { console.warn('HAVANA NICE chat load failed:', error); return; }
-    messages = data || [];
-    render(); updateUnread();
+    messages = data || []; render(); updateUnread();
   }
 
   async function sendMessage(e) {
@@ -187,57 +204,79 @@
     if (!sb || !p?.id || !text || text.length > MAX_LENGTH) return;
     sendEl.disabled = true;
     try {
-      const { data, error } = await sb.rpc('send_chat_message', { p_profile_id:p.id, p_message:text });
+      let finalText = text;
+      if (replyTarget) {
+        const quote = `${replyTarget.sender_name || 'MIEMBRO'}: ${replyTarget.message || ''}`;
+        finalText = `↳ ${quote}\n${text}`.slice(0, MAX_LENGTH);
+      }
+      const { data, error } = await sb.rpc('send_chat_message', { p_profile_id:p.id, p_message:finalText });
       if (error) throw error;
-      inputEl.value=''; inputEl.style.height='auto';
+      inputEl.value=''; inputEl.style.height='auto'; closeReply();
       const row = Array.isArray(data) ? data[0] : data;
       if (row && !messages.some(m => m.id === row.id)) { messages.push(row); messages.sort((a,b)=>new Date(a.created_at)-new Date(b.created_at)); render(); }
       markRead();
     } catch (error) {
-      console.error('HAVANA NICE chat send failed:', error);
-      alert('No se pudo enviar el mensaje.');
+      console.error('HAVANA NICE chat send failed:', error); alert('No se pudo enviar el mensaje.');
     } finally { sendEl.disabled=false; inputEl?.focus(); }
   }
 
   function subscribe() {
-    const sb = client();
-    if (!sb || chatChannel) return;
-    chatChannel = sb.channel('hn-chat-realtime')
-      .on('postgres_changes', { event:'INSERT', schema:'public', table:CHAT_TABLE }, payload => {
-        const row = payload.new;
-        if (!messages.some(m => m.id === row.id)) messages.push(row);
-        messages.sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
-        render();
-        const active = chatScreen?.classList.contains('is-active');
-        if (active) markRead(); else updateUnread();
-      })
-      .subscribe();
+    const sb = client(); if (!sb || chatChannel) return;
+    chatChannel = sb.channel('hn-chat-realtime').on('postgres_changes', { event:'INSERT', schema:'public', table:CHAT_TABLE }, payload => {
+      const row = payload.new;
+      if (!messages.some(m => m.id === row.id)) messages.push(row);
+      messages.sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
+      render();
+      if (chatScreen?.classList.contains('is-active')) markRead(); else updateUnread();
+    }).subscribe();
   }
 
-  function openChat() {
+  function closeChat(fromButton = false) {
+    if (!chatScreen) return;
+    closeReply();
+    chatScreen.classList.remove('is-active');
+    if (previousScreen) previousScreen.classList.add('is-active');
+    else document.getElementById('homeScreen')?.classList.add('is-active');
+    const video = document.getElementById('backgroundVideo');
+    if (video) video.muted = videoWasMuted;
+    if (historyArmed && fromButton) {
+      historyArmed = false;
+      try { history.back(); } catch (_) {}
+    } else if (!fromButton) {
+      historyArmed = false;
+    }
+  }
+
+  function openChat(fromPopState = false) {
     buildScreen();
+    previousScreen = document.querySelector('.screen.is-active:not(#hn-chat-screen)') || document.getElementById('homeScreen');
     document.querySelectorAll('.screen').forEach(s => { if (s !== chatScreen) s.classList.remove('is-active'); });
     chatScreen.classList.add('is-active');
-    markRead();
-    render();
+    markRead(); render();
+    const video = document.getElementById('backgroundVideo');
+    if (video) { videoWasMuted = !!video.muted; video.muted = true; video.play().catch(()=>{}); }
+    if (!fromPopState && !historyArmed) {
+      try { history.pushState({ ...(history.state || {}), hnChat:true }, '', location.href); historyArmed=true; } catch (_) {}
+    }
     setTimeout(() => inputEl?.focus(), 250);
   }
 
   function wireModule() {
     const module = ensureHomeModule();
     if (!module || module.dataset.hnChatBound === '1') return;
-    module.dataset.hnChatBound='1';
-    module.addEventListener('click', openChat);
+    module.dataset.hnChatBound='1'; module.addEventListener('click', () => openChat());
+  }
+
+  function wireNativeBack() {
+    window.addEventListener('popstate', event => {
+      if (chatScreen?.classList.contains('is-active')) closeChat(false);
+    });
   }
 
   async function init() {
     if (initialized) return;
-    initialized=true;
-    wireModule();
-    buildScreen();
-    await loadMessages();
-    subscribe();
-    setInterval(async () => { if (!chatScreen?.classList.contains('is-active')) { await loadMessages(); } }, 5000);
+    initialized=true; wireModule(); buildScreen(); wireNativeBack(); await loadMessages(); subscribe();
+    setInterval(async () => { if (!chatScreen?.classList.contains('is-active')) await loadMessages(); }, 5000);
   }
 
   const boot = () => setTimeout(init, 250);
