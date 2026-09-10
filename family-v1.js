@@ -24,8 +24,8 @@
     module.dataset.module = 'FAMILIA';
     const title = module.querySelector('.module-title');
     const subtitle = module.querySelector('.module-subtitle');
-    if (title) title.textContent = 'Familia';
-    if (subtitle) subtitle.textContent = 'Familia HAVANA NICE';
+    if (title) title.textContent = 'Familia HAVANA NICE';
+    if (subtitle) subtitle.textContent = '';
 
     const screen = document.createElement('section');
     screen.id = 'familyScreen';
