@@ -76,10 +76,8 @@ $('nAdd').onclick=async()=>{const title=$('nTitle').value.trim(),message=$('nMes
 $('songAdd').onclick=async()=>{const title=$('songTitle').value.trim(),artist=$('songArtist').value.trim(),category=$('songCategory').value;if(!title){$('songMsg').textContent='Escribe un título';return}const{error}=await s.rpc('admin_create_repertoire_song',{p_title:title,p_artist:artist||null,p_category:category,p_position:songs.length+1});if(error){$('songMsg').textContent='No se pudo agregar';return}$('songTitle').value='';$('songArtist').value='';$('songMsg').textContent='Canción agregada';loadSongs()};
 $('logout').onclick=async()=>{await s.auth.signOut();check()};check();
 </script>
-<script src="./notifications-admin-fix.js?v=ce95df23ba462a618a4765faeddb49a2691f3f35"></script>
-<script src="./notifications-admin-fix.js?v=6fbcae961ca8f305ceb9423e2465584debbb2101"></script>
-<script src="./notifications-admin-fix.js?v=737cd368367c2da918c674666df67c8c8fe9f7ba"></script>
-<script src="./calendar-v1.js?v=e5ef37c00be135950dcada6a5ce39a6a24a1d221"></script>
-<script src="./notifications-admin-fix.js?v=e5ef37c00be135950dcada6a5ce39a6a24a1d221"></script>
+<script src="./calendar-v1.js?v=a16a50a1281c21b05adbf629fddf66ad1aabe50e"></script>
+<script src="./notifications-admin-fix.js?v=a16a50a1281c21b05adbf629fddf66ad1aabe50e"></script>
+<script src="./admin-ui-v1.js?v=a16a50a1281c21b05adbf629fddf66ad1aabe50e"></script>
 </body>
 </html>
