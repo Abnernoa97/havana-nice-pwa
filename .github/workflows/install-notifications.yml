@@ -42,9 +42,9 @@ jobs:
           s=s.replace('</body>',tags+'</body>',1);p.write_text(s,encoding='utf-8')
 
           a=Path('admin.html'); h=a.read_text(encoding='utf-8')
-          for pattern in [r'\s*<script src="\./calendar-v1\.js(?:\?v=[^"\']+)?"></script>',r'\s*<script src="\./notifications-admin-fix\.js(?:\?v=[^"\']+)?"></script>',r'\s*<script src="\./admin-ui-v1\.js(?:\?v=[^"\']+)?"></script>']:
+          for pattern in [r'\s*<script src="\./calendar-v1\.js(?:\?v=[^"\']+)?"></script>',r'\s*<script src="\./notifications-admin-fix\.js(?:\?v=[^"\']+)?"></script>',r'\s*<script src="\./admin-ui-v1\.js(?:\?v=[^"\']+)?"></script>',r'\s*<script src="\./admin-pwa\.js(?:\?v=[^"\']+)?"></script>']:
             h=re.sub(pattern,'',h)
-          tags=f'<script src="./calendar-v1.js?v={sha}"></script>\n<script src="./notifications-admin-fix.js?v={sha}"></script>\n<script src="./admin-ui-v1.js?v={sha}"></script>\n'
+          tags=f'<script src="./calendar-v1.js?v={sha}"></script>\n<script src="./notifications-admin-fix.js?v={sha}"></script>\n<script src="./admin-ui-v1.js?v={sha}"></script>\n<script src="./admin-pwa.js?v={sha}"></script>\n'
           h=h.replace('</body>',tags+'</body>',1)
           a.write_text(h,encoding='utf-8')
           PY
@@ -54,5 +54,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add index.html admin.html
           if git diff --cached --quiet; then echo "No generated changes to commit."; exit 0; fi
-          git commit -m "feat: compact admin dashboard"
+          git commit -m "feat: installable admin app"
           git push origin HEAD:main
