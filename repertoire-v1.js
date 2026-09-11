@@ -317,7 +317,7 @@
     started = true;
     sync(false);
     subscribe();
-    repertoirePollTimer = setInterval(function () { sync(false); }, 5000);
+    repertoirePollTimer = setInterval(function () { sync(false); }, 30000);
   }
 
   function watchSession() {
@@ -325,7 +325,7 @@
     sessionPollTimer = setInterval(function () {
       if (isLoggedIn()) start();
       else if (started) stop();
-    }, 1000);
+    }, 5000);
   }
 
   function bindGenericRestore() {
