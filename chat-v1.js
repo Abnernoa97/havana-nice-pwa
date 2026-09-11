@@ -6,6 +6,7 @@
   const CHAT_TABLE = 'chat_messages';
   const MAX_LENGTH = 1000;
   const READ_KEY = 'hn_chat_last_read_at';
+  const REPLY_SEPARATOR = '\n---\n';
   let chatChannel = null;
   let messages = [];
   let chatScreen = null;
@@ -18,7 +19,7 @@
   let previousScreen = null;
   let videoWasMuted = true;
 
-  const esc = (value) => String(value ?? '').replace(/[&<>'"]/g, ch => ({ '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;' }[ch]));
+  const esc = (value) => String(value ?? '').replace(/[&<>'\"]/g, ch => ({ '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','\"':'&quot;' }[ch]));
   const session = () => {
     try { return JSON.parse(sessionStorage.getItem('hn_profile') || 'null'); } catch (_) { return null; }
   };
@@ -38,6 +39,32 @@
     const y = new Date(now); y.setDate(now.getDate()-1);
     if (same(d, y)) return 'AYER';
     return new Intl.DateTimeFormat('es-MX', { day:'2-digit', month:'short', year:'numeric' }).format(d).toUpperCase();
+  }
+
+  function parseReplyMessage(value) {
+    const raw = String(value ?? '');
+    if (!raw.startsWith('↳ ')) return { quote: null, text: raw };
+    const separatorIndex = raw.indexOf(REPLY_SEPARATOR);
+    if (separatorIndex >= 0) {
+      const quote = raw.slice(2, separatorIndex);
+      const text = raw.slice(separatorIndex + REPLY_SEPARATOR.length);
+      const colon = quote.indexOf(': ');
+      return {
+        quote: colon >= 0 ? { sender: quote.slice(0, colon), text: quote.slice(colon + 2) } : { sender:'MIEMBRO', text:quote },
+        text
+      };
+    }
+    const lineBreak = raw.indexOf('\n');
+    if (lineBreak >= 0) {
+      const quote = raw.slice(2, lineBreak);
+      const text = raw.slice(lineBreak + 1);
+      const colon = quote.indexOf(': ');
+      return {
+        quote: colon >= 0 ? { sender: quote.slice(0, colon), text: quote.slice(colon + 2) } : { sender:'MIEMBRO', text:quote },
+        text
+      };
+    }
+    return { quote:null, text:raw };
   }
 
   function ensureHomeModule() {
@@ -71,14 +98,18 @@
       .hn-chat-list { flex:1 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:4px 2px 18px; scrollbar-width:none; }
       .hn-chat-list::-webkit-scrollbar { display:none; }
       .hn-chat-day { text-align:center; margin:13px 0 10px; color:rgba(244,241,232,.35); font-size:8px; letter-spacing:.22em; }
-      .hn-chat-row { display:flex; margin:7px 0; }
+      .hn-chat-row { display:flex; margin:7px 0; transition:transform .18s ease; }
       .hn-chat-row.mine { justify-content:flex-end; }
-      .hn-chat-bubble { max-width:min(82%,560px); padding:10px 12px 8px; border:1px solid rgba(229,189,98,.28); background:rgba(0,0,0,.46); backdrop-filter:blur(7px); cursor:pointer; transition:border-color .2s ease, box-shadow .2s ease, transform .15s ease; }
+      .hn-chat-bubble { max-width:min(82%,560px); padding:10px 12px 8px; border:1px solid rgba(229,189,98,.28); background:rgba(0,0,0,.46); backdrop-filter:blur(7px); cursor:pointer; touch-action:pan-y; user-select:none; transition:border-color .2s ease, box-shadow .2s ease, transform .15s ease; }
       .hn-chat-row.mine .hn-chat-bubble { border-color:rgba(229,189,98,.55); background:rgba(75,52,15,.25); }
       .hn-chat-bubble.hn-chat-selected { border-color:#fff1a8 !important; box-shadow:0 0 0 1px rgba(229,189,98,.35), 0 0 18px rgba(229,189,98,.10); transform:translateY(-1px); }
       .hn-chat-sender { margin-bottom:5px; color:#e5bd62; font-size:8px; font-weight:600; letter-spacing:.16em; text-transform:uppercase; }
-      .hn-chat-text { color:#f4f1e8; font-size:14px; line-height:1.42; white-space:pre-wrap; overflow-wrap:anywhere; }
+      .hn-chat-text { color:#f4f1e8; font-size:14px; line-height:1.42; white-space:pre-wrap; overflow-wrap:anywhere; user-select:text; }
       .hn-chat-time { margin-top:5px; color:rgba(244,241,232,.34); font-size:8px; text-align:right; letter-spacing:.08em; }
+      .hn-chat-quoted { margin-bottom:8px; padding:7px 9px; border-left:2px solid #e5bd62; background:rgba(229,189,98,.08); border-radius:0; }
+      .hn-chat-quoted-sender { color:#e5bd62; font-size:8px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; margin-bottom:3px; }
+      .hn-chat-quoted-text { color:rgba(244,241,232,.58); font-size:11px; line-height:1.3; white-space:pre-wrap; overflow:hidden; max-height:42px; }
+      .hn-chat-row.mine .hn-chat-quoted { background:rgba(229,189,98,.10); }
       .hn-chat-reply { flex:0 0 auto; display:none; align-items:stretch; border-top:1px solid rgba(229,189,98,.18); background:rgba(0,0,0,.22); }
       .hn-chat-reply.is-visible { display:flex; }
       .hn-chat-reply-line { width:2px; flex:0 0 2px; background:#e5bd62; }
@@ -109,15 +140,50 @@
     if (!message) return;
     replyTarget = message;
     chatScreen?.querySelectorAll('.hn-chat-bubble').forEach(el => el.classList.toggle('hn-chat-selected', el.dataset.messageId === id));
+    const parsed = parseReplyMessage(message.message);
     const reply = chatScreen?.querySelector('.hn-chat-reply');
     if (reply) {
       reply.classList.add('is-visible');
       const who = reply.querySelector('.hn-chat-reply-label');
       const text = reply.querySelector('.hn-chat-reply-text');
       if (who) who.textContent = `RESPONDER A ${message.sender_name || 'MIEMBRO'}`;
-      if (text) text.textContent = message.message || '';
+      if (text) text.textContent = parsed.text || message.message || '';
     }
     inputEl?.focus();
+  }
+
+  function wireMessageInteractions() {
+    if (!listEl) return;
+    listEl.querySelectorAll('.hn-chat-bubble').forEach(bubble => {
+      bubble.addEventListener('click', () => {
+        if (bubble.dataset.hnSwiped === '1') { bubble.dataset.hnSwiped='0'; return; }
+        selectMessage(bubble.dataset.messageId);
+      });
+      let startX = 0, startY = 0, tracking = false, swiped = false;
+      bubble.addEventListener('pointerdown', e => {
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        startX = e.clientX; startY = e.clientY; tracking = true; swiped = false;
+        try { bubble.setPointerCapture(e.pointerId); } catch (_) {}
+      });
+      bubble.addEventListener('pointermove', e => {
+        if (!tracking) return;
+        const dx = e.clientX - startX, dy = e.clientY - startY;
+        if (dx > 12 && Math.abs(dx) > Math.abs(dy)) bubble.style.transform = `translateX(${Math.min(dx,72)}px)`;
+      });
+      const finishSwipe = e => {
+        if (!tracking) return;
+        const dx = e.clientX - startX, dy = e.clientY - startY;
+        tracking = false;
+        bubble.style.transform = '';
+        if (dx >= 55 && Math.abs(dx) > Math.abs(dy) * 1.15) {
+          swiped = true;
+          bubble.dataset.hnSwiped = '1';
+          selectMessage(bubble.dataset.messageId);
+        }
+      };
+      bubble.addEventListener('pointerup', finishSwipe);
+      bubble.addEventListener('pointercancel', () => { tracking=false; bubble.style.transform=''; });
+    });
   }
 
   function buildScreen() {
@@ -165,13 +231,18 @@
     const me = currentProfile();
     let lastDay = '';
     listEl.innerHTML = messages.map(m => {
-      const day = dayLabel(m.created_at), mine = me && m.profile_id === me.id;
+      const day = dayLabel(m.created_at), mine = me && m.profile_id === me.id, parsed = parseReplyMessage(m.message);
       let html = '';
       if (day !== lastDay) { html += `<div class="hn-chat-day">${esc(day)}</div>`; lastDay = day; }
-      html += `<div class="hn-chat-row ${mine?'mine':''}"><div class="hn-chat-bubble" data-message-id="${esc(m.id)}"><div class="hn-chat-sender">${esc(m.sender_name || 'MIEMBRO')}</div><div class="hn-chat-text">${esc(m.message)}</div><div class="hn-chat-time">${esc(formatTime(m.created_at))}</div></div></div>`;
+      html += `<div class="hn-chat-row ${mine?'mine':''}"><div class="hn-chat-bubble" data-message-id="${esc(m.id)}">`;
+      html += `<div class="hn-chat-sender">${esc(m.sender_name || 'MIEMBRO')}</div>`;
+      if (parsed.quote) {
+        html += `<div class="hn-chat-quoted"><div class="hn-chat-quoted-sender">${esc(parsed.quote.sender)}</div><div class="hn-chat-quoted-text">${esc(parsed.quote.text)}</div></div>`;
+      }
+      html += `<div class="hn-chat-text">${esc(parsed.text)}</div><div class="hn-chat-time">${esc(formatTime(m.created_at))}</div></div></div>`;
       return html;
     }).join('');
-    listEl.querySelectorAll('.hn-chat-bubble').forEach(bubble => bubble.addEventListener('click', () => selectMessage(bubble.dataset.messageId)));
+    wireMessageInteractions();
     if (replyTarget) {
       const current = messages.find(m => m.id === replyTarget.id);
       if (current) selectMessage(current.id); else closeReply();
@@ -221,8 +292,9 @@
     try {
       let finalText = text;
       if (replyTarget) {
-        const quote = `${replyTarget.sender_name || 'MIEMBRO'}: ${replyTarget.message || ''}`;
-        finalText = `↳ ${quote}\n${text}`.slice(0, MAX_LENGTH);
+        const sender = replyTarget.sender_name || 'MIEMBRO';
+        const quoted = replyTarget.message || '';
+        finalText = `↳ ${sender}: ${quoted}${REPLY_SEPARATOR}${text}`.slice(0, MAX_LENGTH);
       }
       const { data, error } = await sb.rpc('send_chat_message', { p_profile_id:p.id, p_message:finalText });
       if (error) throw error;
