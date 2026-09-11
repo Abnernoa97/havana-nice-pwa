@@ -1,4 +1,4 @@
-const CACHE = "hn-v2";
+const CACHE = "hn-v3";
 
 const ASSETS = [
   "./",
@@ -9,16 +9,12 @@ const ASSETS = [
 ];
 
 self.addEventListener("install", event => {
-  event.waitUntil(
-    caches.open(CACHE).then(cache => cache.addAll(ASSETS))
-  );
+  event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)));
   self.skipWaiting();
 });
 
 self.addEventListener("activate", event => {
-  event.waitUntil(
-    caches.keys().then(keys => Promise.all(keys.filter(key => key !== CACHE).map(key => caches.delete(key)))
-  );
+  event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key !== CACHE).map(key => caches.delete(key)))));
   self.clients.claim();
 });
 
@@ -33,7 +29,7 @@ self.addEventListener("fetch", event => {
         const type=response.headers.get('content-type')||'';
         if(!type.includes('text/html'))return response;
         const html=await response.text();
-        const injected=html.replace('</body>','<script src="./chat-theme-v1.js?v=b45fe8759cfbee12eb4b130c86a7bf66ab031128"></script></body>');
+        const injected=html.replace('</body>','<script src="./chat-theme-v1.js?v=f4be77a0df2e40152b0cc1019aa1281a33a91d29"></script></body>');
         return new Response(injected,{status:response.status,statusText:response.statusText,headers:response.headers});
       }catch(_){return caches.match(event.request)}
     })());
