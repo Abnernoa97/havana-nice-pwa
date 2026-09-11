@@ -49,20 +49,14 @@
       const quote = raw.slice(2, separatorIndex);
       const text = raw.slice(separatorIndex + REPLY_SEPARATOR.length);
       const colon = quote.indexOf(': ');
-      return {
-        quote: colon >= 0 ? { sender: quote.slice(0, colon), text: quote.slice(colon + 2) } : { sender:'MIEMBRO', text:quote },
-        text
-      };
+      return { quote: colon >= 0 ? { sender: quote.slice(0, colon), text: quote.slice(colon + 2) } : { sender:'MIEMBRO', text:quote }, text };
     }
     const lineBreak = raw.indexOf('\n');
     if (lineBreak >= 0) {
       const quote = raw.slice(2, lineBreak);
       const text = raw.slice(lineBreak + 1);
       const colon = quote.indexOf(': ');
-      return {
-        quote: colon >= 0 ? { sender: quote.slice(0, colon), text: quote.slice(colon + 2) } : { sender:'MIEMBRO', text:quote },
-        text
-      };
+      return { quote: colon >= 0 ? { sender: quote.slice(0, colon), text: quote.slice(colon + 2) } : { sender:'MIEMBRO', text:quote }, text };
     }
     return { quote:null, text:raw };
   }
@@ -83,9 +77,8 @@
   }
 
   function ensureStyles() {
-    if (document.getElementById('hn-chat-styles')) return;
-    const style = document.createElement('style');
-    style.id = 'hn-chat-styles';
+    let style = document.getElementById('hn-chat-styles');
+    if (!style) { style = document.createElement('style'); style.id = 'hn-chat-styles'; document.head.appendChild(style); }
     style.textContent = `
       .hn-chat-module { position:relative; }
       .hn-chat-screen { padding-bottom:max(24px, env(safe-area-inset-bottom)); }
@@ -100,12 +93,13 @@
       .hn-chat-day { text-align:center; margin:13px 0 10px; color:rgba(244,241,232,.35); font-size:8px; letter-spacing:.22em; }
       .hn-chat-row { display:flex; margin:7px 0; transition:transform .18s ease; }
       .hn-chat-row.mine { justify-content:flex-end; }
-      .hn-chat-bubble { max-width:min(82%,560px); padding:10px 12px 8px; border:1px solid rgba(229,189,98,.28); background:rgba(0,0,0,.46); backdrop-filter:blur(7px); cursor:pointer; touch-action:pan-y; user-select:none; transition:border-color .2s ease, box-shadow .2s ease, transform .15s ease, background .2s ease; }
-      .hn-chat-row.mine .hn-chat-bubble { border-color:rgba(229,189,98,.72); background:rgba(20,74,52,.82); box-shadow:inset 0 0 0 1px rgba(229,189,98,.08), 0 4px 16px rgba(0,0,0,.14); }
+      .hn-chat-bubble { max-width:min(82%,560px); padding:10px 12px 8px; border:1px solid rgba(229,189,98,.32); background:rgba(0,0,0,.58) !important; backdrop-filter:blur(7px); cursor:pointer; touch-action:pan-y; user-select:none; transition:border-color .2s ease, box-shadow .2s ease, transform .15s ease, background .2s ease; }
+      .hn-chat-row.mine .hn-chat-bubble { border-color:#e5bd62 !important; background:#0d5a3d !important; box-shadow:inset 0 0 0 1px rgba(255,241,168,.10), 0 4px 18px rgba(0,0,0,.20); }
+      .hn-chat-row:not(.mine) .hn-chat-bubble { background:#171717 !important; border-color:rgba(229,189,98,.30) !important; }
       .hn-chat-bubble.hn-chat-selected { border-color:#fff1a8 !important; box-shadow:0 0 0 1px rgba(229,189,98,.35), 0 0 18px rgba(229,189,98,.10); transform:translateY(-1px); }
       .hn-chat-sender { margin-bottom:5px; color:#e5bd62; font-size:8px; font-weight:600; letter-spacing:.16em; text-transform:uppercase; }
       .hn-chat-text { color:#f4f1e8; font-size:14px; line-height:1.42; white-space:pre-wrap; overflow-wrap:anywhere; user-select:text; }
-      .hn-chat-time { margin-top:5px; color:rgba(244,241,232,.34); font-size:8px; text-align:right; letter-spacing:.08em; }
+      .hn-chat-time { margin-top:5px; color:rgba(244,241,232,.42); font-size:8px; text-align:right; letter-spacing:.08em; }
       .hn-chat-quoted { margin-bottom:8px; padding:7px 9px; border-left:2px solid #e5bd62; background:rgba(229,189,98,.08); border-radius:0; }
       .hn-chat-quoted-sender { color:#e5bd62; font-size:8px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; margin-bottom:3px; }
       .hn-chat-quoted-text { color:rgba(244,241,232,.58); font-size:11px; line-height:1.3; white-space:pre-wrap; overflow:hidden; max-height:42px; }
@@ -125,7 +119,6 @@
       .hn-chat-empty { padding:45px 20px; text-align:center; color:rgba(244,241,232,.38); font-size:9px; letter-spacing:.18em; text-transform:uppercase; }
       @media (max-height:700px) { .hn-chat-head { padding-bottom:10px; } .hn-chat-bubble { padding:8px 10px 7px; } .hn-chat-input { min-height:70px; } .hn-chat-send { min-height:48px; } }
     `;
-    document.head.appendChild(style);
   }
 
   function closeReply() {
@@ -158,10 +151,10 @@
         if (bubble.dataset.hnSwiped === '1') { bubble.dataset.hnSwiped='0'; return; }
         selectMessage(bubble.dataset.messageId);
       });
-      let startX = 0, startY = 0, tracking = false, swiped = false;
+      let startX = 0, startY = 0, tracking = false;
       bubble.addEventListener('pointerdown', e => {
         if (e.pointerType === 'mouse' && e.button !== 0) return;
-        startX = e.clientX; startY = e.clientY; tracking = true; swiped = false;
+        startX = e.clientX; startY = e.clientY; tracking = true;
         try { bubble.setPointerCapture(e.pointerId); } catch (_) {}
       });
       bubble.addEventListener('pointermove', e => {
@@ -175,7 +168,6 @@
         tracking = false;
         bubble.style.transform = '';
         if (dx >= 55 && Math.abs(dx) > Math.abs(dy) * 1.15) {
-          swiped = true;
           bubble.dataset.hnSwiped = '1';
           selectMessage(bubble.dataset.messageId);
         }
@@ -228,14 +220,14 @@
     const me = currentProfile();
     let lastDay = '';
     listEl.innerHTML = messages.map(m => {
-      const day = dayLabel(m.created_at), mine = me && m.profile_id === me.id, parsed = parseReplyMessage(m.message);
+      const day = dayLabel(m.created_at);
+      const mine = !!me && String(m.profile_id) === String(me.id);
+      const parsed = parseReplyMessage(m.message);
       let html = '';
       if (day !== lastDay) { html += `<div class="hn-chat-day">${esc(day)}</div>`; lastDay = day; }
-      html += `<div class="hn-chat-row ${mine?'mine':''}"><div class="hn-chat-bubble" data-message-id="${esc(m.id)}">`;
+      html += `<div class="hn-chat-row ${mine ? 'mine' : 'other'}"><div class="hn-chat-bubble" data-message-id="${esc(m.id)}">`;
       html += `<div class="hn-chat-sender">${esc(m.sender_name || 'MIEMBRO')}</div>`;
-      if (parsed.quote) {
-        html += `<div class="hn-chat-quoted"><div class="hn-chat-quoted-sender">${esc(parsed.quote.sender)}</div><div class="hn-chat-quoted-text">${esc(parsed.quote.text)}</div></div>`;
-      }
+      if (parsed.quote) html += `<div class="hn-chat-quoted"><div class="hn-chat-quoted-sender">${esc(parsed.quote.sender)}</div><div class="hn-chat-quoted-text">${esc(parsed.quote.text)}</div></div>`;
       html += `<div class="hn-chat-text">${esc(parsed.text)}</div><div class="hn-chat-time">${esc(formatTime(m.created_at))}</div></div></div>`;
       return html;
     }).join('');
@@ -254,10 +246,7 @@
     const lastTime = last ? Date.parse(last) : NaN;
     const count = Number.isNaN(lastTime) ? messages.length : messages.filter(m => Date.parse(m.created_at) > lastTime).length;
     let badge = module.querySelector('.hn-chat-unread');
-    if (count <= 0) {
-      if (badge) badge.remove();
-      return;
-    }
+    if (count <= 0) { if (badge) badge.remove(); return; }
     if (!badge) {
       badge = document.createElement('span');
       badge.className='hn-chat-unread';
@@ -323,12 +312,8 @@
     else document.getElementById('homeScreen')?.classList.add('is-active');
     const video = document.getElementById('backgroundVideo');
     if (video) video.muted = videoWasMuted;
-    if (historyArmed && fromButton) {
-      historyArmed = false;
-      try { history.back(); } catch (_) {}
-    } else if (!fromButton) {
-      historyArmed = false;
-    }
+    if (historyArmed && fromButton) { historyArmed = false; try { history.back(); } catch (_) {} }
+    else if (!fromButton) historyArmed = false;
   }
 
   function openChat(fromPopState = false) {
@@ -339,9 +324,7 @@
     markRead(); render();
     const video = document.getElementById('backgroundVideo');
     if (video) { videoWasMuted = !!video.muted; video.muted = true; video.play().catch(()=>{}); }
-    if (!fromPopState && !historyArmed) {
-      try { history.pushState({ ...(history.state || {}), hnChat:true }, '', location.href); historyArmed=true; } catch (_) {}
-    }
+    if (!fromPopState && !historyArmed) { try { history.pushState({ ...(history.state || {}), hnChat:true }, '', location.href); historyArmed=true; } catch (_) {} }
     setTimeout(() => inputEl?.focus(), 250);
   }
 
@@ -352,9 +335,7 @@
   }
 
   function wireNativeBack() {
-    window.addEventListener('popstate', event => {
-      if (chatScreen?.classList.contains('is-active')) closeChat(false);
-    });
+    window.addEventListener('popstate', () => { if (chatScreen?.classList.contains('is-active')) closeChat(false); });
   }
 
   async function init() {
