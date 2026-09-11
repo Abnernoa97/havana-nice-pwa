@@ -4,6 +4,7 @@
 
   const SUPABASE_URL = 'https://xzfradccsxonmauinecl.supabase.co';
   const CHAT_TABLE = 'chat_messages';
+  const AUDIO_BUCKET = 'chat-audio';
   const MAX_LENGTH = 1000;
   const READ_KEY = 'hn_chat_last_read_at';
   const REPLY_SEPARATOR = '\n---\n';
@@ -13,11 +14,16 @@
   let listEl = null;
   let inputEl = null;
   let sendEl = null;
+  let micEl = null;
   let initialized = false;
   let replyTarget = null;
   let historyArmed = false;
   let previousScreen = null;
   let videoWasMuted = true;
+  let mediaRecorder = null;
+  let audioChunks = [];
+  let recordingStartedAt = 0;
+  let recordingTimer = null;
 
   const esc = (value) => String(value ?? '').replace(/[&<>'\"]/g, ch => ({ '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','\"':'&quot;' }[ch]));
   const session = () => {
@@ -30,6 +36,13 @@
   function formatTime(ts) {
     try { return new Intl.DateTimeFormat('es-MX', { hour:'2-digit', minute:'2-digit' }).format(new Date(ts)); }
     catch (_) { return ''; }
+  }
+
+  function formatDuration(seconds) {
+    const total = Math.max(0, Math.floor(Number(seconds) || 0));
+    const m = Math.floor(total / 60);
+    const s = total % 60;
+    return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
   }
 
   function dayLabel(ts) {
@@ -104,6 +117,9 @@
       .hn-chat-quoted-sender { color:#e5bd62; font-size:8px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; margin-bottom:3px; }
       .hn-chat-quoted-text { color:rgba(244,241,232,.58); font-size:11px; line-height:1.3; white-space:pre-wrap; overflow:hidden; max-height:42px; }
       .hn-chat-row.mine .hn-chat-quoted { background:rgba(229,189,98,.10); }
+      .hn-chat-audio { width:min(100%,360px); height:42px; display:block; margin-top:2px; accent-color:#e5bd62; }
+      .hn-chat-audio-label { display:flex; align-items:center; gap:8px; color:#f4f1e8; font-size:11px; letter-spacing:.10em; text-transform:uppercase; }
+      .hn-chat-audio-icon { color:#e5bd62; font-size:17px; line-height:1; }
       .hn-chat-reply { flex:0 0 auto; display:none; align-items:stretch; border-top:1px solid rgba(229,189,98,.18); background:rgba(0,0,0,.22); }
       .hn-chat-reply.is-visible { display:flex; }
       .hn-chat-reply-line { width:2px; flex:0 0 2px; background:#e5bd62; }
@@ -112,11 +128,20 @@
       .hn-chat-reply-text { margin-top:4px; color:rgba(244,241,232,.60); font-size:11px; line-height:1.3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
       .hn-chat-reply-close { width:42px; border:0; background:transparent; color:rgba(244,241,232,.60); font-size:18px; }
       .hn-chat-compose { flex:0 0 auto; display:flex; flex-direction:column; gap:8px; padding-top:8px; border-top:1px solid rgba(229,189,98,.18); }
-      .hn-chat-input { width:100%; min-width:0; min-height:78px; max-height:150px; resize:none; box-sizing:border-box; padding:14px 12px; border:1px solid rgba(229,189,98,.45); border-radius:0; outline:none; background:rgba(0,0,0,.42); color:#f4f1e8; font-size:14px; line-height:1.4; }
+      .hn-chat-input-wrap { position:relative; width:100%; }
+      .hn-chat-input { width:100%; min-width:0; min-height:78px; max-height:150px; resize:none; box-sizing:border-box; padding:14px 58px 14px 12px; border:1px solid rgba(229,189,98,.45); border-radius:0; outline:none; background:rgba(0,0,0,.42); color:#f4f1e8; font-size:14px; line-height:1.4; }
       .hn-chat-input::placeholder { color:rgba(244,241,232,.35); }
+      .hn-chat-mic { position:absolute; right:9px; bottom:9px; width:42px; height:42px; border:1px solid rgba(229,189,98,.65); border-radius:50%; background:rgba(0,0,0,.55); color:#e5bd62; display:flex; align-items:center; justify-content:center; font-size:20px; line-height:1; }
+      .hn-chat-mic.is-recording { border-color:#fff1a8; background:#6d1515; color:#fff1a8; animation:hnChatPulse 1.15s ease-in-out infinite; }
+      .hn-chat-mic:disabled { opacity:.45; }
+      .hn-chat-recording { display:none; align-items:center; justify-content:space-between; min-height:42px; padding:0 12px; border:1px solid rgba(229,189,98,.35); background:rgba(0,0,0,.42); color:#f4f1e8; }
+      .hn-chat-recording.is-visible { display:flex; }
+      .hn-chat-recording-status { color:#e5bd62; font-size:9px; font-weight:600; letter-spacing:.15em; text-transform:uppercase; }
+      .hn-chat-recording-time { font-variant-numeric:tabular-nums; font-size:13px; letter-spacing:.08em; }
       .hn-chat-send { width:100%; min-height:52px; border:1px solid #e5bd62; border-radius:0; background:rgba(0,0,0,.35); color:#fff1a8; font-size:10px; font-weight:600; letter-spacing:.16em; text-transform:uppercase; }
       .hn-chat-send:disabled { opacity:.4; }
       .hn-chat-empty { padding:45px 20px; text-align:center; color:rgba(244,241,232,.38); font-size:9px; letter-spacing:.18em; text-transform:uppercase; }
+      @keyframes hnChatPulse { 0%,100% { transform:scale(1); } 50% { transform:scale(1.08); } }
       @media (max-height:700px) { .hn-chat-head { padding-bottom:10px; } .hn-chat-bubble { padding:8px 10px 7px; } .hn-chat-input { min-height:70px; } .hn-chat-send { min-height:48px; } }
     `;
   }
@@ -139,7 +164,7 @@
       const who = reply.querySelector('.hn-chat-reply-label');
       const text = reply.querySelector('.hn-chat-reply-text');
       if (who) who.textContent = `RESPONDER A ${message.sender_name || 'MIEMBRO'}`;
-      if (text) text.textContent = parsed.text || message.message || '';
+      if (text) text.textContent = message.message_type === 'audio' ? '🎙 NOTA DE VOZ' : (parsed.text || message.message || '');
     }
     inputEl?.focus();
   }
@@ -177,6 +202,113 @@
     });
   }
 
+  function pickAudioMime() {
+    if (!window.MediaRecorder) return '';
+    const types = ['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/ogg;codecs=opus'];
+    return types.find(type => MediaRecorder.isTypeSupported(type)) || '';
+  }
+
+  function updateRecordingUI() {
+    const box = chatScreen?.querySelector('.hn-chat-recording');
+    const time = chatScreen?.querySelector('.hn-chat-recording-time');
+    if (!box || !time) return;
+    box.classList.add('is-visible');
+    time.textContent = formatDuration((Date.now() - recordingStartedAt) / 1000);
+  }
+
+  function stopRecordingTimer() {
+    if (recordingTimer) clearInterval(recordingTimer);
+    recordingTimer = null;
+  }
+
+  async function uploadVoiceNote(blob, duration) {
+    const sb = client(), p = currentProfile();
+    if (!sb || !p?.id || !blob?.size) throw new Error('No se pudo preparar el audio.');
+    const mime = blob.type || 'audio/webm';
+    const ext = mime.includes('mp4') ? 'm4a' : mime.includes('ogg') ? 'ogg' : 'webm';
+    const path = `${p.id}/${crypto.randomUUID()}.${ext}`;
+    const { error: uploadError } = await sb.storage.from(AUDIO_BUCKET).upload(path, blob, { contentType:mime, upsert:false });
+    if (uploadError) throw uploadError;
+    const { data:urlData } = sb.storage.from(AUDIO_BUCKET).getPublicUrl(path);
+    const audioUrl = urlData?.publicUrl;
+    if (!audioUrl) throw new Error('No se pudo obtener la URL del audio.');
+    const { data, error } = await sb.rpc('send_chat_audio', { p_profile_id:p.id, p_audio_url:audioUrl, p_audio_duration:duration });
+    if (error) throw error;
+    const row = Array.isArray(data) ? data[0] : data;
+    if (row && !messages.some(m => m.id === row.id)) { messages.push(row); messages.sort((a,b)=>new Date(a.created_at)-new Date(b.created_at)); render(); }
+    markRead();
+  }
+
+  function resetRecordingUI() {
+    stopRecordingTimer();
+    const box = chatScreen?.querySelector('.hn-chat-recording');
+    const time = chatScreen?.querySelector('.hn-chat-recording-time');
+    if (box) box.classList.remove('is-visible');
+    if (time) time.textContent = '00:00';
+    micEl?.classList.remove('is-recording');
+    micEl?.setAttribute('aria-label','Grabar nota de voz');
+    micEl?.setAttribute('title','Grabar nota de voz');
+  }
+
+  function startRecording() {
+    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+      alert('Este dispositivo o navegador no permite grabar notas de voz.');
+      return;
+    }
+    const mimeType = pickAudioMime();
+    navigator.mediaDevices.getUserMedia({ audio:true }).then(stream => {
+      audioChunks = [];
+      mediaRecorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+      recordingStartedAt = Date.now();
+      micEl?.classList.add('is-recording');
+      micEl?.setAttribute('aria-label','Detener grabación');
+      micEl?.setAttribute('title','Detener grabación');
+      updateRecordingUI();
+      recordingTimer = setInterval(updateRecordingUI, 250);
+      mediaRecorder.ondataavailable = event => { if (event.data?.size) audioChunks.push(event.data); };
+      mediaRecorder.onerror = () => {
+        stream.getTracks().forEach(track => track.stop());
+        mediaRecorder = null;
+        resetRecordingUI();
+        alert('No se pudo grabar el audio.');
+      };
+      mediaRecorder.onstop = async () => {
+        stopRecordingTimer();
+        stream.getTracks().forEach(track => track.stop());
+        const duration = Math.max(1, Math.round((Date.now() - recordingStartedAt) / 1000));
+        const blob = new Blob(audioChunks, { type: mediaRecorder?.mimeType || mimeType || 'audio/webm' });
+        mediaRecorder = null;
+        resetRecordingUI();
+        if (!blob.size) return;
+        const oldText = micEl?.textContent;
+        if (micEl) { micEl.disabled=true; micEl.textContent='↑'; }
+        try {
+          await uploadVoiceNote(blob, duration);
+        } catch (error) {
+          console.error('HAVANA NICE voice note failed:', error);
+          alert('No se pudo enviar la nota de voz.');
+        } finally {
+          if (micEl) { micEl.disabled=false; micEl.textContent=oldText || '🎙'; }
+          inputEl?.focus();
+        }
+      };
+      mediaRecorder.start();
+    }).catch(error => {
+      console.error('HAVANA NICE microphone permission failed:', error);
+      alert('Necesitamos permiso para usar el micrófono.');
+    });
+  }
+
+  function stopRecording() {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+  }
+
+  function toggleRecording() {
+    if (micEl?.disabled) return;
+    if (mediaRecorder && mediaRecorder.state === 'recording') stopRecording();
+    else startRecording();
+  }
+
   function buildScreen() {
     if (chatScreen) return chatScreen;
     ensureStyles();
@@ -196,7 +328,11 @@
           <button class="hn-chat-reply-close" type="button" aria-label="Cerrar respuesta">×</button>
         </div>
         <form class="hn-chat-compose">
-          <textarea class="hn-chat-input" rows="3" maxlength="1000" placeholder="Escribe un mensaje..."></textarea>
+          <div class="hn-chat-input-wrap">
+            <textarea class="hn-chat-input" rows="3" maxlength="1000" placeholder="Escribe un mensaje..."></textarea>
+            <button class="hn-chat-mic" type="button" aria-label="Grabar nota de voz" title="Grabar nota de voz">🎙</button>
+          </div>
+          <div class="hn-chat-recording"><span class="hn-chat-recording-status">GRABANDO NOTA DE VOZ</span><span class="hn-chat-recording-time">00:00</span></div>
           <button class="hn-chat-send" type="submit">ENVIAR</button>
         </form>
       </div>
@@ -205,8 +341,10 @@
     listEl = chatScreen.querySelector('.hn-chat-list');
     inputEl = chatScreen.querySelector('.hn-chat-input');
     sendEl = chatScreen.querySelector('.hn-chat-send');
+    micEl = chatScreen.querySelector('.hn-chat-mic');
     chatScreen.querySelector('.hn-chat-compose').addEventListener('submit', sendMessage);
     chatScreen.querySelector('.hn-chat-reply-close').addEventListener('click', closeReply);
+    micEl.addEventListener('click', toggleRecording);
     inputEl.addEventListener('input', () => { inputEl.style.height='auto'; inputEl.style.height=Math.min(inputEl.scrollHeight,150)+'px'; });
     inputEl.addEventListener('keydown', e => {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); chatScreen.querySelector('.hn-chat-compose').requestSubmit(); }
@@ -228,7 +366,12 @@
       html += `<div class="hn-chat-row ${mine ? 'mine' : 'other'}"><div class="hn-chat-bubble" data-message-id="${esc(m.id)}">`;
       html += `<div class="hn-chat-sender">${esc(m.sender_name || 'MIEMBRO')}</div>`;
       if (parsed.quote) html += `<div class="hn-chat-quoted"><div class="hn-chat-quoted-sender">${esc(parsed.quote.sender)}</div><div class="hn-chat-quoted-text">${esc(parsed.quote.text)}</div></div>`;
-      html += `<div class="hn-chat-text">${esc(parsed.text)}</div><div class="hn-chat-time">${esc(formatTime(m.created_at))}</div></div></div>`;
+      if (m.message_type === 'audio' && m.audio_url) {
+        html += `<div class="hn-chat-audio-label"><span class="hn-chat-audio-icon">🎙</span><span>NOTA DE VOZ</span></div><audio class="hn-chat-audio" controls preload="metadata" src="${esc(m.audio_url)}"></audio>`;
+      } else {
+        html += `<div class="hn-chat-text">${esc(parsed.text)}</div>`;
+      }
+      html += `<div class="hn-chat-time">${esc(formatTime(m.created_at))}</div></div></div>`;
       return html;
     }).join('');
     wireMessageInteractions();
@@ -264,7 +407,7 @@
 
   async function loadMessages() {
     const sb = client(); if (!sb) return;
-    const { data, error } = await sb.from(CHAT_TABLE).select('id,profile_id,sender_name,message,created_at').order('created_at', { ascending:true }).limit(200);
+    const { data, error } = await sb.from(CHAT_TABLE).select('id,profile_id,sender_name,message,created_at,message_type,audio_url,audio_duration').order('created_at', { ascending:true }).limit(200);
     if (error) { console.warn('HAVANA NICE chat load failed:', error); return; }
     messages = data || []; render(); updateUnread();
   }
@@ -279,7 +422,7 @@
       let finalText = text;
       if (replyTarget) {
         const sender = replyTarget.sender_name || 'MIEMBRO';
-        const quoted = replyTarget.message || '';
+        const quoted = replyTarget.message || (replyTarget.message_type === 'audio' ? '🎙 NOTA DE VOZ' : '');
         finalText = `↳ ${sender}: ${quoted}${REPLY_SEPARATOR}${text}`.slice(0, MAX_LENGTH);
       }
       const { data, error } = await sb.rpc('send_chat_message', { p_profile_id:p.id, p_message:finalText });
@@ -306,6 +449,7 @@
 
   function closeChat(fromButton = false) {
     if (!chatScreen) return;
+    if (mediaRecorder && mediaRecorder.state === 'recording') { try { mediaRecorder.stop(); } catch (_) {} }
     closeReply();
     chatScreen.classList.remove('is-active');
     if (previousScreen) previousScreen.classList.add('is-active');
