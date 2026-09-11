@@ -46,7 +46,7 @@
     card.classList.add(ACC);
     const title=head.querySelector('h1');
     const sub=head.querySelector('.sub');
-    if(title&&summaries[title.textContent.trim()])sub.textContent=summaries[title.textContent.trim()];
+    if(title&&summaries[title.textContent.trim()]&&sub)sub.textContent=summaries[title.textContent.trim()];
     const arrow=document.createElement('div');arrow.className='hn-admin-arrow';arrow.setAttribute('aria-hidden','true');arrow.textContent='⌄';
     head.appendChild(arrow);
     const body=document.createElement('div');body.className='hn-admin-body hn-admin-collapsible';
@@ -54,19 +54,12 @@
     children.forEach(x=>body.appendChild(x));
     card.appendChild(body);
     head.setAttribute('role','button');head.setAttribute('tabindex','0');head.setAttribute('aria-expanded','false');
-    const toggle=()=>{
-      const open=!card.classList.contains('hn-open');
-      card.classList.toggle('hn-open',open);
-      head.setAttribute('aria-expanded',String(open));
-    };
+    const toggle=()=>{const open=!card.classList.contains('hn-open');card.classList.toggle('hn-open',open);head.setAttribute('aria-expanded',String(open));};
     head.addEventListener('click',toggle);
     head.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();toggle()}});
   }
   function scan(){document.querySelectorAll('.dashboard>.card').forEach(enhance)}
-  function init(){
-    style();scan();
-    const root=document.querySelector('.dashboard');
-    if(root){new MutationObserver(scan).observe(root,{childList:true,subtree:true});}
-  }
+  function loadChatAdmin(){if(document.getElementById('hnAdminChatScript'))return;const script=document.createElement('script');script.id='hnAdminChatScript';script.src='./admin-chat-v1.js?v=1';document.body.appendChild(script)}
+  function init(){style();scan();loadChatAdmin();const root=document.querySelector('.dashboard');if(root)new MutationObserver(scan).observe(root,{childList:true,subtree:true});}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();
