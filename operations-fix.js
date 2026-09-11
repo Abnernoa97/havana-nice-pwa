@@ -19,7 +19,8 @@
         card.appendChild(button);
       });
     }
-    decorate();window.addEventListener('hn-calendar-updated',()=>setTimeout(decorate,100));setInterval(decorate,1500);
+    decorate();
+    window.addEventListener('hn-calendar-updated',()=>setTimeout(decorate,100));
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();
