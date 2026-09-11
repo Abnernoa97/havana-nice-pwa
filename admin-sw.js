@@ -1,9 +1,8 @@
-const CACHE='hn-admin-v1';
+const CACHE='hn-admin-v2';
 const ASSETS=[
   './admin.html',
   './admin-manifest.json',
   './admin-ui-v1.js',
-  './notifications-admin-fix.js',
   './calendar-v1.js',
   './havana-nice-icon-192.png',
   './havana-nice-icon-512.png'
