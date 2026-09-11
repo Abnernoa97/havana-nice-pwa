@@ -1,3 +1,4 @@
+/* HAVANA NICE — FAMILIA / CHAT-STYLE NAVIGATION */
 (() => {
   'use strict';
 
@@ -9,140 +10,131 @@
     { name: 'ANDY REY', role: 'MÚSICO' }
   ];
 
+  let familyScreen = null;
   let historyArmed = false;
   let previousScreen = null;
   let videoWasMuted = true;
 
-  function ready() {
-    const homeScreen = document.getElementById('homeScreen');
-    const homeModules = document.querySelector('.modules');
-    if (!homeScreen || !homeModules) return;
+  function home() {
+    return document.getElementById('homeScreen');
+  }
 
-    const module = Array.from(homeModules.querySelectorAll('.module')).find((el) => {
-      const number = el.querySelector('.module-number')?.textContent?.trim();
-      const title = el.querySelector('.module-title')?.textContent?.trim().toUpperCase();
-      return number === '04' || title === 'MÚSICOS' || title === 'MUSICOS';
-    });
-    if (!module) return;
-
-    module.dataset.module = 'FAMILIA';
-    const title = module.querySelector('.module-title');
-    const subtitle = module.querySelector('.module-subtitle');
-    if (title) title.textContent = 'Familia HAVANA NICE';
-    if (subtitle) subtitle.textContent = '';
-
-    const screen = document.createElement('section');
-    screen.id = 'familyScreen';
-    screen.className = 'screen family-screen';
-    screen.innerHTML = `
-      <div class="screen-inner family-inner">
-        <div class="family-header">
-          <p class="brand metallic-gold">HAVANA NICE</p>
-          <div class="brand-line"></div>
-          <p class="family-caption">The Family</p>
-        </div>
-        <button id="familyTopBackButton" class="back-button family-top-back" type="button">Volver</button>
-        <div class="family-list">
-          ${FAMILY.map((person, index) => `
-            <button class="family-member" type="button" data-family-index="${index}">
-              <span class="family-number">0${index + 1}</span>
-              <span class="family-copy">
-                <span class="family-name">${person.name}</span>
-                <span class="family-role">${person.role}</span>
-              </span>
-              <span class="family-arrow">›</span>
-            </button>
-          `).join('')}
-        </div>
-        <div class="family-footer">
-          <button id="familyBackButton" class="back-button" type="button">Volver</button>
-        </div>
-      </div>
-    `;
-
-    document.getElementById('experience')?.appendChild(screen);
+  function buildFamily() {
+    if (familyScreen) return familyScreen;
 
     const style = document.createElement('style');
-    style.id = 'family-v1-style';
+    style.id = 'hn-family-styles';
     style.textContent = `
-      .family-screen { padding-bottom: max(76px, env(safe-area-inset-bottom)); }
-      .family-inner { width: min(100%, 650px); height: 100%; margin: 0 auto; display: flex; flex-direction: column; padding-top: 5px; }
-      .family-header { flex: 0 0 auto; text-align: center; margin-bottom: 14px; }
-      .family-caption { margin: 20px 0 0; color: rgba(244,241,232,.56); font-size: 8px; letter-spacing: .30em; text-transform: uppercase; }
-      .family-top-back { flex: 0 0 auto; width: 100%; margin: 0 0 12px; }
-      .family-list { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 3px 28px 0; scrollbar-width: thin; scrollbar-color: rgba(229,189,98,.55) transparent; }
-      .family-list::-webkit-scrollbar { width: 3px; }
-      .family-list::-webkit-scrollbar-track { background: transparent; }
-      .family-list::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #fff1a8, #8c6424); }
-      .family-member { position: relative; width: 100%; min-height: 78px; display: flex; align-items: center; gap: 17px; padding: 14px 18px; margin-bottom: 9px; border: 1px solid rgba(229,189,98,.50); border-radius: 0; background: linear-gradient(105deg, rgba(0,0,0,.58), rgba(20,14,5,.28), rgba(0,0,0,.46)); color: var(--white); text-align: left; backdrop-filter: blur(8px); transition: background .3s ease, border-color .3s ease, transform .2s ease; }
-      .family-member:hover { border-color: var(--gold-light); background: linear-gradient(105deg, rgba(111,75,20,.25), rgba(0,0,0,.38), rgba(111,75,20,.20)); }
-      .family-member:active { transform: scale(.985); }
-      .family-number { width: 27px; flex: 0 0 27px; color: var(--gold); font-family: Georgia, "Times New Roman", serif; font-size: 13px; letter-spacing: .08em; }
-      .family-copy { flex: 1; min-width: 0; }
-      .family-name { display: block; color: var(--white); font-family: Georgia, "Times New Roman", serif; font-size: 20px; font-weight: 400; letter-spacing: .05em; line-height: 1.1; text-transform: uppercase; }
-      .family-role { display: block; margin-top: 7px; color: rgba(244,241,232,.43); font-size: 8px; letter-spacing: .22em; text-transform: uppercase; }
-      .family-arrow { color: var(--gold-light); font-size: 23px; font-weight: 300; line-height: 1; }
-      .family-footer { flex: 0 0 auto; padding-top: 7px; }
-      @media (max-height: 700px) { .family-member { min-height: 65px; } .family-role { display: none; } .family-header { margin-bottom: 8px; } .family-top-back { margin-bottom: 8px; } }
+      .family-screen { padding-bottom:max(76px, env(safe-area-inset-bottom)); }
+      .family-inner { width:min(100%, 650px); height:100%; margin:0 auto; display:flex; flex-direction:column; padding-top:5px; }
+      .family-header { flex:0 0 auto; text-align:center; margin-bottom:18px; }
+      .family-heading { margin:20px 0 0; font-family:Georgia,"Times New Roman",serif; font-size:clamp(40px,11vw,68px); font-weight:400; line-height:.9; letter-spacing:-.035em; text-transform:uppercase; }
+      .family-caption { margin:12px 0 0; color:rgba(244,241,232,.56); font-size:8px; letter-spacing:.30em; text-transform:uppercase; }
+      .family-list { flex:1; min-height:0; overflow-y:auto; padding:4px 3px 28px 0; scrollbar-width:thin; scrollbar-color:rgba(229,189,98,.55) transparent; }
+      .family-list::-webkit-scrollbar { width:3px; }
+      .family-list::-webkit-scrollbar-thumb { background:linear-gradient(180deg,#fff1a8,#8c6424); }
+      .family-member { border:1px solid rgba(229,189,98,.40); background:linear-gradient(105deg,rgba(0,0,0,.54),rgba(28,20,8,.25),rgba(0,0,0,.42)); padding:16px; margin-bottom:9px; backdrop-filter:blur(7px); }
+      .family-member-name { color:var(--white); font-family:Georgia,"Times New Roman",serif; font-size:24px; line-height:1.05; text-transform:uppercase; }
+      .family-member-role { margin-top:8px; color:rgba(244,241,232,.70); font-size:9px; letter-spacing:.18em; text-transform:uppercase; }
+      .family-back { flex:0 0 auto; width:100%; height:44px; margin-top:8px; border:1px solid rgba(229,189,98,.35); border-radius:0; background:rgba(0,0,0,.25); color:rgba(244,241,232,.72); font-size:9px; letter-spacing:.2em; text-transform:uppercase; }
     `;
     document.head.appendChild(style);
 
-    function closeFamily(fromButton = false) {
-      screen.classList.remove('is-active');
-      if (previousScreen) previousScreen.classList.add('is-active');
-      else homeScreen.classList.add('is-active');
+    familyScreen = document.createElement('section');
+    familyScreen.className = 'screen family-screen';
+    familyScreen.id = 'familyScreen';
+    familyScreen.innerHTML = `
+      <div class="family-inner">
+        <div class="family-header">
+          <p class="brand metallic-gold">HAVANA NICE</p>
+          <div class="brand-line"></div>
+          <h2 class="family-heading metallic-gold">Familia</h2>
+          <p class="family-caption">Equipo · HAVANA NICE</p>
+        </div>
+        <div class="family-list">
+          ${FAMILY.map(person => `<article class="family-member"><div class="family-member-name">${person.name}</div><div class="family-member-role">${person.role}</div></article>`).join('')}
+        </div>
+        <button id="familyBackButton" class="family-back" type="button">VOLVER</button>
+      </div>
+    `;
 
-      const video = document.getElementById('backgroundVideo');
-      if (video) video.muted = videoWasMuted;
+    document.querySelector('.experience')?.appendChild(familyScreen);
 
-      if (historyArmed && fromButton) {
-        historyArmed = false;
-        try { history.back(); } catch (_) {}
-      } else if (!fromButton) {
-        historyArmed = false;
-      }
+    familyScreen.querySelector('#familyBackButton').addEventListener('click', () => closeFamily(true));
+    return familyScreen;
+  }
+
+  function openFamily(fromPopState = false) {
+    buildFamily();
+
+    if (!fromPopState) {
+      previousScreen = [...document.querySelectorAll('.screen.is-active')]
+        .find(screen => screen !== familyScreen) || home();
     }
 
-    function openFamily(fromPopState = false) {
-      previousScreen = document.querySelector('.screen.is-active:not(#familyScreen)') || homeScreen;
-      document.querySelectorAll('.screen').forEach((el) => {
-        if (el !== screen) el.classList.remove('is-active');
-      });
-      screen.classList.add('is-active');
+    document.querySelectorAll('.screen').forEach(screen => {
+      if (screen !== familyScreen) screen.classList.remove('is-active');
+    });
 
-      const video = document.getElementById('backgroundVideo');
-      if (video) {
-        videoWasMuted = !!video.muted;
-        video.muted = true;
-        video.play().catch(() => {});
-      }
+    familyScreen.classList.add('is-active');
 
-      if (!fromPopState && !historyArmed) {
-        try {
-          history.pushState({ ...(history.state || {}), hnFamily: true }, '', location.href);
-          historyArmed = true;
-        } catch (_) {}
-      }
+    const video = document.getElementById('backgroundVideo');
+    if (video) {
+      videoWasMuted = video.muted;
+      video.muted = true;
+      video.play?.().catch(() => {});
     }
 
-    const showFamily = (event) => {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      openFamily();
-    };
+    if (!fromPopState && !historyArmed) {
+      history.pushState({ hnFamily: true }, '', location.href);
+      historyArmed = true;
+    }
+  }
 
-    module.addEventListener('click', showFamily, true);
-    screen.querySelector('#familyTopBackButton')?.addEventListener('click', () => closeFamily(true));
-    screen.querySelector('#familyBackButton')?.addEventListener('click', () => closeFamily(true));
+  function closeFamily(fromButton = false) {
+    if (!familyScreen?.classList.contains('is-active')) return;
+
+    familyScreen.classList.remove('is-active');
+
+    const target = previousScreen || home();
+    document.querySelectorAll('.screen').forEach(screen => screen.classList.remove('is-active'));
+    target?.classList.add('is-active');
+
+    const video = document.getElementById('backgroundVideo');
+    if (video) video.muted = videoWasMuted;
+
+    if (fromButton && historyArmed) {
+      historyArmed = false;
+      history.back();
+    } else if (!fromButton) {
+      historyArmed = false;
+    }
+  }
+
+  function init() {
+    const modules = document.querySelector('.modules');
+    if (!modules) return;
+
+    let module = [...modules.querySelectorAll('.module')]
+      .find(el => /FAMILIA/i.test(el.textContent || ''));
+
+    if (!module) return;
+
+    module.dataset.module = 'FAMILIA';
+    const number = module.querySelector('.module-number');
+    const title = module.querySelector('.module-title');
+    const subtitle = module.querySelector('.module-subtitle');
+    if (number) number.textContent = '04';
+    if (title) title.textContent = 'FAMILIA HAVANA NICE';
+    if (subtitle) subtitle.textContent = 'EQUIPO HAVANA NICE';
+
+    module.addEventListener('click', () => openFamily(false));
 
     window.addEventListener('popstate', () => {
-      if (screen.classList.contains('is-active')) closeFamily(false);
+      if (familyScreen?.classList.contains('is-active')) closeFamily(false);
     });
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', ready, { once: true });
-  } else {
-    ready();
-  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once:true });
+  else init();
 })();
