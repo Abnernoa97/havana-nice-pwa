@@ -14,14 +14,11 @@
   function closeCalendar(fromButton = false) {
     const screen = calendar();
     if (!screen) return;
-
     screen.classList.remove('is-active');
     if (previousScreen) previousScreen.classList.add('is-active');
     else home()?.classList.add('is-active');
-
     const video = document.getElementById('backgroundVideo');
     if (video) video.muted = videoWasMuted;
-
     if (historyArmed && fromButton) {
       historyArmed = false;
       try { history.back(); } catch (_) {}
@@ -33,21 +30,18 @@
   function openCalendar() {
     const screen = calendar();
     if (!screen) return;
-
     previousScreen = document.querySelector('.screen.is-active:not(#calendarScreen)') || home();
     document.querySelectorAll('.screen').forEach(s => {
       if (s !== screen) s.classList.remove('is-active');
     });
     legacyModule()?.classList.remove('is-active');
     screen.classList.add('is-active');
-
     const video = document.getElementById('backgroundVideo');
     if (video) {
       videoWasMuted = !!video.muted;
       video.muted = true;
       video.play().catch(() => {});
     }
-
     if (!historyArmed) {
       try {
         history.pushState({ ...(history.state || {}), hnCalendar: true }, '', location.href);
@@ -58,16 +52,13 @@
 
   function ensureButton(screen) {
     if (screen.querySelector('.hn-calendar-back')) return;
-
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'hn-calendar-back';
     button.textContent = 'VOLVER';
     button.addEventListener('click', () => closeCalendar(true));
-
     const inner = screen.querySelector('.calendar-inner') || screen;
     inner.appendChild(button);
-
     if (!document.getElementById('hn-calendar-nav-style')) {
       const style = document.createElement('style');
       style.id = 'hn-calendar-nav-style';
@@ -81,7 +72,6 @@
     const module = [...document.querySelectorAll('.module[data-module]')]
       .find(x => x.dataset.module === 'CALENDARIO DE EVENTOS');
     if (!module) return false;
-
     bound = true;
     module.addEventListener('click', () => openCalendar());
     return true;
@@ -104,7 +94,5 @@
 
   const observer = new MutationObserver(watchCalendar);
   observer.observe(document.documentElement, { childList: true, subtree: true });
-
-  setInterval(watchCalendar, 500);
   watchCalendar();
 })();
