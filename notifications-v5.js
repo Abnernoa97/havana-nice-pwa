@@ -1,0 +1,3 @@
+/* Legacy compatibility stub.
+   Notifications now lives entirely in notifications.html.
+   This file intentionally performs no work. */
