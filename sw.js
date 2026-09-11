@@ -1,4 +1,4 @@
-const CACHE = "hn-v5";
+const CACHE = "hn-v6";
 
 const ASSETS = [
   "./",
@@ -20,20 +20,5 @@ self.addEventListener("activate", event => {
 
 self.addEventListener("fetch", event => {
   if (event.request.method !== "GET") return;
-  const url = new URL(event.request.url);
-  if (url.pathname.endsWith("/index.html") || url.pathname.endsWith("/")) {
-    event.respondWith((async()=>{
-      try {
-        const response = await fetch(event.request);
-        if(!response.ok)return response;
-        const type=response.headers.get('content-type')||'';
-        if(!type.includes('text/html'))return response;
-        const html=await response.text();
-        const injected=html.replace('</body>','<script src="./chat-theme-v1.js?v=f4be77a0df2e40152b0cc1019aa1281a33a91d29"></script><script src="./calendar-recipients-v1.js?v=a6e80f29a5ed64be9f164c7dfe88f27d737e416c"></script></body>');
-        return new Response(injected,{status:response.status,statusText:response.statusText,headers:response.headers});
-      }catch(_){return caches.match(event.request)}
-    })());
-    return;
-  }
   event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
 });
