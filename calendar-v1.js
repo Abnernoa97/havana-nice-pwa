@@ -48,6 +48,6 @@
     document.addEventListener('click',event=>{const other=event.target.closest('.module[data-module]');if(other&&other!==module)screen.classList.remove('is-active');},true);
     load();
     s.channel('calendar-events-live-v3').on('postgres_changes',{event:'*',schema:'public',table:'calendar_events'},()=>load()).subscribe();
-    setInterval(load,5000);
+    setInterval(load,30000);
   }
 })();
