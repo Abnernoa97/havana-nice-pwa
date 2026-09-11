@@ -3,6 +3,7 @@ name: Install musician notifications
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 concurrency:
   group: install-musician-notifications-main
@@ -27,8 +28,8 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
-          import re, os
-          sha=os.environ.get('GITHUB_SHA','4')
+          import re
+          sha=os.popen('git rev-parse HEAD').read().strip() if False else '4'
           p=Path('index.html'); s=p.read_text(encoding='utf-8')
           s=re.sub(r'\s*<link[^>]+rel=["\']manifest["\'][^>]*>','',s,flags=re.I)
           s=re.sub(r'\s*<script>\s*if\s*\(\s*["\']serviceWorker["\']\s+in\s+navigator\s*\)[\s\S]*?</script>','',s,flags=re.I)
