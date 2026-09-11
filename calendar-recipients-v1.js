@@ -1,4 +1,4 @@
-/* HAVANA NICE — CALENDAR RECIPIENTS V1 */
+/* HAVANA NICE — CALENDAR RECIPIENTS V2 */
 (function(){
   'use strict';
   const URL='https://xzfradccsxonmauinecl.supabase.co';
@@ -36,15 +36,21 @@
 
   async function initMusician(){
     const module=[...document.querySelectorAll('.module[data-module]')].find(x=>x.dataset.module==='CALENDARIO DE EVENTOS');if(!module)return;
+    /* Hide the calendar list immediately. calendar-v1 renders all public events first,
+       then this module applies recipient permissions. Visibility prevents unauthorized
+       cards from ever flashing on screen while the permission query is loading. */
+    const gateStyle=document.createElement('style');gateStyle.textContent='#calendarList.hn-recipient-pending{visibility:hidden!important}';document.head.appendChild(gateStyle);
+    const gate=()=>{const list=document.getElementById('calendarList');if(list)list.classList.add('hn-recipient-pending');return list};
+    gate();
     const s=await sb();
     const session=()=>{try{return JSON.parse(sessionStorage.getItem('hn_profile')||'null')}catch(_){return null}};
     const profile=()=>session()?.id||null;
     let applying=false;
-    async function filter(){const id=profile();if(!id)return[];const{data,error}=await s.rpc('get_calendar_events_for_profile',{p_profile_id:id});if(error){console.error('Calendar recipients error',error);return[];}return data||[];}
-    function renderFiltered(rows){const list=document.getElementById('calendarList');if(!list)return;const byId=new Set(rows.map(x=>x.id));list.querySelectorAll('.calendar-event-card').forEach(card=>{card.style.display=byId.has(card.dataset.eventId)?'':'none'});const empty=list.querySelector('.calendar-empty');if(empty)empty.style.display=rows.length?'none':'';}
+    async function filter(){const id=profile();if(!id)return null;const{data,error}=await s.rpc('get_calendar_events_for_profile',{p_profile_id:id});if(error){console.error('Calendar recipients error',error);return null;}return data||[];}
+    function renderFiltered(rows){const list=gate();if(!list)return;const cards=list.querySelectorAll('.calendar-event-card');if(rows===null){list.classList.remove('hn-recipient-pending');return;}const byId=new Set(rows.map(x=>x.id));cards.forEach(card=>{card.style.display=byId.has(card.dataset.eventId)?'':'none'});const empty=list.querySelector('.calendar-empty');if(empty)empty.style.display=rows.length?'none':'';list.classList.remove('hn-recipient-pending');}
     async function apply(){if(applying)return;applying=true;try{renderFiltered(await filter());}finally{applying=false;}}
     window.addEventListener('hn-calendar-updated',apply);
-    const observer=new MutationObserver(()=>apply());const target=document.getElementById('calendarList');if(target)observer.observe(target,{childList:true,subtree:true});
+    const observer=new MutationObserver(()=>apply());const target=gate();if(target)observer.observe(target,{childList:true,subtree:true});
     try{s.channel('calendar-recipient-sync').on('postgres_changes',{event:'*',schema:'public',table:'calendar_event_recipients'},()=>apply()).subscribe();}catch(e){console.warn('calendar recipient realtime',e)}
     setTimeout(apply,700);setInterval(apply,30000);
   }
