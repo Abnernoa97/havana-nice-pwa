@@ -27,7 +27,7 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
-          import re
+          import re, os
           sha=os.environ.get('GITHUB_SHA','4')
           p=Path('index.html'); s=p.read_text(encoding='utf-8')
           s=re.sub(r'\s*<link[^>]+rel=["\']manifest["\'][^>]*>','',s,flags=re.I)
