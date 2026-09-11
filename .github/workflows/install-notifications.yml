@@ -29,7 +29,8 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           import re
-          sha=os.popen('git rev-parse HEAD').read().strip() if False else '4'
+          import subprocess
+          sha=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
           p=Path('index.html'); s=p.read_text(encoding='utf-8')
           s=re.sub(r'\s*<link[^>]+rel=["\']manifest["\'][^>]*>','',s,flags=re.I)
           s=re.sub(r'\s*<script>\s*if\s*\(\s*["\']serviceWorker["\']\s+in\s+navigator\s*\)[\s\S]*?</script>','',s,flags=re.I)
