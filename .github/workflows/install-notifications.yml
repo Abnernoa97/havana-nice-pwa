@@ -37,6 +37,7 @@ jobs:
           s=s.replace('</body>',pwa+'</body>',1)
           patterns=[
             r'\s*<script(?: type="module")? src="\./notifications-v(?:2|3|4)\.js(?:\?v=[^"\']+)?"></script>',
+            r'\s*<script src="\./notifications-read-fix\.js(?:\?v=[^"\']+)?"></script>',
             r'\s*<script src="\./repertoire-v1\.js(?:\?v=[^"\']+)?"></script>',
             r'\s*<script src="\./calendar-v1\.js(?:\?v=[^"\']+)?"></script>',
             r'\s*<script src="\./calendar-expand\.js(?:\?v=[^"\']+)?"></script>',
@@ -59,6 +60,7 @@ jobs:
           s=s.replace(marker,bridge,1)
           tags=''.join([
             f'<script src="./notifications-v4.js?v={sha}"></script>\n',
+            f'<script src="./notifications-read-fix.js?v={sha}"></script>\n',
             f'<script src="./repertoire-v1.js?v={sha}"></script>\n',
             f'<script src="./calendar-v1.js?v={sha}"></script>\n',
             f'<script src="./calendar-expand.js?v={sha}"></script>\n',
