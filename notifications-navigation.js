@@ -18,14 +18,11 @@
   function closeNotifications(fromButton = false) {
     const screen = notifications();
     if (!screen) return;
-
     screen.classList.remove('is-active');
     if (previousScreen) previousScreen.classList.add('is-active');
     else home()?.classList.add('is-active');
-
     const video = document.getElementById('backgroundVideo');
     if (video) video.muted = videoWasMuted;
-
     if (historyArmed && fromButton) {
       historyArmed = false;
       try { history.back(); } catch (_) {}
@@ -36,16 +33,13 @@
 
   function openNotificationsHistory() {
     if (!isNotificationScreenActive()) return;
-
     previousScreen = document.querySelector('.screen.is-active:not(#moduleScreen)') || home();
-
     const video = document.getElementById('backgroundVideo');
     if (video) {
       videoWasMuted = !!video.muted;
       video.muted = true;
       video.play().catch(() => {});
     }
-
     if (!historyArmed) {
       try {
         history.pushState({ ...(history.state || {}), hnNotifications: true }, '', location.href);
@@ -57,7 +51,6 @@
   function ensureTopButton(screen) {
     const inner = screen.querySelector('.hn-notify-screen');
     if (!inner || inner.querySelector('.hn-notify-top-back')) return;
-
     const heading = inner.querySelector('.hn-n-head');
     const button = document.createElement('button');
     button.type = 'button';
@@ -68,10 +61,8 @@
       event.stopPropagation();
       closeNotifications(true);
     });
-
     if (heading) heading.insertAdjacentElement('afterend', button);
     else inner.insertBefore(button, inner.firstChild);
-
     if (!document.getElementById('hn-notify-nav-style')) {
       const style = document.createElement('style');
       style.id = 'hn-notify-nav-style';
@@ -85,7 +76,6 @@
     const module = [...document.querySelectorAll('.module[data-module]')]
       .find(x => x.dataset.module === 'NOTIFICACIONES');
     if (!module) return false;
-
     bound = true;
     module.addEventListener('click', () => {
       const before = document.querySelector('.screen.is-active:not(#moduleScreen)') || home();
@@ -94,7 +84,6 @@
         if (isNotificationScreenActive()) openNotificationsHistory();
       }, 0);
     }, true);
-
     return true;
   }
 
@@ -110,7 +99,5 @@
 
   const observer = new MutationObserver(watchNotifications);
   observer.observe(document.documentElement, { childList: true, subtree: true });
-
-  setInterval(watchNotifications, 500);
   watchNotifications();
 })();
