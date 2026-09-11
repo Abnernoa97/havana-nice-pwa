@@ -24,7 +24,7 @@ jobs:
         run: |
           git fetch origin main
           git reset --hard origin/main
-      - name: Inject PWA, realtime bridges and app modules
+      - name: Inject PWA, realtime bridges and lazy module loader
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -52,29 +52,17 @@ jobs:
             r'\s*<script src="\./chat-theme-v1\.js(?:\?v=[^"\']+)?"></script>',
             r'\s*<script src="\./calendar-recipients-v1\.js(?:\?v=[^"\']+)?"></script>',
             r'\s*<script src="\./navigation-fix\.js(?:\?v=[^"\']+)?"></script>',
-            r'\s*<script src="\./notifications-navigation\.js(?:\?v=[^"\']+)?"></script>'
+            r'\s*<script src="\./notifications-navigation\.js(?:\?v=[^"\']+)?"></script>',
+            r'\s*<script src="\./lazy-modules-v1\.js(?:\?v=[^"\']+)?"></script>'
           ]
           for pattern in patterns: s=re.sub(pattern,'',s)
           s=re.sub(r'^\s*window\.hnSupabase\s*=\s*supabase;\s*$','',s,flags=re.M)
           marker='  restoreSession();'
-          bridge='  restoreSession();\n\n  window.hnSupabase = supabase;'
+          bridge='  restoreSession();\n\n  window.hnSupabase = supabase;\n  window.HN_APP_REVISION = "'+sha+'";'
           if marker not in s: raise SystemExit('Could not find restoreSession() marker')
           s=s.replace(marker,bridge,1)
-          tags=''.join([
-            f'<script src="./notifications-v5.js?v={sha}"></script>\n',
-            f'<script src="./repertoire-v1.js?v={sha}"></script>\n',
-            f'<script src="./calendar-v1.js?v={sha}"></script>\n',
-            f'<script src="./calendar-expand.js?v={sha}"></script>\n',
-            f'<script src="./calendar-navigation.js?v={sha}"></script>\n',
-            f'<script src="./notifications-navigation.js?v={sha}"></script>\n',
-            f'<script src="./family-v1.js?v={sha}"></script>\n',
-            f'<script src="./operations-v1.js?v={sha}"></script>\n',
-            f'<script src="./operations-fix.js?v={sha}"></script>\n',
-            f'<script src="./chat-v1.js?v={sha}"></script>\n',
-            f'<script src="./chat-theme-v1.js?v={sha}"></script>\n',
-            f'<script src="./calendar-recipients-v1.js?v={sha}"></script>\n'
-          ])
-          s=s.replace('</body>',tags+'</body>',1)
+          lazy=f'<script src="./lazy-modules-v1.js?v={sha}"></script>\n'
+          s=s.replace('</body>',lazy+'</body>',1)
           p.write_text(s,encoding='utf-8')
 
           a=Path('admin.html'); h=a.read_text(encoding='utf-8')
