@@ -40,6 +40,7 @@ jobs:
           patterns=[
             r'\s*<script(?: type="module")? src="\./notifications-v(?:2|3|4|5)\.js(?:\?v=[^"\']+)?"></script>',
             r'\s*<script src="\./notifications-read-fix\.js(?:\?v=[^"\']+)?"></script>',
+            r'\s*<script src="\./entry-shell-v1\.js(?:\?v=[^"\']+)?"></script>',
             r'\s*<script src="\./home-shell-v1\.js(?:\?v=[^"\']+)?"></script>',
             r'\s*<script src="\./repertoire-v1\.js(?:\?v=[^"\']+)?"></script>',
             r'\s*<script src="\./calendar-v1\.js(?:\?v=[^"\']+)?"></script>',
@@ -62,6 +63,7 @@ jobs:
           if marker not in s: raise SystemExit('Could not find restoreSession() marker')
           s=s.replace(marker,bridge,1)
           tags=''.join([
+            f'<script src="./entry-shell-v1.js?v={sha}"></script>\n',
             f'<script src="./home-shell-v1.js?v={sha}"></script>\n',
             f'<script src="./notifications-v5.js?v={sha}"></script>\n',
             f'<script src="./repertoire-v1.js?v={sha}"></script>\n',
