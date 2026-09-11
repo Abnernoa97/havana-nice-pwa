@@ -117,14 +117,13 @@
       .hn-chat-reply-label { color:#e5bd62; font-size:8px; font-weight:600; letter-spacing:.16em; text-transform:uppercase; }
       .hn-chat-reply-text { margin-top:4px; color:rgba(244,241,232,.60); font-size:11px; line-height:1.3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
       .hn-chat-reply-close { width:42px; border:0; background:transparent; color:rgba(244,241,232,.60); font-size:18px; }
-      .hn-chat-compose { flex:0 0 auto; display:flex; gap:8px; padding-top:8px; border-top:1px solid rgba(229,189,98,.18); }
-      .hn-chat-input { flex:1; min-width:0; min-height:48px; max-height:110px; resize:none; padding:13px 12px; border:1px solid rgba(229,189,98,.45); border-radius:0; outline:none; background:rgba(0,0,0,.42); color:#f4f1e8; font-size:14px; line-height:1.35; }
+      .hn-chat-compose { flex:0 0 auto; display:flex; flex-direction:column; gap:8px; padding-top:8px; border-top:1px solid rgba(229,189,98,.18); }
+      .hn-chat-input { width:100%; min-width:0; min-height:78px; max-height:150px; resize:none; box-sizing:border-box; padding:14px 12px; border:1px solid rgba(229,189,98,.45); border-radius:0; outline:none; background:rgba(0,0,0,.42); color:#f4f1e8; font-size:14px; line-height:1.4; }
       .hn-chat-input::placeholder { color:rgba(244,241,232,.35); }
-      .hn-chat-send { flex:0 0 54px; min-height:48px; border:1px solid #e5bd62; border-radius:0; background:rgba(0,0,0,.35); color:#fff1a8; font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; }
+      .hn-chat-send { width:100%; min-height:52px; border:1px solid #e5bd62; border-radius:0; background:rgba(0,0,0,.35); color:#fff1a8; font-size:10px; font-weight:600; letter-spacing:.16em; text-transform:uppercase; }
       .hn-chat-send:disabled { opacity:.4; }
       .hn-chat-empty { padding:45px 20px; text-align:center; color:rgba(244,241,232,.38); font-size:9px; letter-spacing:.18em; text-transform:uppercase; }
-      .hn-chat-back { flex:0 0 auto; width:100%; height:44px; margin-top:8px; border:1px solid rgba(229,189,98,.35); border-radius:0; background:rgba(0,0,0,.25); color:rgba(244,241,232,.72); font-size:9px; letter-spacing:.2em; text-transform:uppercase; }
-      @media (max-height:700px) { .hn-chat-head { padding-bottom:10px; } .hn-chat-bubble { padding:8px 10px 7px; } }
+      @media (max-height:700px) { .hn-chat-head { padding-bottom:10px; } .hn-chat-bubble { padding:8px 10px 7px; } .hn-chat-input { min-height:70px; } .hn-chat-send { min-height:48px; } }
     `;
     document.head.appendChild(style);
   }
@@ -205,10 +204,9 @@
           <button class="hn-chat-reply-close" type="button" aria-label="Cerrar respuesta">×</button>
         </div>
         <form class="hn-chat-compose">
-          <textarea class="hn-chat-input" rows="1" maxlength="1000" placeholder="Escribe un mensaje..."></textarea>
+          <textarea class="hn-chat-input" rows="3" maxlength="1000" placeholder="Escribe un mensaje..."></textarea>
           <button class="hn-chat-send" type="submit">ENVIAR</button>
         </form>
-        <button class="hn-chat-back" type="button">VOLVER</button>
       </div>
     `;
     document.querySelector('.experience')?.appendChild(chatScreen);
@@ -217,8 +215,7 @@
     sendEl = chatScreen.querySelector('.hn-chat-send');
     chatScreen.querySelector('.hn-chat-compose').addEventListener('submit', sendMessage);
     chatScreen.querySelector('.hn-chat-reply-close').addEventListener('click', closeReply);
-    chatScreen.querySelector('.hn-chat-back').addEventListener('click', () => closeChat(true));
-    inputEl.addEventListener('input', () => { inputEl.style.height='auto'; inputEl.style.height=Math.min(inputEl.scrollHeight,110)+'px'; });
+    inputEl.addEventListener('input', () => { inputEl.style.height='auto'; inputEl.style.height=Math.min(inputEl.scrollHeight,150)+'px'; });
     inputEl.addEventListener('keydown', e => {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); chatScreen.querySelector('.hn-chat-compose').requestSubmit(); }
     });
