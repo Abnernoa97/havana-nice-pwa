@@ -30,12 +30,16 @@
     }
   }
 
-  function openCalendarHistory() {
+  function openCalendar() {
     const screen = calendar();
     if (!screen) return;
 
     previousScreen = document.querySelector('.screen.is-active:not(#calendarScreen)') || home();
+    document.querySelectorAll('.screen').forEach(s => {
+      if (s !== screen) s.classList.remove('is-active');
+    });
     legacyModule()?.classList.remove('is-active');
+    screen.classList.add('is-active');
 
     const video = document.getElementById('backgroundVideo');
     if (video) {
@@ -79,14 +83,7 @@
     if (!module) return false;
 
     bound = true;
-    module.addEventListener('click', () => {
-      const before = document.querySelector('.screen.is-active:not(#calendarScreen)') || home();
-      previousScreen = before;
-      setTimeout(() => {
-        if (calendar()?.classList.contains('is-active')) openCalendarHistory();
-      }, 0);
-    }, true);
-
+    module.addEventListener('click', () => openCalendar());
     return true;
   }
 
