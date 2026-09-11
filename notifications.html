@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#020302">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>HAVANA NICE — NOTIFICATIONS</title>
+  <style>
+    :root{--gold:#e5bd62;--gold-light:#fff1a8;--gold-dark:#8c6424;--white:#f4f1e8;--black:#020302}
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+    html,body{margin:0;min-height:100%;background:var(--black);color:var(--white);font-family:"Helvetica Neue",Helvetica,Arial,sans-serif}
+    body{min-height:100svh;padding:max(28px,env(safe-area-inset-top)) max(20px,env(safe-area-inset-right)) max(28px,env(safe-area-inset-bottom)) max(20px,env(safe-area-inset-left));overflow-x:hidden}
+    .page{width:min(100%,720px);margin:0 auto}
+    .brand{text-align:center;font:400 clamp(25px,6vw,39px)/1 Georgia,"Times New Roman",serif;letter-spacing:.18em;text-indent:.18em;text-transform:uppercase;background:linear-gradient(180deg,#fff6bd 0%,#f9df8a 14%,#d9ad4e 35%,#fff0a0 49%,#bd8730 64%,#f1cf70 80%,#8d5f20 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;text-shadow:0 4px 18px rgba(0,0,0,.42)}
+    .line{width:46px;height:1px;margin:18px auto 0;background:linear-gradient(90deg,var(--gold-dark),var(--gold-light),var(--gold-dark));box-shadow:0 0 8px rgba(229,189,98,.35)}
+    header{text-align:center;margin-bottom:28px}
+    h1{margin:25px 0 8px;font:400 clamp(40px,11vw,68px)/.9 Georgia,"Times New Roman",serif;letter-spacing:-.035em;text-transform:uppercase;background:linear-gradient(180deg,#fff6bd,#d9ad4e 38%,#fff0a0 55%,#8d5f20);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+    .caption{margin:0;color:rgba(244,241,232,.55);font-size:8px;letter-spacing:.3em;text-transform:uppercase}
+    #status{text-align:center;min-height:18px;margin:12px 0 18px;color:rgba(244,241,232,.55);font-size:9px;letter-spacing:.15em;text-transform:uppercase}
+    .list{display:grid;gap:10px}
+    .item{border:1px solid rgba(229,189,98,.42);background:linear-gradient(105deg,rgba(0,0,0,.58),rgba(28,20,8,.24),rgba(0,0,0,.44));padding:18px;backdrop-filter:blur(7px)}
+    .title{color:var(--white);font-size:13px;font-weight:600;letter-spacing:.14em;text-transform:uppercase}
+    .message{margin-top:10px;color:rgba(244,241,232,.78);font-size:13px;line-height:1.55;white-space:pre-wrap}
+    .images{display:grid;gap:8px;margin-top:14px}
+    .images img{display:block;width:100%;max-height:360px;object-fit:cover;border:1px solid rgba(229,189,98,.22)}
+    .date{margin-top:13px;color:rgba(244,241,232,.38);font-size:8px;letter-spacing:.13em;text-transform:uppercase}
+    .empty{padding:35px 20px;border:1px solid rgba(229,189,98,.25);text-align:center;color:rgba(244,241,232,.45);font-size:9px;letter-spacing:.2em;text-transform:uppercase}
+    .back{display:block;margin:22px auto 0;min-height:43px;padding:0 25px;border:1px solid var(--gold);border-radius:0;background:rgba(0,0,0,.24);color:var(--gold-light);font-size:9px;letter-spacing:.27em;text-indent:.27em;text-transform:uppercase;cursor:pointer}
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header>
+      <div class="brand">HAVANA NICE</div>
+      <div class="line"></div>
+      <h1>Notifications</h1>
+      <p class="caption">Private musician space</p>
+    </header>
+    <div id="status">Cargando…</div>
+    <section id="list" class="list" aria-live="polite"></section>
+    <button id="back" class="back" type="button">Volver</button>
+  </main>
+
+  <script type="module">
+    import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+
+    const SUPABASE_URL="https://xzfradccsxonmauinecl.supabase.co";
+    const SUPABASE_PUBLISHABLE_KEY="sb_publishable_Ip5rGK0UVIfXOfjs_RQ_LhA_c14foHN9";
+    const supabase=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);
+    const status=document.getElementById("status");
+    const list=document.getElementById("list");
+    let channel=null;
+
+    function profile(){
+      try{
+        const value=sessionStorage.getItem("hn_profile");
+        return value?JSON.parse(value):null;
+      }catch(_){return null}
+    }
+
+    function render(rows){
+      list.innerHTML="";
+      if(!rows.length){
+        list.innerHTML='<div class="empty">No notifications</div>';
+        status.textContent="Sin notificaciones";
+        return;
+      }
+      status.textContent=rows.length===1?"1 notificación":`${rows.length} notificaciones`;
+      rows.forEach(row=>{
+        const item=document.createElement("article"); item.className="item";
+        const title=document.createElement("div"); title.className="title"; title.textContent=row.title||"Notification"; item.appendChild(title);
+        if(row.message){const message=document.createElement("div");message.className="message";message.textContent=row.message;item.appendChild(message)}
+        const urls=Array.isArray(row.image_urls)?row.image_urls:(row.image_url?[row.image_url]:[]);
+        if(urls.length){const images=document.createElement("div");images.className="images";urls.slice(0,3).forEach(url=>{if(!url)return;const img=document.createElement("img");img.src=url;img.alt="Imagen de notificación";img.loading="lazy";images.appendChild(img)});item.appendChild(images)}
+        const date=document.createElement("div");date.className="date";date.textContent=row.created_at?new Date(row.created_at).toLocaleString():"";item.appendChild(date);
+        list.appendChild(item);
+      });
+    }
+
+    async function load(){
+      if(!profile()){
+        window.location.replace("./index.html");
+        return;
+      }
+      status.textContent="Cargando…";
+      const {data,error}=await supabase.from("notifications").select("id,title,message,image_url,image_urls,created_at").order("created_at",{ascending:false}).limit(50);
+      if(error){console.error("HAVANA NICE notifications:",error);status.textContent="No fue posible cargar las notificaciones";return}
+      render(data||[]);
+    }
+
+    function subscribe(){
+      channel=supabase.channel("hn-notifications-page").on("postgres_changes",{event:"INSERT",schema:"public",table:"notifications"},load).on("postgres_changes",{event:"DELETE",schema:"public",table:"notifications"},load).subscribe();
+    }
+
+    document.getElementById("back").addEventListener("click",()=>window.location.replace("./index.html"));
+    window.addEventListener("pagehide",()=>{if(channel)supabase.removeChannel(channel)});
+    load().then(subscribe);
+  </script>
+</body>
+</html>
