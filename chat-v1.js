@@ -24,6 +24,8 @@
   let audioChunks = [];
   let recordingStartedAt = 0;
   let recordingTimer = null;
+  let pendingAudioBlob = null;
+  let pendingAudioDuration = 0;
 
   const esc = (value) => String(value ?? '').replace(/[&<>'\"]/g, ch => ({ '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','\"':'&quot;' }[ch]));
   const session = () => {
@@ -117,9 +119,16 @@
       .hn-chat-quoted-sender { color:#e5bd62; font-size:8px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; margin-bottom:3px; }
       .hn-chat-quoted-text { color:rgba(244,241,232,.58); font-size:11px; line-height:1.3; white-space:pre-wrap; overflow:hidden; max-height:42px; }
       .hn-chat-row.mine .hn-chat-quoted { background:rgba(229,189,98,.10); }
-      .hn-chat-audio { width:min(100%,360px); height:42px; display:block; margin-top:2px; accent-color:#e5bd62; }
-      .hn-chat-audio-label { display:flex; align-items:center; gap:8px; color:#f4f1e8; font-size:11px; letter-spacing:.10em; text-transform:uppercase; }
+      .hn-chat-audio-label { display:flex; align-items:center; gap:8px; color:#f4f1e8; font-size:11px; letter-spacing:.10em; text-transform:uppercase; margin-bottom:7px; }
       .hn-chat-audio-icon { color:#e5bd62; font-size:17px; line-height:1; }
+      .hn-chat-audio-player { width:min(100%,360px); display:flex; align-items:center; gap:9px; }
+      .hn-chat-audio-play { width:40px; height:40px; flex:0 0 40px; border:1px solid rgba(229,189,98,.65); border-radius:50%; background:rgba(0,0,0,.32); color:#fff1a8; display:flex; align-items:center; justify-content:center; font-size:17px; line-height:1; padding:0; }
+      .hn-chat-audio-play.is-playing { font-size:14px; }
+      .hn-chat-audio-progress { flex:1; min-width:50px; height:4px; appearance:none; -webkit-appearance:none; background:rgba(244,241,232,.20); accent-color:#e5bd62; }
+      .hn-chat-audio-progress::-webkit-slider-thumb { appearance:none; -webkit-appearance:none; width:12px; height:12px; border-radius:50%; background:#e5bd62; border:0; }
+      .hn-chat-audio-progress::-moz-range-thumb { width:12px; height:12px; border-radius:50%; background:#e5bd62; border:0; }
+      .hn-chat-audio-duration { min-width:40px; color:rgba(244,241,232,.62); font-size:9px; font-variant-numeric:tabular-nums; text-align:right; }
+      .hn-chat-audio-native { display:none; }
       .hn-chat-reply { flex:0 0 auto; display:none; align-items:stretch; border-top:1px solid rgba(229,189,98,.18); background:rgba(0,0,0,.22); }
       .hn-chat-reply.is-visible { display:flex; }
       .hn-chat-reply-line { width:2px; flex:0 0 2px; background:#e5bd62; }
@@ -136,6 +145,7 @@
       .hn-chat-mic:disabled { opacity:.45; }
       .hn-chat-recording { display:none; align-items:center; justify-content:space-between; min-height:42px; padding:0 12px; border:1px solid rgba(229,189,98,.35); background:rgba(0,0,0,.42); color:#f4f1e8; }
       .hn-chat-recording.is-visible { display:flex; }
+      .hn-chat-recording.is-pending { border-color:#e5bd62; }
       .hn-chat-recording-status { color:#e5bd62; font-size:9px; font-weight:600; letter-spacing:.15em; text-transform:uppercase; }
       .hn-chat-recording-time { font-variant-numeric:tabular-nums; font-size:13px; letter-spacing:.08em; }
       .hn-chat-send { width:100%; min-height:52px; border:1px solid #e5bd62; border-radius:0; background:rgba(0,0,0,.35); color:#fff1a8; font-size:10px; font-weight:600; letter-spacing:.16em; text-transform:uppercase; }
@@ -172,12 +182,14 @@
   function wireMessageInteractions() {
     if (!listEl) return;
     listEl.querySelectorAll('.hn-chat-bubble').forEach(bubble => {
-      bubble.addEventListener('click', () => {
+      bubble.addEventListener('click', e => {
+        if (e.target.closest('.hn-chat-audio-player')) return;
         if (bubble.dataset.hnSwiped === '1') { bubble.dataset.hnSwiped='0'; return; }
         selectMessage(bubble.dataset.messageId);
       });
       let startX = 0, startY = 0, tracking = false;
       bubble.addEventListener('pointerdown', e => {
+        if (e.target.closest('.hn-chat-audio-player')) return;
         if (e.pointerType === 'mouse' && e.button !== 0) return;
         startX = e.clientX; startY = e.clientY; tracking = true;
         try { bubble.setPointerCapture(e.pointerId); } catch (_) {}
@@ -202,6 +214,47 @@
     });
   }
 
+  function wireAudioPlayers() {
+    if (!listEl) return;
+    let activeAudio = null;
+    listEl.querySelectorAll('.hn-chat-audio-player').forEach(player => {
+      const audio = player.querySelector('.hn-chat-audio-native');
+      const play = player.querySelector('.hn-chat-audio-play');
+      const progress = player.querySelector('.hn-chat-audio-progress');
+      const durationEl = player.querySelector('.hn-chat-audio-duration');
+      if (!audio || !play || !progress) return;
+
+      const setPlayIcon = () => { play.textContent = audio.paused ? '▶' : 'Ⅱ'; play.classList.toggle('is-playing', !audio.paused); };
+      const updateProgress = () => {
+        const duration = Number.isFinite(audio.duration) ? audio.duration : Number(player.dataset.duration || 0);
+        progress.max = duration || 1;
+        progress.value = duration ? audio.currentTime : 0;
+        if (durationEl) durationEl.textContent = formatDuration(duration);
+      };
+      audio.addEventListener('loadedmetadata', updateProgress);
+      audio.addEventListener('timeupdate', updateProgress);
+      audio.addEventListener('play', () => {
+        if (activeAudio && activeAudio !== audio) { activeAudio.pause(); activeAudio.currentTime = 0; }
+        activeAudio = audio;
+        setPlayIcon();
+      });
+      audio.addEventListener('pause', setPlayIcon);
+      audio.addEventListener('ended', () => { audio.currentTime=0; setPlayIcon(); updateProgress(); });
+      play.addEventListener('click', e => {
+        e.preventDefault(); e.stopPropagation();
+        if (audio.paused) audio.play().catch(() => alert('No se pudo reproducir la nota de voz.'));
+        else audio.pause();
+      });
+      progress.addEventListener('input', e => {
+        e.stopPropagation();
+        audio.currentTime = Number(progress.value) || 0;
+      });
+      progress.addEventListener('pointerdown', e => e.stopPropagation());
+      updateProgress();
+      setPlayIcon();
+    });
+  }
+
   function pickAudioMime() {
     if (!window.MediaRecorder) return '';
     const types = ['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/ogg;codecs=opus'];
@@ -221,33 +274,33 @@
     recordingTimer = null;
   }
 
-  async function uploadVoiceNote(blob, duration) {
-    const sb = client(), p = currentProfile();
-    if (!sb || !p?.id || !blob?.size) throw new Error('No se pudo preparar el audio.');
-    const mime = blob.type || 'audio/webm';
-    const ext = mime.includes('mp4') ? 'm4a' : mime.includes('ogg') ? 'ogg' : 'webm';
-    const path = `${p.id}/${crypto.randomUUID()}.${ext}`;
-    const { error: uploadError } = await sb.storage.from(AUDIO_BUCKET).upload(path, blob, { contentType:mime, upsert:false });
-    if (uploadError) throw uploadError;
-    const { data:urlData } = sb.storage.from(AUDIO_BUCKET).getPublicUrl(path);
-    const audioUrl = urlData?.publicUrl;
-    if (!audioUrl) throw new Error('No se pudo obtener la URL del audio.');
-    const { data, error } = await sb.rpc('send_chat_audio', { p_profile_id:p.id, p_audio_url:audioUrl, p_audio_duration:duration });
-    if (error) throw error;
-    const row = Array.isArray(data) ? data[0] : data;
-    if (row && !messages.some(m => m.id === row.id)) { messages.push(row); messages.sort((a,b)=>new Date(a.created_at)-new Date(b.created_at)); render(); }
-    markRead();
+  function showPendingAudio() {
+    const box = chatScreen?.querySelector('.hn-chat-recording');
+    const status = chatScreen?.querySelector('.hn-chat-recording-status');
+    const time = chatScreen?.querySelector('.hn-chat-recording-time');
+    if (!box || !status || !time) return;
+    box.classList.add('is-visible','is-pending');
+    status.textContent = 'NOTA DE VOZ LISTA';
+    time.textContent = formatDuration(pendingAudioDuration);
+    if (sendEl) sendEl.textContent = 'ENVIAR NOTA DE VOZ';
   }
 
-  function resetRecordingUI() {
+  function resetRecordingUI(clearPending = false) {
     stopRecordingTimer();
     const box = chatScreen?.querySelector('.hn-chat-recording');
+    const status = chatScreen?.querySelector('.hn-chat-recording-status');
     const time = chatScreen?.querySelector('.hn-chat-recording-time');
-    if (box) box.classList.remove('is-visible');
+    if (box) box.classList.remove('is-visible','is-pending');
+    if (status) status.textContent = 'GRABANDO NOTA DE VOZ';
     if (time) time.textContent = '00:00';
     micEl?.classList.remove('is-recording');
     micEl?.setAttribute('aria-label','Grabar nota de voz');
     micEl?.setAttribute('title','Grabar nota de voz');
+    if (clearPending) {
+      pendingAudioBlob = null;
+      pendingAudioDuration = 0;
+      if (sendEl) sendEl.textContent = 'ENVIAR';
+    }
   }
 
   function startRecording() {
@@ -255,6 +308,7 @@
       alert('Este dispositivo o navegador no permite grabar notas de voz.');
       return;
     }
+    if (pendingAudioBlob) resetRecordingUI(true);
     const mimeType = pickAudioMime();
     navigator.mediaDevices.getUserMedia({ audio:true }).then(stream => {
       audioChunks = [];
@@ -269,28 +323,23 @@
       mediaRecorder.onerror = () => {
         stream.getTracks().forEach(track => track.stop());
         mediaRecorder = null;
-        resetRecordingUI();
+        resetRecordingUI(true);
         alert('No se pudo grabar el audio.');
       };
-      mediaRecorder.onstop = async () => {
+      mediaRecorder.onstop = () => {
         stopRecordingTimer();
         stream.getTracks().forEach(track => track.stop());
         const duration = Math.max(1, Math.round((Date.now() - recordingStartedAt) / 1000));
         const blob = new Blob(audioChunks, { type: mediaRecorder?.mimeType || mimeType || 'audio/webm' });
         mediaRecorder = null;
-        resetRecordingUI();
-        if (!blob.size) return;
-        const oldText = micEl?.textContent;
-        if (micEl) { micEl.disabled=true; micEl.textContent='↑'; }
-        try {
-          await uploadVoiceNote(blob, duration);
-        } catch (error) {
-          console.error('HAVANA NICE voice note failed:', error);
-          alert('No se pudo enviar la nota de voz.');
-        } finally {
-          if (micEl) { micEl.disabled=false; micEl.textContent=oldText || '🎙'; }
-          inputEl?.focus();
-        }
+        micEl?.classList.remove('is-recording');
+        micEl?.setAttribute('aria-label','Grabar nota de voz');
+        micEl?.setAttribute('title','Grabar nota de voz');
+        if (!blob.size) { resetRecordingUI(true); return; }
+        pendingAudioBlob = blob;
+        pendingAudioDuration = duration;
+        showPendingAudio();
+        inputEl?.focus();
       };
       mediaRecorder.start();
     }).catch(error => {
@@ -307,6 +356,24 @@
     if (micEl?.disabled) return;
     if (mediaRecorder && mediaRecorder.state === 'recording') stopRecording();
     else startRecording();
+  }
+
+  async function uploadVoiceNote(blob, duration) {
+    const sb = client(), p = currentProfile();
+    if (!sb || !p?.id || !blob?.size) throw new Error('No se pudo preparar el audio.');
+    const mime = blob.type || 'audio/webm';
+    const ext = mime.includes('mp4') ? 'm4a' : mime.includes('ogg') ? 'ogg' : 'webm';
+    const path = `${p.id}/${crypto.randomUUID()}.${ext}`;
+    const { error: uploadError } = await sb.storage.from(AUDIO_BUCKET).upload(path, blob, { contentType:mime, upsert:false });
+    if (uploadError) throw uploadError;
+    const { data:urlData } = sb.storage.from(AUDIO_BUCKET).getPublicUrl(path);
+    const audioUrl = urlData?.publicUrl;
+    if (!audioUrl) throw new Error('No se pudo obtener la URL del audio.');
+    const { data, error } = await sb.rpc('send_chat_audio', { p_profile_id:p.id, p_audio_url:audioUrl, p_audio_duration:duration });
+    if (error) throw error;
+    const row = Array.isArray(data) ? data[0] : data;
+    if (row && !messages.some(m => m.id === row.id)) { messages.push(row); messages.sort((a,b)=>new Date(a.created_at)-new Date(b.created_at)); render(); }
+    markRead();
   }
 
   function buildScreen() {
@@ -367,7 +434,14 @@
       html += `<div class="hn-chat-sender">${esc(m.sender_name || 'MIEMBRO')}</div>`;
       if (parsed.quote) html += `<div class="hn-chat-quoted"><div class="hn-chat-quoted-sender">${esc(parsed.quote.sender)}</div><div class="hn-chat-quoted-text">${esc(parsed.quote.text)}</div></div>`;
       if (m.message_type === 'audio' && m.audio_url) {
-        html += `<div class="hn-chat-audio-label"><span class="hn-chat-audio-icon">🎙</span><span>NOTA DE VOZ</span></div><audio class="hn-chat-audio" controls preload="metadata" src="${esc(m.audio_url)}"></audio>`;
+        const duration = Number(m.audio_duration) || 0;
+        html += `<div class="hn-chat-audio-label"><span class="hn-chat-audio-icon">🎙</span><span>NOTA DE VOZ</span></div>`;
+        html += `<div class="hn-chat-audio-player" data-duration="${esc(duration)}">`;
+        html += `<audio class="hn-chat-audio-native" preload="metadata" src="${esc(m.audio_url)}"></audio>`;
+        html += `<button class="hn-chat-audio-play" type="button" aria-label="Reproducir nota de voz">▶</button>`;
+        html += `<input class="hn-chat-audio-progress" type="range" min="0" max="1" value="0" step="0.1" aria-label="Progreso de la nota de voz">`;
+        html += `<span class="hn-chat-audio-duration">${esc(formatDuration(duration))}</span>`;
+        html += `</div>`;
       } else {
         html += `<div class="hn-chat-text">${esc(parsed.text)}</div>`;
       }
@@ -375,6 +449,7 @@
       return html;
     }).join('');
     wireMessageInteractions();
+    wireAudioPlayers();
     if (replyTarget) {
       const current = messages.find(m => m.id === replyTarget.id);
       if (current) selectMessage(current.id); else closeReply();
@@ -416,24 +491,40 @@
     e.preventDefault();
     const sb = client(), p = currentProfile();
     const text = (inputEl?.value || '').trim();
-    if (!sb || !p?.id || !text || text.length > MAX_LENGTH) return;
+    if (!sb || !p?.id) return;
+    if (mediaRecorder && mediaRecorder.state === 'recording') return;
+    if (!pendingAudioBlob && (!text || text.length > MAX_LENGTH)) return;
     sendEl.disabled = true;
     try {
-      let finalText = text;
-      if (replyTarget) {
-        const sender = replyTarget.sender_name || 'MIEMBRO';
-        const quoted = replyTarget.message || (replyTarget.message_type === 'audio' ? '🎙 NOTA DE VOZ' : '');
-        finalText = `↳ ${sender}: ${quoted}${REPLY_SEPARATOR}${text}`.slice(0, MAX_LENGTH);
+      if (pendingAudioBlob) {
+        await uploadVoiceNote(pendingAudioBlob, pendingAudioDuration);
+        pendingAudioBlob = null;
+        pendingAudioDuration = 0;
+        resetRecordingUI(true);
+        inputEl.value='';
+        inputEl.style.height='auto';
+        closeReply();
+      } else {
+        let finalText = text;
+        if (replyTarget) {
+          const sender = replyTarget.sender_name || 'MIEMBRO';
+          const quoted = replyTarget.message || (replyTarget.message_type === 'audio' ? '🎙 NOTA DE VOZ' : '');
+          finalText = `↳ ${sender}: ${quoted}${REPLY_SEPARATOR}${text}`.slice(0, MAX_LENGTH);
+        }
+        const { data, error } = await sb.rpc('send_chat_message', { p_profile_id:p.id, p_message:finalText });
+        if (error) throw error;
+        inputEl.value=''; inputEl.style.height='auto'; closeReply();
+        const row = Array.isArray(data) ? data[0] : data;
+        if (row && !messages.some(m => m.id === row.id)) { messages.push(row); messages.sort((a,b)=>new Date(a.created_at)-new Date(b.created_at)); render(); }
+        markRead();
       }
-      const { data, error } = await sb.rpc('send_chat_message', { p_profile_id:p.id, p_message:finalText });
-      if (error) throw error;
-      inputEl.value=''; inputEl.style.height='auto'; closeReply();
-      const row = Array.isArray(data) ? data[0] : data;
-      if (row && !messages.some(m => m.id === row.id)) { messages.push(row); messages.sort((a,b)=>new Date(a.created_at)-new Date(b.created_at)); render(); }
-      markRead();
     } catch (error) {
       console.error('HAVANA NICE chat send failed:', error); alert('No se pudo enviar el mensaje.');
-    } finally { sendEl.disabled=false; inputEl?.focus(); }
+    } finally {
+      sendEl.disabled=false;
+      sendEl.textContent='ENVIAR';
+      inputEl?.focus();
+    }
   }
 
   function subscribe() {
