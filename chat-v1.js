@@ -100,8 +100,8 @@
       .hn-chat-day { text-align:center; margin:13px 0 10px; color:rgba(244,241,232,.35); font-size:8px; letter-spacing:.22em; }
       .hn-chat-row { display:flex; margin:7px 0; transition:transform .18s ease; }
       .hn-chat-row.mine { justify-content:flex-end; }
-      .hn-chat-bubble { max-width:min(82%,560px); padding:10px 12px 8px; border:1px solid rgba(229,189,98,.28); background:rgba(0,0,0,.46); backdrop-filter:blur(7px); cursor:pointer; touch-action:pan-y; user-select:none; transition:border-color .2s ease, box-shadow .2s ease, transform .15s ease; }
-      .hn-chat-row.mine .hn-chat-bubble { border-color:rgba(229,189,98,.55); background:rgba(75,52,15,.25); }
+      .hn-chat-bubble { max-width:min(82%,560px); padding:10px 12px 8px; border:1px solid rgba(229,189,98,.28); background:rgba(0,0,0,.46); backdrop-filter:blur(7px); cursor:pointer; touch-action:pan-y; user-select:none; transition:border-color .2s ease, box-shadow .2s ease, transform .15s ease, background .2s ease; }
+      .hn-chat-row.mine .hn-chat-bubble { border-color:rgba(229,189,98,.72); background:rgba(20,74,52,.82); box-shadow:inset 0 0 0 1px rgba(229,189,98,.08), 0 4px 16px rgba(0,0,0,.14); }
       .hn-chat-bubble.hn-chat-selected { border-color:#fff1a8 !important; box-shadow:0 0 0 1px rgba(229,189,98,.35), 0 0 18px rgba(229,189,98,.10); transform:translateY(-1px); }
       .hn-chat-sender { margin-bottom:5px; color:#e5bd62; font-size:8px; font-weight:600; letter-spacing:.16em; text-transform:uppercase; }
       .hn-chat-text { color:#f4f1e8; font-size:14px; line-height:1.42; white-space:pre-wrap; overflow-wrap:anywhere; user-select:text; }
