@@ -73,11 +73,14 @@
 
   function bindModule() {
     if (bound) return true;
-    const module = [...document.querySelectorAll('.module[data-module]')]
-      .find(x => x.dataset.module === 'NOTIFICACIONES');
-    if (!module) return false;
     bound = true;
-    module.addEventListener('click', () => {
+    // notifications-v5.js handles the module click at document-capture level
+    // and stops propagation. Listen at window-capture so the history entry is
+    // armed before that handler runs, without changing notification behavior.
+    window.addEventListener('click', (event) => {
+      const target = event.target;
+      const module = target && target.closest ? target.closest('.module[data-module]') : null;
+      if (!module || module.dataset.module !== 'NOTIFICACIONES') return;
       const before = document.querySelector('.screen.is-active:not(#moduleScreen)') || home();
       previousScreen = before;
       setTimeout(() => {
