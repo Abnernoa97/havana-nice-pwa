@@ -30,19 +30,6 @@
     }
   }
 
-  function armCalendarHistory() {
-    const screen = calendar();
-    if (!screen || !screen.classList.contains('is-active')) return;
-    if (history.state?.hnCalendar) {
-      historyArmed = true;
-      return;
-    }
-    try {
-      history.pushState({ ...(history.state || {}), hnCalendar: true }, '', location.href);
-      historyArmed = true;
-    } catch (_) {}
-  }
-
   function openCalendarHistory() {
     const screen = calendar();
     if (!screen) return;
@@ -57,7 +44,12 @@
       video.play().catch(() => {});
     }
 
-    if (!historyArmed) armCalendarHistory();
+    if (!historyArmed) {
+      try {
+        history.pushState({ ...(history.state || {}), hnCalendar: true }, '', location.href);
+        historyArmed = true;
+      } catch (_) {}
+    }
   }
 
   function ensureButton(screen) {
@@ -103,7 +95,9 @@
     const screen = calendar();
     if (screen) {
       ensureButton(screen);
-      if (screen.classList.contains('is-active')) armCalendarHistory();
+      if (screen.classList.contains('is-active')) {
+        legacyModule()?.classList.remove('is-active');
+      }
     }
   }
 
@@ -111,16 +105,8 @@
     if (calendar()?.classList.contains('is-active')) closeCalendar(false);
   });
 
-  const observer = new MutationObserver((mutations) => {
-    watchCalendar();
-    for (const mutation of mutations) {
-      if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
-        const screen = calendar();
-        if (screen?.classList.contains('is-active')) armCalendarHistory();
-      }
-    }
-  });
-  observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+  const observer = new MutationObserver(watchCalendar);
+  observer.observe(document.documentElement, { childList: true, subtree: true });
 
   setInterval(watchCalendar, 500);
   watchCalendar();
