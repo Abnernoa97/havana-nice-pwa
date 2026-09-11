@@ -11,6 +11,9 @@
   var subtitle = null;
   var badge = null;
   var seenKey = 'hn_repertoire_seen_v1';
+  var historyArmed = false;
+  var previousScreen = null;
+  var videoWasMuted = true;
 
   function isLoggedIn() {
     return !!sessionStorage.getItem('hn_profile');
@@ -64,6 +67,7 @@
       '.hn-rep-screen .hn-r-artist{margin-top:5px;color:rgba(244,241,232,.52);font-size:10px;letter-spacing:.06em}',
       '.hn-rep-screen .hn-r-empty{padding:34px 0;color:rgba(244,241,232,.42);font-size:10px;letter-spacing:.12em;text-transform:uppercase;text-align:center}',
       '.hn-rep-screen .hn-r-back{display:block;margin:28px 0 20px;position:relative;z-index:5;pointer-events:auto}',
+      '.hn-rep-screen .hn-r-back-top{display:block;margin:16px 0 0;position:relative;z-index:5;pointer-events:auto}',
       '.hn-rep-badge{position:absolute;top:10px;right:12px;min-width:24px;height:24px;padding:0 7px;border:1px solid #fff1a8;border-radius:999px;background:#e5bd62;color:#020302;display:none;align-items:center;justify-content:center;font:600 11px Arial,sans-serif;letter-spacing:0;box-shadow:0 0 16px rgba(229,189,98,.35);z-index:3}',
       '.hn-rep-badge.hn-rep-badge-visible{display:flex}'
     ].join('');
@@ -150,6 +154,22 @@
     inner.appendChild(back);
   }
 
+  function closeRepertoire(fromButton) {
+    var screen = document.getElementById('moduleScreen');
+    if (!screen) return;
+    screen.classList.remove('is-active');
+    if (previousScreen) previousScreen.classList.add('is-active');
+    else document.getElementById('homeScreen')?.classList.add('is-active');
+    var video = document.getElementById('backgroundVideo');
+    if (video) video.muted = videoWasMuted;
+    if (historyArmed && fromButton) {
+      historyArmed = false;
+      try { history.back(); } catch (_) {}
+    } else if (!fromButton) {
+      historyArmed = false;
+    }
+  }
+
   function render() {
     var screen = document.getElementById('moduleScreen');
     if (!screen) return;
@@ -160,6 +180,14 @@
     inner.appendChild(makeElement('p', 'brand metallic-gold', 'HAVANA NICE'));
     inner.appendChild(makeElement('div', 'brand-line'));
     inner.appendChild(makeElement('div', 'hn-r-head', 'Repertorio'));
+
+    var topBack = makeElement('button', 'back-button hn-r-back-top', 'Volver');
+    topBack.type = 'button';
+    topBack.addEventListener('click', function (event) {
+      event.preventDefault(); event.stopPropagation();
+      closeRepertoire(true);
+    });
+    inner.appendChild(topBack);
 
     var groups = {};
     songs.forEach(function (song) {
@@ -189,16 +217,14 @@
     back.type = 'button';
     back.addEventListener('click', function (event) {
       event.preventDefault(); event.stopPropagation();
-      var screen = document.getElementById('moduleScreen');
-      var home = document.getElementById('homeScreen');
-      if (screen) screen.classList.remove('is-active');
-      if (home) home.classList.add('is-active');
+      closeRepertoire(true);
     });
     inner.appendChild(back);
   }
 
-  function openRepertoire() {
+  function openRepertoire(fromPopState) {
     if (!isLoggedIn()) return;
+    previousScreen = document.querySelector('.screen.is-active:not(#moduleScreen)') || document.getElementById('homeScreen');
     render();
     markAllSeen();
     var screen = document.getElementById('moduleScreen');
@@ -206,9 +232,25 @@
     var login = document.getElementById('loginScreen');
     var repertoireScreen = document.getElementById('repertoireScreen');
     if (login) login.classList.remove('is-active');
+    document.querySelectorAll('.screen').forEach(function (s) {
+      if (s !== screen) s.classList.remove('is-active');
+    });
     if (home) home.classList.remove('is-active');
     if (repertoireScreen) repertoireScreen.classList.remove('is-active');
     if (screen) screen.classList.add('is-active');
+
+    var video = document.getElementById('backgroundVideo');
+    if (video) {
+      videoWasMuted = !!video.muted;
+      video.muted = true;
+      video.play().catch(function () {});
+    }
+    if (!fromPopState && !historyArmed) {
+      try {
+        history.pushState(Object.assign({}, history.state || {}, { hnRepertoire: true }), '', location.href);
+        historyArmed = true;
+      } catch (_) {}
+    }
   }
 
   function bindModule() {
@@ -219,7 +261,7 @@
       event.preventDefault();
       event.stopImmediatePropagation();
       if (typeof window.playClickSound === 'function') { try { window.playClickSound(); } catch (_) {} }
-      openRepertoire();
+      openRepertoire(false);
     }, true);
   }
 
@@ -295,10 +337,20 @@
     }, true);
   }
 
+  function wireNativeBack() {
+    window.addEventListener('popstate', function () {
+      var screen = document.getElementById('moduleScreen');
+      if (screen && screen.classList.contains('is-active') && screen.querySelector('.hn-rep-screen')) {
+        closeRepertoire(false);
+      }
+    });
+  }
+
   function init() {
     addStyle();
     bindModule();
     bindGenericRestore();
+    wireNativeBack();
     start();
     watchSession();
     window.addEventListener('online', function () { if (started) sync(false); });
