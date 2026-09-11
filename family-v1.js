@@ -9,6 +9,10 @@
     { name: 'ANDY REY', role: 'MÚSICO' }
   ];
 
+  let historyArmed = false;
+  let previousScreen = null;
+  let videoWasMuted = true;
+
   function ready() {
     const homeScreen = document.getElementById('homeScreen');
     const homeModules = document.querySelector('.modules');
@@ -37,6 +41,7 @@
           <div class="brand-line"></div>
           <p class="family-caption">The Family</p>
         </div>
+        <button id="familyTopBackButton" class="back-button family-top-back" type="button">Volver</button>
         <div class="family-list">
           ${FAMILY.map((person, index) => `
             <button class="family-member" type="button" data-family-index="${index}">
@@ -62,8 +67,9 @@
     style.textContent = `
       .family-screen { padding-bottom: max(76px, env(safe-area-inset-bottom)); }
       .family-inner { width: min(100%, 650px); height: 100%; margin: 0 auto; display: flex; flex-direction: column; padding-top: 5px; }
-      .family-header { flex: 0 0 auto; text-align: center; margin-bottom: 22px; }
+      .family-header { flex: 0 0 auto; text-align: center; margin-bottom: 14px; }
       .family-caption { margin: 20px 0 0; color: rgba(244,241,232,.56); font-size: 8px; letter-spacing: .30em; text-transform: uppercase; }
+      .family-top-back { flex: 0 0 auto; width: 100%; margin: 0 0 12px; }
       .family-list { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 3px 28px 0; scrollbar-width: thin; scrollbar-color: rgba(229,189,98,.55) transparent; }
       .family-list::-webkit-scrollbar { width: 3px; }
       .family-list::-webkit-scrollbar-track { background: transparent; }
@@ -77,22 +83,60 @@
       .family-role { display: block; margin-top: 7px; color: rgba(244,241,232,.43); font-size: 8px; letter-spacing: .22em; text-transform: uppercase; }
       .family-arrow { color: var(--gold-light); font-size: 23px; font-weight: 300; line-height: 1; }
       .family-footer { flex: 0 0 auto; padding-top: 7px; }
-      @media (max-height: 700px) { .family-member { min-height: 65px; } .family-role { display: none; } .family-header { margin-bottom: 12px; } }
+      @media (max-height: 700px) { .family-member { min-height: 65px; } .family-role { display: none; } .family-header { margin-bottom: 8px; } .family-top-back { margin-bottom: 8px; } }
     `;
     document.head.appendChild(style);
+
+    function closeFamily(fromButton = false) {
+      screen.classList.remove('is-active');
+      if (previousScreen) previousScreen.classList.add('is-active');
+      else homeScreen.classList.add('is-active');
+
+      const video = document.getElementById('backgroundVideo');
+      if (video) video.muted = videoWasMuted;
+
+      if (historyArmed && fromButton) {
+        historyArmed = false;
+        try { history.back(); } catch (_) {}
+      } else if (!fromButton) {
+        historyArmed = false;
+      }
+    }
+
+    function openFamily(fromPopState = false) {
+      previousScreen = document.querySelector('.screen.is-active:not(#familyScreen)') || homeScreen;
+      document.querySelectorAll('.screen').forEach((el) => {
+        if (el !== screen) el.classList.remove('is-active');
+      });
+      screen.classList.add('is-active');
+
+      const video = document.getElementById('backgroundVideo');
+      if (video) {
+        videoWasMuted = !!video.muted;
+        video.muted = true;
+        video.play().catch(() => {});
+      }
+
+      if (!fromPopState && !historyArmed) {
+        try {
+          history.pushState({ ...(history.state || {}), hnFamily: true }, '', location.href);
+          historyArmed = true;
+        } catch (_) {}
+      }
+    }
 
     const showFamily = (event) => {
       event.preventDefault();
       event.stopImmediatePropagation();
-      document.querySelectorAll('.screen').forEach((el) => el.classList.remove('is-active'));
-      screen.classList.add('is-active');
+      openFamily();
     };
 
     module.addEventListener('click', showFamily, true);
+    screen.querySelector('#familyTopBackButton')?.addEventListener('click', () => closeFamily(true));
+    screen.querySelector('#familyBackButton')?.addEventListener('click', () => closeFamily(true));
 
-    screen.querySelector('#familyBackButton')?.addEventListener('click', () => {
-      screen.classList.remove('is-active');
-      homeScreen.classList.add('is-active');
+    window.addEventListener('popstate', () => {
+      if (screen.classList.contains('is-active')) closeFamily(false);
     });
   }
 
