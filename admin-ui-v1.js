@@ -1,65 +1,17 @@
-/* HAVANA NICE — ADMIN UI V1
+/* HAVANA NICE — ADMIN UI V2
    Compact accordion dashboard. Keeps all existing admin logic intact.
 */
 (function(){
   'use strict';
   const STYLE_ID='hnAdminUiV1Style';
   const ACC='hn-admin-accordion';
-  const summaries={
-    'Accesos a músicos':'Gestiona accesos, activación y músicos',
-    'Notificaciones':'Crea y administra avisos para el equipo',
-    'Repertorio':'Canciones, categorías y disponibilidad',
-    'Calendario':'Eventos, horarios, vestuario y ubicación',
-    'Resumen':'Estado general de la aplicación'
-  };
-  function style(){
-    if(document.getElementById(STYLE_ID))return;
-    const s=document.createElement('style');s.id=STYLE_ID;
-    s.textContent=`
-      .dashboard{display:flex!important;flex-direction:column!important;gap:10px!important}
-      .dashboard>.card{width:100%;margin:0!important;padding:0!important;overflow:hidden;transition:border-color .2s ease,box-shadow .2s ease}
-      .dashboard>.card.hn-open{box-shadow:0 14px 34px rgba(0,0,0,.25)}
-      .dashboard>.card .card-head{margin:0!important;padding:17px 18px;cursor:pointer;user-select:none;align-items:center!important;min-height:76px}
-      .dashboard>.card .card-head>div:first-child{min-width:0}
-      .dashboard>.card .eyebrow{margin-bottom:5px}
-      .dashboard>.card .card-head h1{font-size:22px!important;line-height:1.15}
-      .dashboard>.card .card-head .sub{font-size:8px;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-      .hn-admin-arrow{width:30px;height:30px;flex:0 0 30px;border:1px solid #70501d;display:flex;align-items:center;justify-content:center;color:#e5bd62;font-size:15px;transition:transform .2s ease,background .2s ease}
-      .hn-open .hn-admin-arrow{transform:rotate(180deg);background:rgba(229,189,98,.06)}
-      .hn-admin-body{padding:0 18px 18px}
-      .hn-admin-body>*:first-child{margin-top:0}
-      .hn-admin-collapsible{display:none!important}
-      .hn-open .hn-admin-collapsible{display:block!important}
-      @media(max-width:760px){
-        .dashboard>.card .card-head{padding:15px 16px;min-height:70px}
-        .dashboard>.card .card-head h1{font-size:20px!important}
-        .hn-admin-body{padding:0 16px 16px}
-      }
-    `;
-    document.head.appendChild(s);
-  }
-  function enhance(card){
-    if(!card||card.dataset.hnAccordion==='1')return;
-    const head=card.querySelector(':scope > .card-head');
-    if(!head)return;
-    card.dataset.hnAccordion='1';
-    card.classList.add(ACC);
-    const title=head.querySelector('h1');
-    const sub=head.querySelector('.sub');
-    if(title&&summaries[title.textContent.trim()]&&sub)sub.textContent=summaries[title.textContent.trim()];
-    const arrow=document.createElement('div');arrow.className='hn-admin-arrow';arrow.setAttribute('aria-hidden','true');arrow.textContent='⌄';
-    head.appendChild(arrow);
-    const body=document.createElement('div');body.className='hn-admin-body hn-admin-collapsible';
-    const children=Array.from(card.children).filter(x=>x!==head);
-    children.forEach(x=>body.appendChild(x));
-    card.appendChild(body);
-    head.setAttribute('role','button');head.setAttribute('tabindex','0');head.setAttribute('aria-expanded','false');
-    const toggle=()=>{const open=!card.classList.contains('hn-open');card.classList.toggle('hn-open',open);head.setAttribute('aria-expanded',String(open));};
-    head.addEventListener('click',toggle);
-    head.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();toggle()}});
-  }
+  const summaries={'Accesos a músicos':'Gestiona accesos, activación y músicos','Notificaciones':'Crea y administra avisos para el equipo','Repertorio':'Canciones, categorías y disponibilidad','Calendario':'Eventos, horarios, vestuario y ubicación','Resumen':'Estado general de la aplicación'};
+  function style(){if(document.getElementById(STYLE_ID))return;const s=document.createElement('style');s.id=STYLE_ID;s.textContent=`
+    .dashboard{display:flex!important;flex-direction:column!important;gap:10px!important}.dashboard>.card{width:100%;margin:0!important;padding:0!important;overflow:hidden;transition:border-color .2s ease,box-shadow .2s ease}.dashboard>.card.hn-open{box-shadow:0 14px 34px rgba(0,0,0,.25)}.dashboard>.card .card-head{margin:0!important;padding:17px 18px;cursor:pointer;user-select:none;align-items:center!important;min-height:76px}.dashboard>.card .card-head>div:first-child{min-width:0}.dashboard>.card .eyebrow{margin-bottom:5px}.dashboard>.card .card-head h1{font-size:22px!important;line-height:1.15}.dashboard>.card .card-head .sub{font-size:8px;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hn-admin-arrow{width:30px;height:30px;flex:0 0 30px;border:1px solid #70501d;display:flex;align-items:center;justify-content:center;color:#e5bd62;font-size:15px;transition:transform .2s ease,background .2s ease}.hn-open .hn-admin-arrow{transform:rotate(180deg);background:rgba(229,189,98,.06)}.hn-admin-body{padding:0 18px 18px}.hn-admin-body>*:first-child{margin-top:0}.hn-admin-collapsible{display:none!important}.hn-open .hn-admin-collapsible{display:block!important}@media(max-width:760px){.dashboard>.card .card-head{padding:15px 16px;min-height:70px}.dashboard>.card .card-head h1{font-size:20px!important}.hn-admin-body{padding:0 16px 16px}}
+  `;document.head.appendChild(s)}
+  function enhance(card){if(!card||card.dataset.hnAccordion==='1')return;const head=card.querySelector(':scope > .card-head');if(!head)return;card.dataset.hnAccordion='1';card.classList.add(ACC);const title=head.querySelector('h1'),sub=head.querySelector('.sub');if(title&&summaries[title.textContent.trim()]&&sub)sub.textContent=summaries[title.textContent.trim()];const arrow=document.createElement('div');arrow.className='hn-admin-arrow';arrow.setAttribute('aria-hidden','true');arrow.textContent='⌄';head.appendChild(arrow);const body=document.createElement('div');body.className='hn-admin-body hn-admin-collapsible';Array.from(card.children).filter(x=>x!==head).forEach(x=>body.appendChild(x));card.appendChild(body);head.setAttribute('role','button');head.setAttribute('tabindex','0');head.setAttribute('aria-expanded','false');const toggle=()=>{const open=!card.classList.contains('hn-open');card.classList.toggle('hn-open',open);head.setAttribute('aria-expanded',String(open))};head.addEventListener('click',toggle);head.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();toggle()}})}
   function scan(){document.querySelectorAll('.dashboard>.card').forEach(enhance)}
-  function loadChatAdmin(){if(document.getElementById('hnAdminChatScript'))return;const script=document.createElement('script');script.id='hnAdminChatScript';script.src='./admin-chat-v1.js?v=1';document.body.appendChild(script)}
-  function init(){style();scan();loadChatAdmin();const root=document.querySelector('.dashboard');if(root)new MutationObserver(scan).observe(root,{childList:true,subtree:true});}
+  function loadChatAdmin(){if(document.getElementById('hnAdminChatScript'))return;const script=document.createElement('script');script.id='hnAdminChatScript';script.src='./admin-chat-v1.js?v=b0d5e9c9d956d219e4a64338904eb65bf9060da3';document.body.appendChild(script)}
+  function init(){style();scan();loadChatAdmin();const root=document.querySelector('.dashboard');if(root)new MutationObserver(scan).observe(root,{childList:true,subtree:true})}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();
