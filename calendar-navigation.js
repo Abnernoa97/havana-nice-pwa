@@ -9,6 +9,7 @@
 
   const home = () => document.getElementById('homeScreen');
   const calendar = () => document.getElementById('calendarScreen');
+  const legacyModule = () => document.getElementById('moduleScreen');
 
   function closeCalendar(fromButton = false) {
     const screen = calendar();
@@ -34,6 +35,7 @@
     if (!screen) return;
 
     previousScreen = document.querySelector('.screen.is-active:not(#calendarScreen)') || home();
+    legacyModule()?.classList.remove('is-active');
 
     const video = document.getElementById('backgroundVideo');
     if (video) {
