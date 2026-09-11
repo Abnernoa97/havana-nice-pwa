@@ -24,6 +24,7 @@
   };
   const client = () => window.hnSupabase || window.supabaseClient || window.supabase || null;
   const currentProfile = () => { const p = session(); return p && p.id ? p : null; };
+  const readKey = () => { const p = currentProfile(); return `${READ_KEY}:${p?.id || 'anonymous'}`; };
 
   function formatTime(ts) {
     try { return new Intl.DateTimeFormat('es-MX', { hour:'2-digit', minute:'2-digit' }).format(new Date(ts)); }
@@ -181,14 +182,28 @@
   function updateUnread() {
     const module = ensureHomeModule();
     if (!module) return;
+    const last = localStorage.getItem(readKey());
+    const lastTime = last ? Date.parse(last) : NaN;
+    const count = Number.isNaN(lastTime) ? messages.length : messages.filter(m => Date.parse(m.created_at) > lastTime).length;
     let badge = module.querySelector('.hn-chat-unread');
-    if (!badge) { badge = document.createElement('span'); badge.className='hn-chat-unread'; badge.style.cssText='position:absolute;top:10px;right:48px;min-width:19px;height:19px;padding:0 5px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:#e5bd62;color:#020302;font-size:9px;font-weight:700;'; module.appendChild(badge); }
-    const last = localStorage.getItem(READ_KEY);
-    const count = !last ? messages.length : messages.filter(m => Date.parse(m.created_at) > Date.parse(last)).length;
-    badge.textContent = count > 99 ? '99+' : String(count); badge.hidden = count <= 0;
+    if (count <= 0) {
+      if (badge) badge.remove();
+      return;
+    }
+    if (!badge) {
+      badge = document.createElement('span');
+      badge.className='hn-chat-unread';
+      badge.style.cssText='position:absolute;top:10px;right:48px;min-width:19px;height:19px;padding:0 5px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:#e5bd62;color:#020302;font-size:9px;font-weight:700;';
+      module.appendChild(badge);
+    }
+    badge.textContent = count > 99 ? '99+' : String(count);
+    badge.hidden = false;
   }
 
-  function markRead() { localStorage.setItem(READ_KEY, new Date().toISOString()); updateUnread(); }
+  function markRead() {
+    localStorage.setItem(readKey(), new Date().toISOString());
+    updateUnread();
+  }
 
   async function loadMessages() {
     const sb = client(); if (!sb) return;
