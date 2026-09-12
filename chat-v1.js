@@ -20,6 +20,7 @@
   let pendingVoice = null;
   let pendingMedia = [];
   let lightboxEl = null, lightboxHistory = false;
+  let chatReconnectTimer = null, chatReconnectDelay = 1000;
 
   const esc = value => String(value ?? '').replace(/[&<>'\"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','\"':'&quot;'}[ch]));
   const session = () => { try { return JSON.parse(sessionStorage.getItem('hn_profile') || 'null'); } catch (_) { return null; } };
@@ -134,7 +135,24 @@
 
   async function sendMessage(e){e.preventDefault();if(mediaRecorder&&mediaRecorder.state==='recording')return;const sb=client(),p=currentProfile();if(!sb||!p?.id)return;sendEl.disabled=true;try{if(pendingVoice){const voice=pendingVoice;pendingVoice=null;await uploadVoiceNote(voice.blob,voice.duration);inputEl.value='';inputEl.style.height='auto';closeReply();resetRecordingUI(false);return;}if(pendingMedia.length){const files=[...pendingMedia];pendingMedia=[];renderPendingMedia();const previewUrls=files.map(file=>URL.createObjectURL(file));const tempId=`local-media-${Date.now()}-${Math.random().toString(36).slice(2)}`;const tempRow={id:tempId,profile_id:p.id,sender_name:p.sender_name||p.name||p.full_name||'TÚ',message:(inputEl?.value||'').trim().slice(0,MAX_LENGTH),created_at:new Date().toISOString(),message_type:'media',media_urls:previewUrls,media_types:files.map(file=>file.type.startsWith('video/')?'video':'image')};messages.push(tempRow);messages.sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));render();try{await uploadMediaFiles(files);messages=messages.filter(m=>m.id!==tempId);previewUrls.forEach(url=>URL.revokeObjectURL(url));render();}catch(error){messages=messages.filter(m=>m.id!==tempId);previewUrls.forEach(url=>URL.revokeObjectURL(url));pendingMedia=[...files,...pendingMedia];renderPendingMedia();throw error;}inputEl.value='';inputEl.style.height='auto';closeReply();return;}const text=(inputEl?.value||'').trim();if(!text||text.length>MAX_LENGTH){updateSendState();return;}let finalText=text;if(replyTarget){const sender=replyTarget.sender_name||'MIEMBRO';const quoted=replyTarget.message||(replyTarget.message_type==='audio'?'🎙 NOTA DE VOZ':replyTarget.message_type==='media'?'📎 FOTOS / VIDEOS':'');finalText=`↳ ${sender}: ${quoted}${REPLY_SEPARATOR}${text}`.slice(0,MAX_LENGTH);}const {data,error}=await sb.rpc('send_chat_message',{p_profile_id:p.id,p_message:finalText});if(error)throw error;inputEl.value='';inputEl.style.height='auto';closeReply();addLocalRow(data);}catch(error){console.error('HAVANA NICE chat send failed:',error);alert(error?.message||'No se pudo enviar.');}finally{updateSendState();inputEl?.focus();}}
 
-  function subscribe(){const sb=client();if(!sb||chatChannel)return;chatChannel=sb.channel('hn-chat-realtime').on('postgres_changes',{event:'INSERT',schema:'public',table:CHAT_TABLE},payload=>{const row=payload.new;if(!messages.some(m=>m.id===row.id))messages.push(row);messages.sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));render();if(chatScreen?.classList.contains('is-active'))markRead();else updateUnread();}).subscribe();}
+  function subscribe(){
+    const sb=client();
+    if(!sb)return;
+    clearTimeout(chatReconnectTimer);
+    if(chatChannel){try{sb.removeChannel(chatChannel);}catch(_){}chatChannel=null;}
+    chatChannel=sb.channel('hn-chat-realtime')
+      .on('postgres_changes',{event:'INSERT',schema:'public',table:CHAT_TABLE},payload=>{const row=payload.new;if(!messages.some(m=>m.id===row.id))messages.push(row);messages.sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));render();if(chatScreen?.classList.contains('is-active'))markRead();else updateUnread();})
+      .subscribe(status=>{
+        if(status==='SUBSCRIBED'){
+          chatReconnectDelay=1000;
+          clearTimeout(chatReconnectTimer);
+        }else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'||status==='CLOSED'){
+          clearTimeout(chatReconnectTimer);
+          chatReconnectTimer=setTimeout(()=>subscribe(),chatReconnectDelay);
+          chatReconnectDelay=Math.min(chatReconnectDelay*2,10000);
+        }
+      });
+  }
   function closeChat(fromButton=false){if(!chatScreen)return;if(lightboxEl?.classList.contains('is-open'))closeLightbox();if(mediaRecorder&&mediaRecorder.state==='recording'){try{mediaRecorder.stop();}catch(_){}}closeReply();chatScreen.classList.remove('is-active');if(previousScreen)previousScreen.classList.add('is-active');else document.getElementById('homeScreen')?.classList.add('is-active');const video=document.getElementById('backgroundVideo');if(video)video.muted=videoWasMuted;if(historyArmed&&fromButton){historyArmed=false;try{history.back();}catch(_){}}else if(!fromButton)historyArmed=false;}
   function openChat(fromPopState=false){buildScreen();previousScreen=document.querySelector('.screen.is-active:not(#hn-chat-screen)')||document.getElementById('homeScreen');document.querySelectorAll('.screen').forEach(s=>{if(s!==chatScreen)s.classList.remove('is-active')});chatScreen.classList.add('is-active');markRead();render();const video=document.getElementById('backgroundVideo');if(video){videoWasMuted=!!video.muted;video.muted=true;video.play().catch(()=>{});}if(!fromPopState&&!historyArmed){try{history.pushState({...history.state,hnChat:true},'',location.href);historyArmed=true;}catch(_){}}setTimeout(()=>inputEl?.focus(),250);}
   function wireModule(){const module=ensureHomeModule();if(!module||module.dataset.hnChatBound==='1')return;module.dataset.hnChatBound='1';module.addEventListener('click',()=>openChat());}
