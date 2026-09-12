@@ -1,21 +1,14 @@
-const CACHE='hn-v7';
-
-const ASSETS=[
-  './',
-  './index.html',
-  './manifest.json',
-  './havana-nice-icon-192.png',
-  './havana-nice-icon-512.png'
-];
+const CACHE='hn-v9';
 
 self.addEventListener('install', event => {
-  event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)));
   self.skipWaiting();
 });
 
 self.addEventListener('activate', event => {
-  event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key !== CACHE).map(key => caches.delete(key)))));
-  self.clients.claim();
+  event.waitUntil(
+    caches.keys().then(keys => Promise.all(keys.map(key => caches.delete(key))))
+      .then(() => self.clients.claim())
+  );
 });
 
 self.addEventListener('fetch', event => {
