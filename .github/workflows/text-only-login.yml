@@ -1,0 +1,37 @@
+name: Text only login change
+
+on:
+  push:
+    branches:
+      - text-only-login-20260912
+
+permissions:
+  contents: write
+
+jobs:
+  change:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Change only login words
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          old = '''      <h1 class="orly-name metallic-gold">\n        ORLY SHOW\n      </h1>\n\n      <p class="orly-role">\n        Percusión y Director Musical\n      </p>'''
+          new = '''      <h1 class="orly-name metallic-gold">\n        BIENVENIDOS\n      </h1>\n\n      <p class="orly-role">\n        FAMILIA HAVANA NICE\n      </p>'''
+          if s.count(old) != 1:
+              raise SystemExit('Expected exactly one login text block; refusing to modify anything.')
+          p.write_text(s.replace(old, new, 1), encoding='utf-8')
+          PY
+
+      - name: Commit text-only change
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "Change login welcome text only"
+          git push origin text-only-login-20260912
