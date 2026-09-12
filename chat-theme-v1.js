@@ -5,11 +5,36 @@
   window.__hnChatThemeV3 = true;
 
   const SUPABASE_URL='https://xzfradccsxonmauinecl.supabase.co';
-  const KEY='sb_publishable_Ip5rGK0UVXIfOjs_RQ_LhA_c14foHN9';
+  const KEY='sb_publishable_Ip5rGK0UVIfXOfjs_RQ_LhA_c14foHN9';
   const RPC_URL=`${SUPABASE_URL}/rest/v1/rpc/get_chat_settings`;
   let settings=null, sb=null, channel=null;
 
   const validColor=v=>/^#[0-9a-fA-F]{6}$/.test(v||'');
+
+  function syncChatBackground(){
+    const screen=document.getElementById('hn-chat-screen');
+    const video=document.getElementById('backgroundVideo');
+    if(!screen||!video)return;
+    const active=screen.classList.contains('is-active');
+    if(active){
+      if(!video.paused){
+        video.pause();
+        video.dataset.hnChatPaused='1';
+      }
+    }else if(video.dataset.hnChatPaused==='1'){
+      delete video.dataset.hnChatPaused;
+      video.play().catch(()=>{});
+    }
+  }
+
+  function wireChatBackground(){
+    const screen=document.getElementById('hn-chat-screen');
+    if(!screen||screen.dataset.hnChatBgBound==='1')return;
+    screen.dataset.hnChatBgBound='1';
+    const observer=new MutationObserver(syncChatBackground);
+    observer.observe(screen,{attributes:true,attributeFilter:['class']});
+    syncChatBackground();
+  }
 
   async function load(){
     try{
@@ -39,9 +64,10 @@
       style.id='hn-chat-live-settings';
       document.head.appendChild(style);
     }
-    const css=`#hn-chat-screen{--hn-chat-bg:${bg};--hn-chat-own:${own};--hn-chat-other:${other};--hn-chat-accent:${accent};--hn-chat-text:${text};background:${bg}!important}#hn-chat-screen .hn-chat-wrap{background:${bg}!important}#hn-chat-screen .hn-chat-bubble{border-color:${accent}55!important;background:${other}!important}#hn-chat-screen .hn-chat-row.mine .hn-chat-bubble{background:${own}!important;border-color:${accent}!important}#hn-chat-screen .hn-chat-sender,#hn-chat-screen .hn-chat-audio-icon,#hn-chat-screen .hn-chat-recording-status,#hn-chat-screen .hn-chat-reply-label{color:${accent}!important}#hn-chat-screen .hn-chat-text,#hn-chat-screen .hn-chat-audio-label,#hn-chat-screen .hn-chat-input,#hn-chat-screen .hn-chat-recording,#hn-chat-screen .hn-chat-send,#hn-chat-screen .hn-chat-head-title{color:${text}!important}#hn-chat-screen .hn-chat-input{border-color:${accent}73!important}#hn-chat-screen .hn-chat-send{border-color:${accent}!important;color:${text}!important}#hn-chat-screen .hn-chat-list{background:${bg}!important}`;
+    const css=`#hn-chat-screen{--hn-chat-bg:${bg};--hn-chat-own:${own};--hn-chat-other:${other};--hn-chat-accent:${accent};--hn-chat-text:${text};background:${bg}!important;position:absolute;overflow:hidden}#hn-chat-screen::before{content:"";position:absolute;inset:-35%;z-index:0;pointer-events:none;background:radial-gradient(ellipse at 18% 50%,rgba(229,189,98,.16) 0%,rgba(229,189,98,.07) 14%,transparent 34%),radial-gradient(ellipse at 82% 35%,rgba(13,90,61,.22) 0%,transparent 40%);transform:translateX(-35%);animation:hnChatGoldSweep 8s ease-in-out infinite alternate;will-change:transform}#hn-chat-screen .hn-chat-wrap{background:transparent!important;position:relative;z-index:1}@keyframes hnChatGoldSweep{0%{transform:translateX(-35%) rotate(-2deg)}100%{transform:translateX(35%) rotate(2deg)}}#hn-chat-screen .hn-chat-bubble{border-color:${accent}55!important;background:${other}!important}#hn-chat-screen .hn-chat-row.mine .hn-chat-bubble{background:${own}!important;border-color:${accent}!important}#hn-chat-screen .hn-chat-sender,#hn-chat-screen .hn-chat-audio-icon,#hn-chat-screen .hn-chat-recording-status,#hn-chat-screen .hn-chat-reply-label{color:${accent}!important}#hn-chat-screen .hn-chat-text,#hn-chat-screen .hn-chat-audio-label,#hn-chat-screen .hn-chat-input,#hn-chat-screen .hn-chat-recording,#hn-chat-screen .hn-chat-send,#hn-chat-screen .hn-chat-head-title{color:${text}!important}#hn-chat-screen .hn-chat-input{border-color:${accent}73!important}#hn-chat-screen .hn-chat-send{border-color:${accent}!important;color:${text}!important}#hn-chat-screen .hn-chat-list{background:transparent!important}`;
     if(style.textContent!==css)style.textContent=css;
     wireLimits();
+    wireChatBackground();
   }
 
   function wireLimits(){
@@ -93,13 +119,14 @@
     }catch(e){console.warn('HN chat settings realtime',e)}
   }
 
-  // Observe only newly inserted nodes. The previous version observed the
-  // stylesheet it created, which caused an endless MutationObserver loop.
   const observer=new MutationObserver(mutations=>{
     const chatAdded=mutations.some(m=>[...m.addedNodes].some(node=>
       node.nodeType===1 && (node.id==='hn-chat-screen' || node.querySelector?.('#hn-chat-screen'))
     ));
-    if(chatAdded)apply();
+    if(chatAdded){
+      apply();
+      wireChatBackground();
+    }
   });
   if(document.body)observer.observe(document.body,{childList:true,subtree:true});
 
@@ -108,5 +135,6 @@
   setInterval(()=>{
     load();
     wireLimits();
+    wireChatBackground();
   },60000);
 })();
