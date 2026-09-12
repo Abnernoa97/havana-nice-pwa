@@ -8,8 +8,16 @@
   const KEY='sb_publishable_Ip5rGK0UVIfXOfjs_RQ_LhA_c14foHN9';
   const RPC_URL=`${SUPABASE_URL}/rest/v1/rpc/get_chat_settings`;
   const AUDIO_BUCKET='chat-audio';
+  const MEDIA_BUCKET='chat-media';
+  const MEDIA_IMAGE_MAX=1280;
+  const MEDIA_IMAGE_QUALITY=.62;
+  const MEDIA_VIDEO_MAX=720;
+  const MEDIA_VIDEO_FPS=20;
+  const MEDIA_VIDEO_BPS=900000;
+  const MEDIA_AUDIO_BPS=64000;
   let settings=null, sb=null, channel=null;
   let voiceRecorder=null, voiceStream=null, voiceChunks=[], voiceMime='', voiceStartedAt=0, voiceElapsed=0, voiceTimer=null, voiceStarting=false, voiceSending=false;
+  let mediaCompressionInstalled=false;
 
   const validColor=v=>/^#[0-9a-fA-F]{6}$/.test(v||'');
 
@@ -134,9 +142,8 @@
   function toggleVoice(){
     if(voiceSending||voiceStarting)return;
     if(!voiceRecorder||voiceRecorder.state==='inactive'){startVoice();return;}
-    if(voiceRecorder.state==='recording'){try{voiceRecorder.pause();}catch(_){}}
-    else if(voiceRecorder.state==='paused'){try{voiceRecorder.resume();}catch(_){}
-    }
+    if(voiceRecorder.state==='recording'){try{voiceRecorder.pause();}catch(_){} }
+    else if(voiceRecorder.state==='paused'){try{voiceRecorder.resume();}catch(_){} }
   }
 
   async function uploadVoice(blob,duration){
@@ -157,7 +164,7 @@
 
   function finishVoiceSend(){
     if(voiceSending||!voiceRecorder)return;
-    if(voiceRecorder.state==='recording'){try{voiceRecorder.pause();}catch(_){}}
+    if(voiceRecorder.state==='recording'){try{voiceRecorder.pause();}catch(_){} }
     if(voiceRecorder.state!=='paused')return;
     voiceSending=true;setVoiceUI('sending');stopVoiceTimer();
     const recorder=voiceRecorder;
@@ -194,6 +201,125 @@
     },true);
   }
 
+  function waitForVideoMetadata(video){
+    return new Promise((resolve,reject)=>{
+      if(video.readyState>=1&&video.videoWidth&&video.videoHeight){resolve();return;}
+      const ok=()=>{cleanup();resolve();};
+      const fail=()=>{cleanup();reject(new Error('No se pudo leer el video.'));};
+      const cleanup=()=>{video.removeEventListener('loadedmetadata',ok);video.removeEventListener('error',fail);};
+      video.addEventListener('loadedmetadata',ok,{once:true});video.addEventListener('error',fail,{once:true});
+    });
+  }
+
+  function pickVideoMime(){
+    if(!window.MediaRecorder)return '';
+    return ['video/webm;codecs=vp8,opus','video/webm;codecs=vp9,opus','video/webm','video/mp4'].find(t=>MediaRecorder.isTypeSupported(t))||'';
+  }
+
+  async function compressImage(file){
+    if(!file?.type?.startsWith('image/'))return file;
+    const url=URL.createObjectURL(file);
+    try{
+      const image=new Image();
+      image.decoding='async';
+      image.src=url;
+      await new Promise((resolve,reject)=>{image.onload=resolve;image.onerror=reject;});
+      const scale=Math.min(1,MEDIA_IMAGE_MAX/Math.max(image.naturalWidth||image.width,image.naturalHeight||image.height));
+      const width=Math.max(1,Math.round((image.naturalWidth||image.width)*scale));
+      const height=Math.max(1,Math.round((image.naturalHeight||image.height)*scale));
+      const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;
+      const ctx=canvas.getContext('2d',{alpha:false});if(!ctx)throw new Error('Canvas no disponible.');
+      ctx.drawImage(image,0,0,width,height);
+      const blob=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('No se pudo comprimir la foto.')),'image/jpeg',MEDIA_IMAGE_QUALITY));
+      if(!blob?.size||blob.size>=file.size)return file;
+      const base=file.name.replace(/\.[^.]+$/,'')||'foto';
+      return new File([blob],`${base}.jpg`,{type:'image/jpeg',lastModified:file.lastModified||Date.now()});
+    }finally{URL.revokeObjectURL(url);}
+  }
+
+  async function compressVideo(file){
+    if(!file?.type?.startsWith('video/'))return file;
+    if(!window.MediaRecorder||!window.MediaStream||!HTMLCanvasElement.prototype.captureStream)return file;
+    const mime=pickVideoMime();if(!mime)return file;
+    const url=URL.createObjectURL(file),video=document.createElement('video');
+    let sourceStream=null,outputStream=null,raf=0;
+    video.muted=true;video.playsInline=true;video.preload='auto';video.src=url;
+    try{
+      await waitForVideoMetadata(video);
+      const sourceWidth=video.videoWidth,sourceHeight=video.videoHeight;
+      if(!sourceWidth||!sourceHeight)return file;
+      const scale=Math.min(1,MEDIA_VIDEO_MAX/Math.max(sourceWidth,sourceHeight));
+      const width=Math.max(2,Math.round(sourceWidth*scale/2)*2);
+      const height=Math.max(2,Math.round(sourceHeight*scale/2)*2);
+      const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;
+      const ctx=canvas.getContext('2d',{alpha:false});if(!ctx)throw new Error('Canvas no disponible.');
+      sourceStream=video.captureStream?video.captureStream():(video.mozCaptureStream?video.mozCaptureStream():null);
+      if(!sourceStream) return file;
+      const canvasStream=canvas.captureStream(MEDIA_VIDEO_FPS);
+      outputStream=new MediaStream();
+      canvasStream.getVideoTracks().forEach(track=>outputStream.addTrack(track));
+      sourceStream.getAudioTracks().forEach(track=>outputStream.addTrack(track));
+      const chunks=[];
+      const recorder=new MediaRecorder(outputStream,{mimeType,videoBitsPerSecond:MEDIA_VIDEO_BPS,audioBitsPerSecond:MEDIA_AUDIO_BPS});
+      const finished=new Promise((resolve,reject)=>{
+        recorder.ondataavailable=e=>{if(e.data?.size)chunks.push(e.data);};
+        recorder.onerror=()=>reject(new Error('No se pudo comprimir el video.'));
+        recorder.onstop=()=>resolve(new Blob(chunks,{type:recorder.mimeType||mime}));
+      });
+      const draw=()=>{if(video.ended)return;try{ctx.drawImage(video,0,0,width,height);}catch(_){ }raf=requestAnimationFrame(draw);};
+      video.onended=()=>{if(raf)cancelAnimationFrame(raf);if(recorder.state!=='inactive')recorder.stop();};
+      recorder.start(1000);
+      await video.play();
+      draw();
+      const blob=await finished;
+      if(!blob?.size||blob.size>=file.size)return file;
+      const base=file.name.replace(/\.[^.]+$/,'')||'video';
+      const ext=(blob.type||mime).includes('mp4')?'mp4':'webm';
+      return new File([blob],`${base}.${ext}`,{type:blob.type||mime,lastModified:file.lastModified||Date.now()});
+    }catch(error){
+      console.warn('HAVANA NICE media compression fallback:',error);
+      try{if(raf)cancelAnimationFrame(raf);}catch(_){ }
+      return file;
+    }finally{
+      try{video.pause();}catch(_){ }
+      try{sourceStream?.getTracks().forEach(t=>t.stop());}catch(_){ }
+      try{outputStream?.getTracks().forEach(t=>t.stop());}catch(_){ }
+      URL.revokeObjectURL(url);
+    }
+  }
+
+  async function optimizeMedia(file){
+    if(file?.type?.startsWith('image/'))return compressImage(file);
+    if(file?.type?.startsWith('video/'))return compressVideo(file);
+    return file;
+  }
+
+  function installMediaCompression(){
+    const client=window.hnSupabase||window.supabaseClient||window.supabase||null;
+    const storage=client?.storage;
+    if(!storage?.from||mediaCompressionInstalled)return;
+    const originalFrom=storage.from.bind(storage);
+    storage.from=function(bucket,...args){
+      const api=originalFrom(bucket,...args);
+      if(bucket!==MEDIA_BUCKET||!api?.upload||api.__hnMediaCompressionUpload)return api;
+      const originalUpload=api.upload.bind(api);
+      api.upload=async(path,file,options={})=>{
+        let optimized=file;
+        try{optimized=await optimizeMedia(file);}catch(error){console.warn('HAVANA NICE media optimization failed:',error);optimized=file;}
+        let finalPath=path,finalOptions={...options};
+        if(optimized!==file){
+          const ext=(optimized.type||'').includes('jpeg')?'jpg':(optimized.type||'').includes('mp4')?'mp4':'webm';
+          finalPath=String(path).replace(/\.[^.]+$/,`.${ext}`);
+          finalOptions.contentType=optimized.type;
+        }
+        return originalUpload(finalPath,optimized,finalOptions);
+      };
+      api.__hnMediaCompressionUpload=true;
+      return api;
+    };
+    mediaCompressionInstalled=true;
+  }
+
   async function load(){
     try{
       const r=await fetch(RPC_URL,{method:'POST',headers:{apikey:KEY,Authorization:`Bearer ${KEY}`,'Content-Type':'application/json'},body:'{}'});
@@ -213,7 +339,7 @@
     if(!style){style=document.createElement('style');style.id='hn-chat-live-settings';document.head.appendChild(style);}
     const css=`#hn-chat-screen{--hn-chat-bg:${bg};--hn-chat-own:${own};--hn-chat-other:${other};--hn-chat-accent:${accent};--hn-chat-text:${text};background:${bg}!important;position:absolute;overflow:hidden}#hn-chat-screen::before{content:"";position:absolute;inset:-35%;z-index:0;pointer-events:none;background:radial-gradient(ellipse at 18% 50%,rgba(229,189,98,.16) 0%,rgba(229,189,98,.07) 14%,transparent 34%),radial-gradient(ellipse at 82% 35%,rgba(13,90,61,.22) 0%,transparent 40%);transform:translateX(-35%);animation:hnChatGoldSweep 8s ease-in-out infinite alternate;will-change:transform}#hn-chat-screen .hn-chat-wrap{background:transparent!important;position:relative;z-index:1}@keyframes hnChatGoldSweep{0%{transform:translateX(-35%) rotate(-2deg)}100%{transform:translateX(35%) rotate(2deg)}}#hn-chat-screen .hn-chat-bubble{border-color:${accent}55!important;background:${other}!important}#hn-chat-screen .hn-chat-row.mine .hn-chat-bubble{background:${own}!important;border-color:${accent}!important}#hn-chat-screen .hn-chat-sender,#hn-chat-screen .hn-chat-audio-icon,#hn-chat-screen .hn-chat-recording-status,#hn-chat-screen .hn-chat-reply-label{color:${accent}!important}#hn-chat-screen .hn-chat-text,#hn-chat-screen .hn-chat-audio-label,#hn-chat-screen .hn-chat-input,#hn-chat-screen .hn-chat-recording,#hn-chat-screen .hn-chat-send,#hn-chat-screen .hn-chat-head-title{color:${text}!important}#hn-chat-screen .hn-chat-input{border-color:${accent}73!important}#hn-chat-screen .hn-chat-send{border-color:${accent}!important;color:${text}!important}#hn-chat-screen .hn-chat-list{background:transparent!important}#hn-chat-screen .hn-chat-recording{justify-content:flex-end}#hn-chat-screen .hn-chat-recording-status{display:none!important}#hn-chat-screen .hn-chat-mic.is-paused{border-color:${accent}!important;background:rgba(229,189,98,.16);color:${accent}!important}`;
     if(style.textContent!==css)style.textContent=css;
-    wireLimits();wireChatBackground();
+    wireLimits();wireChatBackground();installMediaCompression();
   }
 
   function wireLimits(){
@@ -247,5 +373,5 @@
 
   interceptVoiceAndSend();
   load();realtime();
-  setInterval(()=>{load();wireLimits();wireChatBackground();},60000);
+  setInterval(()=>{load();wireLimits();wireChatBackground();installMediaCompression();},60000);
 })();
