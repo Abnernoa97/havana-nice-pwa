@@ -73,7 +73,7 @@
   }
   function openLightbox(url){
     if(!url)return;const box=buildLightbox(),image=box.querySelector('.hn-chat-lightbox-image');image.src=url;box.classList.add('is-open');
-    if(!lightboxHistory){try{history.pushState({...history.state,hnChat:true,hnLightbox:true},'',location.href);lightboxHistory=true;}catch(_) {}}
+    if(!lightboxHistory){try{history.pushState({...history.state,hnChat:true,hnLightbox:true},'',location.href);lightboxHistory=true;}catch(_){}}
   }
   function closeLightbox(fromPopState=false){
     if(!lightboxEl?.classList.contains('is-open'))return;
