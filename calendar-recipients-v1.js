@@ -36,8 +36,6 @@
 
   async function initMusician(){
     const module=[...document.querySelectorAll('.module[data-module]')].find(x=>x.dataset.module==='CALENDARIO DE EVENTOS');if(!module)return;
-    /* HARD GATE: hide the calendar list from the moment this module loads.
-       The list stays hidden until the authorized event query succeeds. */
     const gateStyle=document.createElement('style');gateStyle.textContent='#calendarList{visibility:hidden!important}';document.head.appendChild(gateStyle);
     const s=await sb();
     const session=()=>{try{return JSON.parse(sessionStorage.getItem('hn_profile')||'null')}catch(_){return null}};
@@ -48,8 +46,8 @@
     async function apply(){if(applying)return;applying=true;try{const rows=await filter();if(rows!==null)renderFiltered(rows);}finally{applying=false;}}
     window.addEventListener('hn-calendar-updated',apply);
     const observer=new MutationObserver(()=>apply());const target=document.getElementById('calendarList');if(target)observer.observe(target,{childList:true,subtree:true});
-    try{s.channel('calendar-recipient-sync').on('postgres_changes',{event:'*',schema:'public',table:'calendar_event_recipients'},()=>apply()).subscribe();}catch(e){console.warn('calendar recipient realtime',e)}
+    try{const channel=s.channel('calendar-realtime');channel.on('postgres_changes',{event:'*',schema:'public',table:'calendar_events'},()=>apply());channel.on('postgres_changes',{event:'*',schema:'public',table:'calendar_event_recipients'},()=>apply());channel.subscribe();}catch(e){console.warn('calendar realtime',e)}
     apply();
-    setTimeout(apply,700);setInterval(apply,30000);
+    setTimeout(apply,700);
   }
 })();
