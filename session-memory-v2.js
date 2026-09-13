@@ -1,0 +1,153 @@
+/* HAVANA NICE — LAST MUSICIAN MEMORY v2
+   Remembers only the last successfully validated musician on this device.
+   It does not create authentication credentials and does not use biometrics,
+   Passkeys, WebAuthn, fingerprinting or Face ID.
+*/
+(function(){
+  'use strict';
+
+  const KEY='hn_last_musician_v1';
+  let restoring=false;
+
+  function readSaved(){
+    try{
+      const raw=localStorage.getItem(KEY);
+      if(!raw)return null;
+      const saved=JSON.parse(raw);
+      return saved&&typeof saved.username==='string'&&saved.username.trim()
+        ? saved
+        : null;
+    }catch(_){
+      return null;
+    }
+  }
+
+  function save(profile){
+    if(!profile||!profile.username)return;
+    try{
+      localStorage.setItem(KEY,JSON.stringify({
+        id:profile.id||null,
+        username:profile.username,
+        role:profile.role||'Músico de HAVANA NICE'
+      }));
+    }catch(_){}
+  }
+
+  function clear(){
+    try{localStorage.removeItem(KEY);}catch(_){}
+  }
+
+  function getProfile(){
+    try{
+      const raw=sessionStorage.getItem('hn_profile');
+      return raw?JSON.parse(raw):null;
+    }catch(_){
+      return null;
+    }
+  }
+
+  function waitForSupabase(timeoutMs=8000){
+    return new Promise(resolve=>{
+      const started=Date.now();
+      const check=()=>{
+        if(window.hnSupabase)return resolve(window.hnSupabase);
+        if(Date.now()-started>=timeoutMs)return resolve(null);
+        setTimeout(check,100);
+      };
+      check();
+    });
+  }
+
+  function enterHome(profile){
+    const login=document.getElementById('loginScreen');
+    const home=document.getElementById('homeScreen');
+    const name=document.getElementById('welcomeName');
+    const role=document.getElementById('welcomeRole');
+    if(!login||!home||!name||!role)return false;
+
+    name.textContent=profile.username||'';
+    role.textContent=profile.role||'Músico de HAVANA NICE';
+    login.classList.remove('is-active');
+    home.classList.add('is-active');
+    return true;
+  }
+
+  async function restore(){
+    if(restoring)return;
+    if(getProfile())return;
+
+    const saved=readSaved();
+    if(!saved)return;
+
+    restoring=true;
+    const supabase=await waitForSupabase();
+
+    if(!supabase){
+      restoring=false;
+      return;
+    }
+
+    try{
+      const {data,error}=await supabase.rpc('login_by_username',{
+        p_username:saved.username
+      });
+
+      if(error||!data||!data.length){
+        clear();
+        sessionStorage.removeItem('hn_profile');
+        return;
+      }
+
+      const profile=data[0];
+      const current={
+        id:profile.id,
+        username:profile.username,
+        role:profile.role
+      };
+
+      sessionStorage.setItem('hn_profile',JSON.stringify(current));
+      save(current);
+      enterHome(current);
+    }catch(error){
+      console.warn('HAVANA NICE last musician restore failed:',error);
+    }finally{
+      restoring=false;
+    }
+  }
+
+  function watchSuccessfulLogin(){
+    const button=document.getElementById('loginButton');
+    if(!button)return;
+
+    button.addEventListener('click',()=>{
+      let checks=0;
+      const timer=setInterval(()=>{
+        checks++;
+        const profile=getProfile();
+        if(profile&&profile.username){
+          save(profile);
+          clearInterval(timer);
+        }
+        if(checks>=100)clearInterval(timer);
+      },100);
+    },false);
+  }
+
+  function watchLogout(){
+    const button=document.getElementById('logoutButton');
+    if(!button)return;
+    button.addEventListener('click',()=>clear(),false);
+  }
+
+  function init(){
+    watchSuccessfulLogin();
+    watchLogout();
+    restore();
+  }
+
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',init,{once:true});
+  }else{
+    init();
+  }
+})();
