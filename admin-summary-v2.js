@@ -1,10 +1,13 @@
-/* HAVANA NICE — ADMIN SUMMARY V2 / COUNTS ONLY */
+/* HAVANA NICE — ADMIN SUMMARY V2 / REALTIME COUNTS */
 (function(){
   'use strict';
   if(window.__hnAdminSummaryV2)return;
   window.__hnAdminSummaryV2=true;
 
   const $=id=>document.getElementById(id);
+  let channel=null;
+  let refreshTimer=null;
+  let loading=false;
 
   function style(){
     if($('hn-summary-v2-style'))return;
@@ -39,11 +42,18 @@
     return true;
   }
 
+  async function getClient(){
+    if(window.hnAdminSupabase)return window.hnAdminSupabase;
+    return null;
+  }
+
   async function load(){
     if(!ensureFields()){setTimeout(load,500);return}
+    if(loading)return;
+    const c=await getClient();
+    if(!c){setTimeout(load,500);return}
+    loading=true;
     try{
-      const c=window.hnAdminSupabase||null;
-      if(!c){setTimeout(load,500);return}
       const [events,chat,notifications]=await Promise.all([
         c.from('calendar_events').select('id',{count:'exact',head:true}),
         c.rpc('admin_list_chat_messages'),
@@ -77,7 +87,36 @@
       if($('hnSummaryVideos'))$('hnSummaryVideos').textContent=String(videos);
     }catch(e){
       console.warn('HN summary counts',e);
-      setTimeout(load,1500);
+    }finally{
+      loading=false;
+    }
+  }
+
+  function scheduleLoad(){
+    clearTimeout(refreshTimer);
+    refreshTimer=setTimeout(load,120);
+  }
+
+  function subscribe(){
+    if(channel)return;
+    const c=window.hnAdminSupabase;
+    if(!c){setTimeout(subscribe,500);return}
+    try{
+      channel=c.channel('hn-admin-summary-live')
+        .on('postgres_changes',{event:'*',schema:'public',table:'calendar_events'},scheduleLoad)
+        .on('postgres_changes',{event:'*',schema:'public',table:'chat_messages'},scheduleLoad)
+        .on('postgres_changes',{event:'*',schema:'public',table:'notifications'},scheduleLoad)
+        .subscribe(function(st){
+          if(st==='SUBSCRIBED')load();
+          else if(st==='CHANNEL_ERROR'||st==='TIMED_OUT'||st==='CLOSED'){
+            channel=null;
+            setTimeout(subscribe,2500);
+          }
+        });
+    }catch(e){
+      console.warn('HN summary realtime',e);
+      channel=null;
+      setTimeout(subscribe,2500);
     }
   }
 
@@ -86,6 +125,7 @@
     if(!findSummaryCard()){setTimeout(wait,300);return}
     ensureFields();
     load();
+    subscribe();
   }
 
   wait();
