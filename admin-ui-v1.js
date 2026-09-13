@@ -21,3 +21,4 @@
   function loadScript(id,src){if(document.getElementById(id))return;const script=document.createElement('script');script.id=id;script.src=src;document.body.appendChild(script)}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();
+// realtime summary loader
