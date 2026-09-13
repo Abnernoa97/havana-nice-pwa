@@ -1,4 +1,4 @@
-const CACHE='hn-admin-v2';
+const CACHE='hn-admin-v3';
 const ASSETS=[
   './admin.html',
   './admin-manifest.json',
@@ -13,5 +13,9 @@ self.addEventListener('fetch',e=>{
   if(e.request.method!=='GET')return;
   const url=new URL(e.request.url);
   if(url.origin!==location.origin)return;
+  if(url.pathname.endsWith('/admin-ui-v1.js')||url.pathname.endsWith('/admin.html')){
+    e.respondWith(fetch(e.request,{cache:'no-store'}).then(r=>{const copy=r.clone();caches.open(CACHE).then(c=>c.put(e.request,copy));return r}).catch(()=>caches.match(e.request)));
+    return;
+  }
   e.respondWith(fetch(e.request).then(r=>{const copy=r.clone();caches.open(CACHE).then(c=>c.put(e.request,copy));return r}).catch(()=>caches.match(e.request)));
 });
