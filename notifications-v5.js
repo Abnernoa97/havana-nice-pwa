@@ -4,7 +4,6 @@
 var client=null,channel=null,started=false,reconnectTimer=null,sessionPollTimer=null,pollTimer=null;
 var notifications=[],readIds=new Set(),ready=false,module=null,subtitle=null,badge=null;
 var READ_KEY='hn_notifications_read_v2';
-
 function logged(){return !!sessionStorage.getItem('hn_profile')}
 function getClient(){return window.hnSupabase&&typeof window.hnSupabase.channel==='function'?window.hnSupabase:null}
 function style(){if(document.getElementById('hnNotifyV5Style'))return;var s=document.createElement('style');s.id='hnNotifyV5Style';s.textContent='.hn-notify-badge{position:absolute;top:10px;right:12px;min-width:24px;height:24px;padding:0 7px;border:1px solid #fff1a8;border-radius:999px;background:#e5bd62;color:#020302;display:none;align-items:center;justify-content:center;font:600 11px Arial,sans-serif;z-index:3}.hn-notify-badge.hn-notify-badge-visible{display:flex}.hn-notify-loading .hn-notify-badge{display:none!important}.hn-notify-screen{overflow-y:auto!important;overflow-x:hidden!important;-webkit-overflow-scrolling:touch!important;touch-action:pan-y!important;box-sizing:border-box!important;height:100%!important;max-height:100%!important;padding-bottom:40px!important}.hn-notify-screen .hn-n-image{display:block!important;width:auto!important;height:auto!important;max-width:100%!important;max-height:70vh!important;object-fit:contain!important;margin:14px auto!important;border-radius:0!important}.hn-notify-screen .hn-n-item{height:auto!important;min-height:0!important}.hn-notify-screen .hn-n-date{margin-bottom:10px!important}';document.head.appendChild(s)}
@@ -26,3 +25,4 @@ function watch(){clearInterval(sessionPollTimer);sessionPollTimer=setInterval(fu
 function init(){style();find();document.addEventListener('click',function(e){var m=e.target.closest&&e.target.closest('.module');if(!m)return;var t=m.querySelector('.module-title');if(t&&t.textContent.trim().toUpperCase()==='NOTIFICACIONES'){e.preventDefault();e.stopImmediatePropagation();open()}},true);start();watch();document.addEventListener('visibilitychange',function(){if(!document.hidden&&started)sync(false)});window.addEventListener('online',function(){if(started)sync(false)})}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();
+import('./musician-push.js?v=8161dc96f20726250add287b26d2614b9cf42bdc').catch(function(){});
