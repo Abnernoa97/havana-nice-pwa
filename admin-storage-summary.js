@@ -78,9 +78,7 @@
     }catch(e){console.warn('HN storage summary',e)}
   }
   function boot(){
-    if(started)return;started=true;style();refresh();
-    let tries=0;
-    const timer=setInterval(()=>{tries++;refresh();if(tries>=20)clearInterval(timer)},500)
+    if(started)return;started=true;style();refresh();setTimeout(refresh,1200)
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
 })();
