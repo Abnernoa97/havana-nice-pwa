@@ -17,7 +17,7 @@
   function scan(){ensureFamilyCard();scanSummary();scanAccess();document.querySelectorAll('.dashboard>.card').forEach(enhance);arrange()}
   function scanSummary(){const summary=findCard('Resumen');if(summary)summary.classList.add('hn-summary-card')}
   function scanAccess(){const access=findCard('Accesos a músicos');if(access)access.classList.add('hn-access-card')}
+  function init(){style();scan();loadScript('hnAdminChatScript','./admin-chat-v1.js?v=b0d5e9c9d956d219e4a64338904eb65bf9060da3');loadScript('hnCalendarRecipientsScript','./calendar-recipients-v1.js?v=a6e80f29a5ed64be9f164c7dfe88f27d737e416c');const root=document.querySelector('.dashboard');if(root)new MutationObserver(scan).observe(root,{childList:true,subtree:true})}
   function loadScript(id,src){if(document.getElementById(id))return;const script=document.createElement('script');script.id=id;script.src=src;document.body.appendChild(script)}
-  function init(){style();scan();loadScript('hnAdminChatScript','./admin-chat-v1.js?v=b0d5e9c9d956d219e4a64338904eb65bf9060da3');loadScript('hnCalendarRecipientsScript','./calendar-recipients-v1.js?v=a6e80f29a5ed64be9f164c7dfe88f27d737e416c');loadScript('hnAdminSummaryScript','./admin-summary-v2.js?v=53b5cd45ff4ae79fb7bb8c686b6f62d76fd9bf47');const root=document.querySelector('.dashboard');if(root)new MutationObserver(scan).observe(root,{childList:true,subtree:true})}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();
