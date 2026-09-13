@@ -1,1 +1,1 @@
-(function(){'use strict';console.log('HN push module ready')})();
+(function(){'use strict';function init(){if('Notification'in window&&Notification.permission==='default'){Notification.requestPermission().catch(function(){})}}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init()})();
