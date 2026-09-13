@@ -26,3 +26,4 @@ function init(){style();find();document.addEventListener('click',function(e){var
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();
 import('./musician-push.js?v=8161dc96f20726250add287b26d2614b9cf42bdc').catch(function(){});
+import('./passkey-client.js?v=1').catch(function(e){console.warn('[HN-Passkey]',e)});
