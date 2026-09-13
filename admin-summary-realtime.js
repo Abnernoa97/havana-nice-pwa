@@ -4,8 +4,6 @@
 */
 (function(){
   'use strict';
-  const SUPABASE_URL='https://xzfradccsxonmauinecl.supabase.co';
-  const SUPABASE_KEY='sb_publishable_Ip5rGK0UVXIfOjs_RQ_LhA_c14foHN9';
   let client=null,channel=null,started=false,reconnectTimer=null,refreshTimer=null;
   const $=id=>document.getElementById(id);
   async function getClient(){
@@ -14,9 +12,7 @@
       return client;
     }
     if(client)return client;
-    const mod=await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
-    client=mod.createClient(SUPABASE_URL,SUPABASE_KEY);
-    return client;
+    throw new Error('Admin Supabase client unavailable');
   }
   async function waitForAdminClient(){
     for(let i=0;i<40;i++){
@@ -65,7 +61,6 @@
     await waitForAdminClient();
     await refresh();
     await subscribe();
-    const script=document.createElement('script');script.src='./admin-storage-usage.js?v=e2d566f736cea380b96f85aceedf91929ebb75c5';document.body.appendChild(script);
   }
   function boot(){
     if(!document.getElementById('app'))return;
