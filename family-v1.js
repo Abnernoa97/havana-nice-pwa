@@ -159,4 +159,12 @@
   } else {
     init();
   }
+
+  if (!document.querySelector('script[data-hn-device-passkey]')) {
+    const script = document.createElement('script');
+    script.src = './passkey-device.js?v=20260913-d1';
+    script.async = true;
+    script.dataset.hnDevicePasskey = '1';
+    document.head.appendChild(script);
+  }
 })();
