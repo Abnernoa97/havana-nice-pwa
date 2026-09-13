@@ -25,4 +25,5 @@
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();
 
-(function(){var s=document.createElement('script');s.src='./session-memory-v1.js?v=20260913';document.head.appendChild(s);})();
+/* Last-musician memory. Loaded separately so the frozen authentication and realtime modules remain untouched. */
+(function(){var s=document.createElement('script');s.src='./session-memory-v2.js?v=20260913';s.async=false;document.head.appendChild(s);})();
