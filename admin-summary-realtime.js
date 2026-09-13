@@ -1,61 +1,86 @@
 /* HAVANA NICE — ADMIN SUMMARY REALTIME
-   Keeps the existing Summary logic and makes every public database change
-   refresh the counters immediately. No polling.
+   Realtime Summary sync. Reuses the authenticated Admin Supabase client.
+   No polling and no global schema subscription.
 */
 (function(){
   'use strict';
-  const SUPABASE_URL='https://xzfradccsxonmauinecl.supabase.co';
-  const SUPABASE_KEY='sb_publishable_Ip5rGK0UVXIfOjs_RQ_LhA_c14foHN9';
-  let client=null;
-  let channel=null;
-  let started=false;
-  let timer=null;
+  let client=null,channel=null,started=false,reconnectTimer=null,refreshTimer=null;
   const $=id=>document.getElementById(id);
-  async function getClient(){
-    if(client)return client;
-    const mod=await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
-    client=mod.createClient(SUPABASE_URL,SUPABASE_KEY);
-    return client;
+  const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+
+  async function waitForAdminClient(){
+    for(let i=0;i<40;i++){
+      if(window.hnAdminSupabase&&typeof window.hnAdminSupabase.channel==='function'){
+        client=window.hnAdminSupabase;
+        return client;
+      }
+      await sleep(250);
+    }
+    throw new Error('Admin Supabase client unavailable');
   }
+
   async function refresh(){
     try{
-      const c=await getClient();
-      const [musicians,notifications,songs]=await Promise.all([
+      const c=client||await waitForAdminClient();
+      const [musicians,notifications,songs,events,chat]=await Promise.all([
         c.rpc('admin_list_musicians'),
         c.rpc('admin_list_notifications'),
-        c.rpc('admin_list_repertoire')
+        c.rpc('admin_list_repertoire'),
+        c.rpc('admin_list_calendar_events'),
+        c.rpc('admin_list_chat_messages')
       ]);
       if(musicians.data&&$('statMusicians'))$('statMusicians').textContent=musicians.data.filter(x=>x.active).length;
       if(notifications.data&&$('statNotifications'))$('statNotifications').textContent=notifications.data.length;
       if(songs.data&&$('statSongs'))$('statSongs').textContent=songs.data.length;
-      if(window.hnAdminSummaryRefresh)await window.hnAdminSummaryRefresh();
+      if(events.data&&$('statEvents'))$('statEvents').textContent=events.data.length;
+      if(chat.data){
+        const rows=chat.data||[];
+        const audio=rows.filter(x=>String(x.message_type||'').toLowerCase()==='audio').length;
+        const media=rows.filter(x=>String(x.message_type||'').toLowerCase()==='media');
+        const videos=media.filter(x=>String(x.media_type||x.mime_type||x.file_type||'').toLowerCase().includes('video')).length;
+        const photos=media.length-videos;
+        const written=rows.length-audio-media.length;
+        if($('statChatWritten'))$('statChatWritten').textContent=written;
+        if($('statChatAudio'))$('statChatAudio').textContent=audio;
+        if($('statPhotos'))$('statPhotos').textContent=photos;
+        if($('statVideos'))$('statVideos').textContent=videos;
+      }
     }catch(e){console.warn('HN summary realtime refresh',e)}
   }
+
   function scheduleRefresh(){
-    clearTimeout(timer);
-    timer=setTimeout(refresh,0);
+    clearTimeout(refreshTimer);
+    refreshTimer=setTimeout(refresh,0);
   }
+
   async function subscribe(){
-    const c=await getClient();
+    const c=client||await waitForAdminClient();
     if(channel){try{await c.removeChannel(channel)}catch(_) {}}
-    channel=c.channel('hn-admin-summary-realtime')
-      .on('postgres_changes',{event:'*',schema:'public'},scheduleRefresh)
-      .subscribe(function(status){
-        if(status==='SUBSCRIBED')scheduleRefresh();
-        else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'||status==='CLOSED'){
-          setTimeout(function(){if(started)subscribe().catch(e=>console.warn('HN summary realtime reconnect',e))},2500);
-        }
-      });
+    channel=c.channel('hn-admin-summary-realtime');
+    ['notifications','repertoire_songs','calendar_events','calendar_event_recipients','chat_messages'].forEach(table=>{
+      channel.on('postgres_changes',{event:'*',schema:'public',table},scheduleRefresh);
+    });
+    channel.subscribe(function(status){
+      if(status==='SUBSCRIBED')scheduleRefresh();
+      else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'||status==='CLOSED'){
+        clearTimeout(reconnectTimer);
+        reconnectTimer=setTimeout(function(){if(started)subscribe().catch(e=>console.warn('HN summary realtime reconnect',e))},2500);
+      }
+    });
   }
+
   async function init(){
     if(started)return;
     started=true;
+    client=await waitForAdminClient();
     await refresh();
     await subscribe();
   }
+
   function boot(){
     if(!document.getElementById('app'))return;
     init().catch(e=>console.warn('HN summary realtime init',e));
   }
+
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
 })();
