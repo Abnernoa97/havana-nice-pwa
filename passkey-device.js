@@ -80,7 +80,10 @@
     message('Verificando huella / Face ID / clave del dispositivo…');
     try {
       const credentialId = localStorage.getItem(CRED_KEY) || '';
-      let optionsResult = await invoke('passkey-auth-options', credentialId ? { credentialId } : {});
+      let optionsResult = await invoke('passkey-auth-options', {
+        action: 'authentication',
+        ...(credentialId ? { credentialId } : {})
+      });
       const { startAuthentication } = await import(PASSKEY_CDN);
       let response;
       try {
@@ -91,7 +94,7 @@
       } catch (firstError) {
         if (!credentialId) throw firstError;
         localStorage.removeItem(CRED_KEY);
-        optionsResult = await invoke('passkey-auth-options', {});
+        optionsResult = await invoke('passkey-auth-options', { action: 'authentication' });
         response = await Promise.race([
           startAuthentication({ optionsJSON: optionsResult.options || optionsResult }),
           new Promise((_, reject) => setTimeout(() => reject(new Error('PASSKEY_TIMEOUT')), 15000))
@@ -138,11 +141,13 @@
         return;
       }
       const optionsResult = await invoke('passkey-options', { action: 'register', username: p.username });
+      status('Confirma la huella, Face ID o clave del dispositivo.');
       const { startRegistration } = await import(PASSKEY_CDN);
       const response = await Promise.race([
         startRegistration({ optionsJSON: optionsResult.options || optionsResult }),
         new Promise((_, reject) => setTimeout(() => reject(new Error('PASSKEY_TIMEOUT')), 15000))
       ]);
+      status('Guardando acceso del dispositivo…');
       const result = await invoke('passkey-register-verify', { username: p.username, response });
       if (!result?.verified) throw new Error('No se pudo registrar la credencial.');
       localStorage.setItem(ENABLED_KEY, '1');
