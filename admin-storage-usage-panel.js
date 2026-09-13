@@ -1,0 +1,10 @@
+/* HAVANA NICE — STORAGE USAGE PANEL */
+(function(){
+  'use strict';
+  const $=id=>document.getElementById(id);
+  const fmt=b=>{b=Number(b)||0;if(b<1024*1024)return (b/1024).toFixed(1)+' KB';if(b<1024*1024*1024)return (b/1024/1024).toFixed(2)+' MB';return (b/1024/1024/1024).toFixed(2)+' GB'};
+  async function load(){
+    try{const c=window.hnAdminSupabase;if(!c||!$('app'))return;const{data,error}=await c.rpc('admin_storage_usage');if(error||!data||data.error)return;const used=Number(data.storage_bytes)||0,limit=Number(data.storage_limit_bytes)||1073741824,pct=Math.min(100,used/limit*100);let box=document.getElementById('hnStorageUsage');if(!box){const card=[...document.querySelectorAll('.dashboard>.card')].find(x=>x.querySelector('.card-head h1')?.textContent.trim()==='Resumen');if(!card)return;box=document.createElement('div');box.id='hnStorageUsage';box.innerHTML='<div>ALMACENAMIENTO</div><strong id="hnSuUsed">—</strong> <span id="hnSuLimit">de 1 GB</span><b id="hnSuPct">—</b><div><i id="hnSuFill"></i></div><small>Fotos, videos y audios almacenados en Supabase</small>';const body=card.querySelector('.hn-admin-body');(body||card).appendChild(box)}$('hnSuUsed').textContent=fmt(used);$('hnSuLimit').textContent='de '+fmt(limit);$('hnSuPct').textContent=pct.toFixed(1)+'%';$('hnSuFill').style.width=pct+'%'}catch(e){console.warn('HN storage usage',e)}}
+  function boot(){const st=document.createElement('style');st.textContent='#hnStorageUsage{margin-top:12px;border:1px solid rgba(130,190,145,.20);padding:14px;background:rgba(0,0,0,.18);font-size:8px;letter-spacing:.15em;color:#9b9b96}#hnStorageUsage strong{font:24px Georgia,serif;color:#fff1a8;margin-left:8px}#hnStorageUsage span{letter-spacing:.05em}#hnStorageUsage b{float:right;color:#e5bd62}#hnStorageUsage>div:nth-of-type(2){height:6px;background:#171915;margin-top:9px;overflow:hidden}#hnStorageUsage i{display:block;height:100%;width:0;background:#8c6424}#hnStorageUsage small{display:block;margin-top:8px;color:#777;font-size:7px}';document.head.appendChild(st);setTimeout(load,500)}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
+})();
