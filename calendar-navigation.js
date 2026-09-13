@@ -95,4 +95,17 @@
   const observer = new MutationObserver(watchCalendar);
   observer.observe(document.documentElement, { childList: true, subtree: true });
   watchCalendar();
+
+  /* V4 REALTIME BRIDGE
+     Loaded here because this file is already part of the musician PWA.
+     The bridge reuses the existing Supabase client and subscribes to both
+     calendar_events and calendar_event_recipients, with automatic reconnect.
+  */
+  if (!document.querySelector('script[data-hn-calendar-realtime]')) {
+    const script = document.createElement('script');
+    script.src = './calendar-realtime-bridge.js?v=20260913-realtime1';
+    script.async = true;
+    script.dataset.hnCalendarRealtime = '1';
+    document.head.appendChild(script);
+  }
 })();
