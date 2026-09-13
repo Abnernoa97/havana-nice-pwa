@@ -1,4 +1,4 @@
-const CACHE='hn-admin-v3';
+const CACHE='hn-admin-v4';
 const ASSETS=[
   './admin.html',
   './admin-manifest.json',
