@@ -17,8 +17,15 @@
     document.head.appendChild(s);
   }
 
+  function findSummaryCard(){
+    return document.querySelector('.hn-summary-card')||[...document.querySelectorAll('.dashboard>.card')].find(card=>card.querySelector('.card-head h1')?.textContent.trim()==='Resumen')||null;
+  }
+
   function ensureFields(){
-    const wrap=document.querySelector('.hn-summary-card .stats');
+    const card=findSummaryCard();
+    if(!card)return false;
+    card.classList.add('hn-summary-card');
+    const wrap=card.querySelector('.stats');
     if(!wrap||$('hnSummaryEvents'))return false;
     const grid=document.createElement('div');
     grid.className='hn-summary-v2-grid';
@@ -33,9 +40,9 @@
   }
 
   async function load(){
-    if(!ensureFields())return;
+    if(!ensureFields()){setTimeout(load,500);return}
     try{
-      let c=window.hnAdminSupabase||null;
+      const c=window.hnAdminSupabase||null;
       if(!c){setTimeout(load,500);return}
       const [events,chat,notifications]=await Promise.all([
         c.from('calendar_events').select('id',{count:'exact',head:true}),
@@ -70,12 +77,13 @@
       if($('hnSummaryVideos'))$('hnSummaryVideos').textContent=String(videos);
     }catch(e){
       console.warn('HN summary counts',e);
+      setTimeout(load,1500);
     }
   }
 
   function wait(){
-    if(!document.querySelector('.hn-summary-card')){setTimeout(wait,300);return}
     style();
+    if(!findSummaryCard()){setTimeout(wait,300);return}
     ensureFields();
     load();
   }
