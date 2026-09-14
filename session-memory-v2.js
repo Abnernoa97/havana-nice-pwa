@@ -1,12 +1,12 @@
 /* HAVANA NICE — LAST MUSICIAN MEMORY v2
    Remembers only the last successfully validated musician on this device.
-   It does not create authentication credentials and does not use biometrics,
-   Passkeys, WebAuthn, fingerprinting or Face ID.
+   Device authorization is validated server-side before restoring the session.
 */
 (function(){
   'use strict';
 
   const KEY='hn_last_musician_v1';
+  const DEVICE_MODULE='./musician-device-access-v1.js?v=180733417c2b7f261249394d43ba1b1c4a82b1af';
   let restoring=false;
 
   function readSaved(){
@@ -88,21 +88,19 @@
     }
 
     try{
-      const {data,error}=await supabase.rpc('login_by_username',{
-        p_username:saved.username
-      });
-
-      if(error||!data||!data.length){
+      const mod=await import(DEVICE_MODULE);
+      const validation=await mod.validateSession(saved.username);
+      if(validation?.error||!validation?.data?.length||validation.data[0].status!=='authorized'){
         clear();
         sessionStorage.removeItem('hn_profile');
         return;
       }
 
-      const profile=data[0];
+      const row=validation.data[0];
       const current={
-        id:profile.id,
-        username:profile.username,
-        role:profile.role
+        id:row.profile_id,
+        username:row.username,
+        role:row.role
       };
 
       sessionStorage.setItem('hn_profile',JSON.stringify(current));
@@ -110,6 +108,8 @@
       enterHome(current);
     }catch(error){
       console.warn('HAVANA NICE last musician restore failed:',error);
+      clear();
+      sessionStorage.removeItem('hn_profile');
     }finally{
       restoring=false;
     }
