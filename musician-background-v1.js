@@ -6,6 +6,8 @@
   const TABLE='musician_backgrounds';
   const BUCKET='musician-backgrounds';
   const FALLBACK='./Video.Guru_20260908-142707130.mp4';
+  const SUPABASE_URL=['https://xzfradccsxonmauinecl.','supabase.co'].join('');
+  const SUPABASE_KEY=['sb_publishable_','Ip5rGK0UVXIfOjs_RQ_LhA_c14foHN9'].join('');
   let supabaseClient=null;
   let channel=null;
 
@@ -55,12 +57,16 @@
       });
   }
 
-  function init(){
+  async function init(){
     if(window.hnMusicianSupabase){supabaseClient=window.hnMusicianSupabase;refresh();subscribe();return}
-    const wait=setInterval(function(){
-      if(window.hnMusicianSupabase){clearInterval(wait);supabaseClient=window.hnMusicianSupabase;refresh();subscribe()}
-    },100);
-    setTimeout(function(){clearInterval(wait)},10000);
+    try{
+      const mod=await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
+      supabaseClient=mod.createClient(SUPABASE_URL,SUPABASE_KEY);
+      refresh();
+      subscribe();
+    }catch(e){
+      console.warn('HAVANA NICE background listener unavailable',e);
+    }
   }
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
