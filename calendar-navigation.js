@@ -11,7 +11,7 @@
   const calendar = () => document.getElementById('calendarScreen');
   const legacyModule = () => document.getElementById('moduleScreen');
 
-  function closeCalendar(fromButton = false) {
+  function closeCalendar() {
     const screen = calendar();
     if (!screen) return;
     screen.classList.remove('is-active');
@@ -19,12 +19,7 @@
     else home()?.classList.add('is-active');
     const video = document.getElementById('backgroundVideo');
     if (video) video.muted = videoWasMuted;
-    if (historyArmed && fromButton) {
-      historyArmed = false;
-      try { history.back(); } catch (_) {}
-    } else if (!fromButton) {
-      historyArmed = false;
-    }
+    historyArmed = false;
   }
 
   function openCalendar() {
@@ -50,23 +45,6 @@
     }
   }
 
-  function ensureButton(screen) {
-    if (screen.querySelector('.hn-calendar-back')) return;
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'hn-calendar-back';
-    button.textContent = 'VOLVER';
-    button.addEventListener('click', () => closeCalendar(true));
-    const inner = screen.querySelector('.calendar-inner') || screen;
-    inner.appendChild(button);
-    if (!document.getElementById('hn-calendar-nav-style')) {
-      const style = document.createElement('style');
-      style.id = 'hn-calendar-nav-style';
-      style.textContent = `.hn-calendar-back{flex:0 0 auto;width:100%;height:44px;margin-top:8px;border:1px solid rgba(229,189,98,.35);border-radius:0;background:rgba(0,0,0,.25);color:rgba(244,241,232,.72);font-size:9px;letter-spacing:.2em;text-transform:uppercase;cursor:pointer}`;
-      document.head.appendChild(style);
-    }
-  }
-
   function bindModule() {
     if (bound) return true;
     const module = [...document.querySelectorAll('.module[data-module]')]
@@ -80,16 +58,13 @@
   function watchCalendar() {
     bindModule();
     const screen = calendar();
-    if (screen) {
-      ensureButton(screen);
-      if (screen.classList.contains('is-active')) {
-        legacyModule()?.classList.remove('is-active');
-      }
+    if (screen && screen.classList.contains('is-active')) {
+      legacyModule()?.classList.remove('is-active');
     }
   }
 
   window.addEventListener('popstate', () => {
-    if (calendar()?.classList.contains('is-active')) closeCalendar(false);
+    if (calendar()?.classList.contains('is-active')) closeCalendar();
   });
 
   const observer = new MutationObserver(watchCalendar);
