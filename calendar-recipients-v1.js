@@ -2,7 +2,7 @@
 (function(){
   'use strict';
   const URL='https://xzfradccsxonmauinecl.supabase.co';
-  const KEY='sb_publishable_Ip5rGK0UVXIfOjs_RQ_LhA_c14foHN9';
+  const KEY='sb_publishable_Ip5rGK0UVIfXOfjs_RQ_LhA_c14foHN9';
   let clientPromise=null;
   const esc=v=>String(v??'').replace(/[&<>'\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','\"':'&quot;'}[c]));
   function sb(){if(!clientPromise)clientPromise=import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm').then(m=>m.createClient(URL,KEY));return clientPromise;}
@@ -46,7 +46,7 @@
     async function apply(){if(applying)return;applying=true;try{const rows=await filter();if(rows!==null)renderFiltered(rows);}finally{applying=false;}}
     window.addEventListener('hn-calendar-updated',apply);
     const observer=new MutationObserver(()=>apply());const target=document.getElementById('calendarList');if(target)observer.observe(target,{childList:true,subtree:true});
-    try{const channel=s.channel('calendar-realtime');channel.on('postgres_changes',{event:'*',schema:'public',table:'calendar_events'},()=>apply());channel.on('postgres_changes',{event:'*',schema:'public',table:'calendar_event_recipients'},()=>apply());channel.subscribe();}catch(e){console.warn('calendar realtime',e)}
+    /* Realtime is centralized in calendar-realtime-bridge.js to avoid duplicate subscriptions. */
     apply();
     setTimeout(apply,700);
   }
