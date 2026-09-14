@@ -21,6 +21,7 @@
     }
     decorate();
     window.addEventListener('hn-calendar-updated',()=>setTimeout(decorate,100));
+    if(!document.getElementById('hnMusicianBackgroundScript')){const bg=document.createElement('script');bg.id='hnMusicianBackgroundScript';bg.src='./musician-background-v1.js?v=global1';document.body.appendChild(bg)}
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();
