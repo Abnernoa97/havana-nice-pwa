@@ -54,10 +54,18 @@
 /* Last-musician memory. Loaded separately so the frozen authentication and realtime modules remain untouched. */
 (function(){ var s=document.createElement('script'); s.src='./session-memory-v2.js?v=20260913'; s.async=false; document.head.appendChild(s); })();
 
-/* Chat typing indicator loader. The indicator is isolated from chat_messages and uses Supabase Presence. */
+/* Chat typing indicator loader. The indicator is isolated from chat_messages and uses Supabase Broadcast. */
 (function(){
   var s=document.createElement('script');
-  s.src='./chat-typing-v2.js?v=2';
+  s.src='./chat-typing-v2.js?v=3';
+  s.async=false;
+  document.head.appendChild(s);
+})();
+
+/* Chat history reconciliation guard. Realtime remains primary; this only repairs missed/incomplete history. */
+(function(){
+  var s=document.createElement('script');
+  s.src='./chat-realtime-guard-v1.js?v=1';
   s.async=false;
   document.head.appendChild(s);
 })();
