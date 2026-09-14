@@ -11,7 +11,6 @@
 
   function esc(v){return String(v??'').replace(/[&<>'\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','\"':'&quot;'}[c]));}
   function card(){return [...document.querySelectorAll('.dashboard>.card')].find(c=>c.querySelector('.card-head h1')?.textContent.trim()==='Accesos a músicos')||null;}
-  function root(){return document.getElementById(ROOT);}
   function style(){
     if(document.getElementById(STYLE))return;
     const s=document.createElement('style');s.id=STYLE;s.textContent=`
@@ -22,7 +21,7 @@
   }
   function ensurePanel(){
     const c=card();if(!c)return null;
-    let panel=root();if(panel)return panel;
+    let panel=document.getElementById(ROOT);if(panel)return panel;
     const body=c.querySelector('.hn-admin-body')||c;
     panel=document.createElement('div');panel.id=ROOT;
     panel.innerHTML='<div class="hn-da-head"><div class="hn-da-title">Dispositivos / Accesos</div><div class="hn-da-summary" id="hnDaSummary">—</div></div><div class="hn-da-grid" id="hnDaDevices"></div><div class="hn-da-alerts"><div class="hn-da-title">Alertas de acceso</div><div id="hnDaAlerts"></div></div><div id="hnDaMsg" class="msg"></div>';
@@ -38,22 +37,27 @@
     const api=await client();
     const {data:session}=await api.auth.getSession();
     if(!session?.session)return;
-    const [devices,alerts]=await Promise.all([
+    const [profiles,devices,alerts]=await Promise.all([
+      api.rpc('admin_list_musicians'),
       api.rpc('admin_list_musician_devices'),
       api.rpc('admin_list_musician_access_alerts')
     ]);
-    if(devices.error){panel.querySelector('#hnDaMsg').textContent='No se pudieron cargar los dispositivos';return;}
-    renderDevices(devices.data||[]);renderAlerts(alerts.data||[]);
+    if(profiles.error||devices.error){panel.querySelector('#hnDaMsg').textContent='No se pudieron cargar los accesos';return;}
+    renderDevices(profiles.data||[],devices.data||[]);renderAlerts(alerts.data||[]);
   }
-  function renderDevices(rows){
+  function renderDevices(profileRows,deviceRows){
     const el=document.getElementById('hnDaDevices');const sum=document.getElementById('hnDaSummary');if(!el||!sum)return;
-    const by={};(rows||[]).forEach(r=>{(by[r.profile_id]??=[]).push(r)});
-    const profiles=Object.values(by);
-    const authorized=profiles.filter(list=>list.some(r=>r.status==='authorized')).length;
-    sum.textContent=`${authorized} autorizados · ${profiles.length} perfiles con registro`;
+    const by={};(deviceRows||[]).forEach(r=>{(by[r.profile_id]??=[]).push(r)});
     const order=['FER','ORLY','JALI','RAFA','ANDY'];
-    const sorted=profiles.sort((a,b)=>{const ai=order.indexOf(String(a[0].username).toUpperCase());const bi=order.indexOf(String(b[0].username).toUpperCase());return (ai<0?99:ai)-(bi<0?99:bi)});
-    el.innerHTML=sorted.length?sorted.map(list=>list.map(r=>row(r,list.some(x=>x.status==='authorized'))).join('')).join(''):'<div class="hn-da-empty">Sin dispositivos registrados</div>';
+    const profiles=(profileRows||[]).filter(p=>String(p.username).toUpperCase()!=='NOAH').sort((a,b)=>{const ai=order.indexOf(String(a.username).toUpperCase());const bi=order.indexOf(String(b.username).toUpperCase());return (ai<0?99:ai)-(bi<0?99:bi)});
+    const authorized=profiles.filter(p=>(by[p.id]||[]).some(r=>r.status==='authorized')).length;
+    const pending=profiles.filter(p=>(by[p.id]||[]).some(r=>r.status==='pending')).length;
+    sum.textContent=`${profiles.length} perfiles · ${authorized} autorizados · ${pending} pendientes`;
+    el.innerHTML=profiles.map(p=>{
+      const list=by[p.id]||[];
+      if(!list.length)return emptyProfileRow(p);
+      return list.map(r=>row(r,list.some(x=>x.status==='authorized'))).join('');
+    }).join('');
     el.querySelectorAll('[data-da-action]').forEach(btn=>btn.addEventListener('click',async()=>{
       const action=btn.dataset.daAction,id=btn.dataset.id;
       btn.disabled=true;
@@ -65,6 +69,7 @@
       }catch(e){const m=document.getElementById('hnDaMsg');if(m)m.textContent='No se pudo aplicar el cambio';btn.disabled=false;}
     }));
   }
+  function emptyProfileRow(p){return `<div class="hn-da-row"><div class="hn-da-main"><div><div class="hn-da-name">${esc(p.username)}</div><div class="hn-da-meta">Sin dispositivo registrado</div></div><div class="hn-da-status">SIN DISPOSITIVO</div></div></div>`;}
   function row(r,hasAuthorized){
     const status=String(r.status||'').toLowerCase();
     const label=status==='authorized'?'AUTORIZADO':status==='pending'?'PENDIENTE':status==='blocked'?'BLOQUEADO':'REVOCADO';
