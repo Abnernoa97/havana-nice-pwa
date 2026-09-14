@@ -57,7 +57,7 @@
 /* Chat typing indicator loader. The indicator is isolated from chat_messages and uses Supabase Presence. */
 (function(){
   var s=document.createElement('script');
-  s.src='./chat-typing-v1.js?v=1';
+  s.src='./chat-typing-v2.js?v=2';
   s.async=false;
   document.head.appendChild(s);
 })();
