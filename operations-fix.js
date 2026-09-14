@@ -58,7 +58,7 @@
     const urlMatch = script.textContent.match(/const\s+SUPABASE_URL\s*=\s*["']([^"']+)["']/);
     const keyMatch = script.textContent.match(/const\s+SUPABASE_PUBLISHABLE_KEY\s*=\s*["']([^"']+)["']/);
     if(!urlMatch || !keyMatch) return;
-    import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm').then(function(mod){
+    import('https://esm.sh/@supabase/supabase-js@2').then(function(mod){
       window.hnMusicianSupabase = mod.createClient(urlMatch[1], keyMatch[1]);
       done(window.hnMusicianSupabase);
     }).catch(function(){});
