@@ -5,6 +5,47 @@
 (function(){
   'use strict';
 
+  function installDeviceGate(){
+    const button=document.getElementById('loginButton');
+    const input=document.getElementById('username');
+    if(!button||!input||button.dataset.hnDeviceGate==='1')return;
+    button.dataset.hnDeviceGate='1';
+    let busy=false;
+    const setMessage=t=>{const el=document.getElementById('loginMessage');if(el)el.textContent=t||'';};
+    const finish=()=>{button.disabled=false;busy=false;};
+    async function handle(){
+      if(busy)return;
+      const username=input.value.trim();
+      if(!username){setMessage('Escribe tu nombre');return;}
+      busy=true;button.disabled=true;setMessage('Verificando acceso...');
+      try{
+        const mod=await import('./musician-device-access-v1.js?v=180733417c2b7f261249394d43ba1b1c4a82b1af');
+        const result=await mod.requestAccess(username);
+        if(result.status==='authorized'){
+          const p=result.profile;
+          sessionStorage.setItem('hn_profile',JSON.stringify({id:p.id,username:p.username,role:p.role}));
+          const name=document.getElementById('welcomeName');
+          const role=document.getElementById('welcomeRole');
+          if(name)name.textContent=p.username||'';
+          if(role)role.textContent=p.role||'Músico de HAVANA NICE';
+          document.getElementById('loginScreen')?.classList.remove('is-active');
+          document.getElementById('homeScreen')?.classList.add('is-active');
+          setMessage('');
+          return;
+        }
+        if(result.status==='pending'){setMessage('Acceso pendiente de autorización del administrador');return;}
+        setMessage(result.message||'Acceso no autorizado');
+      }catch(error){
+        console.error('HAVANA NICE device access error:',error);
+        setMessage('No fue posible verificar el acceso');
+      }finally{finish();}
+    }
+    button.addEventListener('click',function(e){e.preventDefault();e.stopImmediatePropagation();handle();},true);
+    input.addEventListener('keydown',function(e){
+      if(e.key==='Enter'){e.preventDefault();e.stopImmediatePropagation();button.click();}
+    },true);
+  }
+
   function ensureMusicianSupabase(done){
     if(window.hnMusicianSupabase){
       done(window.hnMusicianSupabase);
@@ -48,6 +89,9 @@
       }
     });
   }
+
+  /* Install before the deferred inline module runs so the existing login handler is gated. */
+  installDeviceGate();
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init); else init();
 })();
 
