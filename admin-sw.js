@@ -1,4 +1,4 @@
-const CACHE='hn-admin-v3';
+const CACHE='hn-admin-v4';
 const ASSETS=[
   './admin.html',
   './admin-manifest.json',
@@ -12,6 +12,10 @@ self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(keys=>Promis
 self.addEventListener('fetch',e=>{
   if(e.request.method!=='GET')return;
   const url=new URL(e.request.url);
+  if(url.hostname==='cdn.jsdelivr.net'&&url.pathname==='/npm/@supabase/supabase-js@2/+esm'){
+    e.respondWith(fetch('https://esm.sh/@supabase/supabase-js@2').catch(()=>fetch(e.request)));
+    return;
+  }
   if(url.origin!==location.origin)return;
   if(url.pathname.endsWith('/admin-ui-v1.js')||url.pathname.endsWith('/admin.html')){
     e.respondWith(fetch(e.request,{cache:'no-store'}).then(r=>{const copy=r.clone();caches.open(CACHE).then(c=>c.put(e.request,copy));return r}).catch(()=>caches.match(e.request)));
