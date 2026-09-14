@@ -23,7 +23,9 @@
         const result=await mod.requestAccess(username);
         if(result.status==='authorized'){
           const p=result.profile;
-          sessionStorage.setItem('hn_profile',JSON.stringify({id:p.id,username:p.username,role:p.role}));
+          const saved={id:p.id,username:p.username,role:p.role};
+          sessionStorage.setItem('hn_profile',JSON.stringify(saved));
+          try{localStorage.setItem('hn_last_musician_v1',JSON.stringify(saved));}catch(_){ }
           const name=document.getElementById('welcomeName');
           const role=document.getElementById('welcomeRole');
           if(name)name.textContent=p.username||'';
