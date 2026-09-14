@@ -1,59 +1,72 @@
-/* HAVANA NICE — CHAT TYPING V2
-   Isolated typing indicator. Does not touch chat_messages.
+/* HAVANA NICE — CHAT TYPING V3
+   Persistent typing state with heartbeat.
+   Isolated from chat_messages.
 */
 (()=>{
   'use strict';
 
-  const CHANNEL = 'hn-chat-typing-v2';
-  let sb = null;
-  let ch = null;
-  let input = null;
-  let indicator = null;
-  let compose = null;
-  let stopTimer = null;
-  let active = false;
-  let lastRemote = Object.create(null);
-  let observerStarted = false;
+  const CHANNEL='hn-chat-typing-v3';
+  const HEARTBEAT_MS=700;
+  const REMOTE_TIMEOUT_MS=2200;
+
+  let sb=null;
+  let ch=null;
+  let input=null;
+  let indicator=null;
+  let compose=null;
+  let active=false;
+  let heartbeat=null;
+
+  const remote=Object.create(null);
 
   function profile(){
-    try { return JSON.parse(sessionStorage.getItem('hn_profile') || 'null'); }
-    catch (_) { return null; }
+    try{
+      return JSON.parse(sessionStorage.getItem('hn_profile')||'null');
+    }catch(_){
+      return null;
+    }
   }
 
-  function myId(){ return String(profile()?.id || ''); }
+  function myId(){
+    return String(profile()?.id||'');
+  }
 
   function myName(){
-    const p = profile() || {};
-    return String(p.sender_name || p.name || p.full_name || p.username || 'MIEMBRO').trim() || 'MIEMBRO';
+    const p=profile()||{};
+    return String(
+      p.sender_name||
+      p.name||
+      p.full_name||
+      p.username||
+      'MIEMBRO'
+    ).trim()||'MIEMBRO';
   }
 
   function findInput(){
     return document.querySelector('#hn-chat-screen .hn-chat-input')
-      || document.querySelector('.hn-chat-input')
-      || document.querySelector('#hn-chat-screen textarea')
-      || document.querySelector('.hn-chat-compose textarea');
-  }
-
-  function findCompose(el){
-    return el?.closest('.hn-chat-compose')
-      || document.querySelector('#hn-chat-screen .hn-chat-compose')
-      || document.querySelector('.hn-chat-compose');
+      ||document.querySelector('.hn-chat-input')
+      ||document.querySelector('#hn-chat-screen textarea')
+      ||document.querySelector('.hn-chat-compose textarea');
   }
 
   function ensure(){
-    const el = findInput();
-    if (!el) return false;
+    const el=findInput();
+    if(!el)return false;
 
-    const box = findCompose(el);
-    if (!box) return false;
+    const box=
+      el.closest('.hn-chat-compose')
+      ||document.querySelector('.hn-chat-compose');
 
-    input = el;
-    compose = box;
+    if(!box)return false;
 
-    if (!indicator || !document.body.contains(indicator)) {
-      indicator = document.createElement('div');
-      indicator.id = 'hn-chat-typing-indicator';
-      indicator.style.cssText = [
+    input=el;
+    compose=box;
+
+    if(!indicator||!document.body.contains(indicator)){
+      indicator=document.createElement('div');
+      indicator.id='hn-chat-typing-indicator';
+
+      indicator.style.cssText=[
         'display:none',
         'min-height:16px',
         'padding:0 2px',
@@ -66,133 +79,234 @@
         'line-height:16px',
         'pointer-events:none'
       ].join(';');
-      box.insertBefore(indicator, box.firstChild);
+
+      box.insertBefore(indicator,box.firstChild);
     }
 
-    if (input.dataset.hnTypingV2 !== '1') {
-      input.dataset.hnTypingV2 = '1';
-      input.addEventListener('input', onInput, { passive:true });
-      input.addEventListener('blur', stopTyping, { passive:true });
-      input.addEventListener('focus', ()=>{ setTimeout(ensure, 0); });
+    if(input.dataset.hnTypingV3!=='1'){
+      input.dataset.hnTypingV3='1';
+
+      input.addEventListener(
+        'input',
+        onInput,
+        {passive:true}
+      );
+
+      input.addEventListener(
+        'blur',
+        stopTyping,
+        {passive:true}
+      );
+
+      input.addEventListener(
+        'keydown',
+        e=>{
+          if(e.key==='Enter'&&!e.shiftKey){
+            stopTyping();
+          }
+        }
+      );
+
+      if(compose){
+        compose.addEventListener(
+          'submit',
+          stopTyping,
+          {capture:true}
+        );
+      }
     }
 
     return true;
   }
 
   function render(){
-    if (!indicator) return;
+    if(!indicator)return;
 
-    const now = Date.now();
-    const me = myId();
+    const now=Date.now();
+    const me=myId();
 
-    Object.keys(lastRemote).forEach(id=>{
-      if (now - lastRemote[id].at > 2400) delete lastRemote[id];
+    Object.keys(remote).forEach(id=>{
+      if(now-remote[id].at>REMOTE_TIMEOUT_MS){
+        delete remote[id];
+      }
     });
 
-    const names = Object.values(lastRemote)
-      .filter(item => String(item.id) !== me)
-      .map(item => item.name)
-      .filter(Boolean);
+    const names=[
+      ...new Set(
+        Object.values(remote)
+          .filter(x=>String(x.id)!==me)
+          .map(x=>x.name)
+          .filter(Boolean)
+      )
+    ];
 
-    const unique = [...new Set(names)];
-
-    if (unique.length === 1) {
-      indicator.textContent = unique[0] + ' está escribiendo…';
-    } else if (unique.length === 2) {
-      indicator.textContent = unique[0] + ' y ' + unique[1] + ' están escribiendo…';
-    } else if (unique.length > 2) {
-      indicator.textContent = unique[0] + ', ' + unique[1] + ' y ' + (unique.length - 2) + ' más están escribiendo…';
-    } else {
-      indicator.textContent = '';
+    if(names.length===1){
+      indicator.textContent=
+        names[0]+' está escribiendo…';
+    }else if(names.length===2){
+      indicator.textContent=
+        names[0]+' y '+names[1]+' están escribiendo…';
+    }else if(names.length>2){
+      indicator.textContent=
+        names[0]+', '+names[1]+' y '+
+        (names.length-2)+' más están escribiendo…';
+    }else{
+      indicator.textContent='';
     }
 
-    indicator.style.display = unique.length ? 'block' : 'none';
+    indicator.style.display=
+      names.length?'block':'none';
   }
 
   function receive(message){
-    const data = message?.payload || {};
-    if (!data.id || String(data.id) === myId()) return;
+    const d=message?.payload||{};
 
-    if (data.typing) {
-      lastRemote[String(data.id)] = {
-        id: data.id,
-        name: data.name || 'MIEMBRO',
-        at: Date.now()
+    if(!d.id||String(d.id)===myId())return;
+
+    if(d.typing){
+      remote[String(d.id)]={
+        id:d.id,
+        name:d.name||'MIEMBRO',
+        at:Date.now()
       };
-    } else {
-      delete lastRemote[String(data.id)];
+    }else{
+      delete remote[String(d.id)];
     }
 
     ensure();
     render();
-    setTimeout(render, 2500);
   }
 
-  async function sendTyping(value){
-    if (!ch) return;
-    try {
+  async function broadcast(typing){
+    if(!ch||!myId())return;
+
+    try{
       await ch.send({
         type:'broadcast',
         event:'typing',
         payload:{
-          id: myId() || null,
-          name: myName(),
-          typing: !!value
+          id:myId(),
+          name:myName(),
+          typing:!!typing
         }
       });
-    } catch (_) {}
+    }catch(_){}
+  }
+
+  function startHeartbeat(){
+    clearInterval(heartbeat);
+
+    heartbeat=setInterval(()=>{
+      if(
+        active&&
+        input&&
+        String(input.value||'').trim()
+      ){
+        broadcast(true);
+      }
+    },HEARTBEAT_MS);
   }
 
   function stopTyping(){
-    clearTimeout(stopTimer);
-    active = false;
-    sendTyping(false);
+    clearInterval(heartbeat);
+
+    heartbeat=null;
+    active=false;
+
+    broadcast(false);
   }
 
   function onInput(){
     ensure();
 
-    if (!input || !String(input.value || '').trim()) {
+    if(
+      !input||
+      !String(input.value||'').trim()
+    ){
       stopTyping();
       return;
     }
 
-    if (!active) {
-      active = true;
-      sendTyping(true);
-    }
+    if(!active){
+      active=true;
 
-    clearTimeout(stopTimer);
-    stopTimer = setTimeout(()=>{
-      active = false;
-      sendTyping(false);
-    }, 1500);
+      broadcast(true);
+
+      startHeartbeat();
+    }
   }
 
   function connect(){
-    sb = window.hnSupabase || window.hnMusicianSupabase || window.supabaseClient || window.supabase || null;
-    if (!sb) {
-      setTimeout(connect, 500);
+    sb=
+      window.hnSupabase||
+      window.hnMusicianSupabase||
+      window.supabaseClient||
+      window.supabase||
+      null;
+
+    if(!sb){
+      setTimeout(connect,500);
       return;
     }
 
-    if (!ch) {
-      ch = sb.channel(CHANNEL);
-      ch.on('broadcast', { event:'typing' }, receive);
-      ch.subscribe(()=>{ ensure(); });
+    if(!ch){
+      ch=sb.channel(CHANNEL);
+
+      ch.on(
+        'broadcast',
+        {event:'typing'},
+        receive
+      );
+
+      ch.subscribe(()=>{
+        ensure();
+      });
     }
 
     ensure();
+    render();
 
-    if (!observerStarted) {
-      observerStarted = true;
-      const observer = new MutationObserver(()=>ensure());
-      observer.observe(document.body, { childList:true, subtree:true });
+    if(!window.__hnTypingObserver){
+      window.__hnTypingObserver=true;
+
+      new MutationObserver(()=>{
+        ensure();
+      }).observe(
+        document.body,
+        {
+          childList:true,
+          subtree:true
+        }
+      );
     }
+
+    setInterval(render,500);
   }
 
-  window.addEventListener('pagehide', stopTyping, { passive:true });
-  window.addEventListener('beforeunload', stopTyping, { passive:true });
+  window.addEventListener(
+    'pagehide',
+    stopTyping,
+    {passive:true}
+  );
+
+  window.addEventListener(
+    'beforeunload',
+    stopTyping,
+    {passive:true}
+  );
+
+  document.addEventListener(
+    'visibilitychange',
+    ()=>{
+      if(document.hidden){
+        stopTyping();
+      }else{
+        ensure();
+      }
+    },
+    {passive:true}
+  );
 
   connect();
+
 })();
