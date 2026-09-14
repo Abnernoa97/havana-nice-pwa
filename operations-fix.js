@@ -1,5 +1,4 @@
 /* HAVANA NICE — OPERATIONS UI FIX
-   Removes the MY DAY home panel without removing Show Day functionality.
    Show Day remains accessible from today's Calendar event.
 */
 (function(){
@@ -22,8 +21,6 @@
   }
 
   function init(){
-    const panel = document.getElementById('hnMyDay');
-    if(panel) panel.remove();
     const style = document.createElement('style');
     style.id = 'hnOperationsFixStyle';
     style.textContent = '.hn-showday-action{display:block;width:100%;margin-top:11px;padding:12px 13px;border:1px solid rgba(229,189,98,.62);color:#fff1a8;background:rgba(0,0,0,.24);font-size:9px;letter-spacing:.18em;text-transform:uppercase;cursor:pointer}.hn-showday-action:active{opacity:.8}';
@@ -54,7 +51,7 @@
 /* Last-musician memory. Loaded separately so the frozen authentication and realtime modules remain untouched. */
 (function(){ var s=document.createElement('script'); s.src='./session-memory-v2.js?v=20260913'; s.async=false; document.head.appendChild(s); })();
 
-/* Chat typing indicator loader. The indicator is isolated from chat_messages and uses Supabase Broadcast. */
+/* Chat typing indicator loader. The active implementation is chat-typing-v2.js. */
 (function(){
   var s=document.createElement('script');
   s.src='./chat-typing-v2.js?v=3';
