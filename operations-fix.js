@@ -69,7 +69,7 @@
     if(panel) panel.remove();
     const style = document.createElement('style');
     style.id = 'hnOperationsFixStyle';
-    style.textContent = '.hn-showday-action{display:block;width:100%;margin-top:11px;padding:12px 13px;border:1px solid rgba(229,189,98,.62);border-radius:10px;color:#fff1a8;background:rgba(0,0,0,.24);font-size:9px;letter-spacing:.18em;text-transform:uppercase;cursor:pointer}.hn-showday-action:active{opacity:.8}.module,.hn-chat-module,.calendar-event-card,.hn-chat-bubble,.hn-chat-input,.hn-chat-send,.hn-chat-recording,.hn-chat-pending-item,.hn-chat-media-item{border-radius:10px!important}';
+    style.textContent = '.hn-showday-action{display:block;width:100%;margin-top:11px;padding:12px 13px;border:1px solid rgba(229,189,98,.62);border-radius:12px;color:#fff1a8;background:rgba(0,0,0,.24);font-size:9px;letter-spacing:.18em;text-transform:uppercase;cursor:pointer}.hn-showday-action:active{opacity:.8}.module,.hn-chat-module,.calendar-event-card,.hn-chat-bubble,.hn-chat-input,.hn-chat-send,.hn-chat-recording,.hn-chat-pending-item,.hn-chat-media-item{border-radius:12px!important}';
     document.head.appendChild(style);
     function decorate(){
       document.querySelectorAll('.calendar-event-card').forEach(function(card){
