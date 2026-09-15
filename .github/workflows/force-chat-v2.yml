@@ -1,6 +1,13 @@
 name: Force chat asset v2
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/force-chat-v2.yml'
+      - 'index.html'
+      - 'sw.js'
+      - 'chat-v1.js'
   workflow_dispatch:
 
 permissions:
@@ -8,6 +15,7 @@ permissions:
 
 jobs:
   migrate:
+    if: github.event_name == 'workflow_dispatch' || github.event.head_commit.message != 'Force fresh chat asset v2'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -19,11 +27,7 @@ jobs:
           set -euo pipefail
           cp chat-v1.js chat-v2.js
           sed -i 's#./chat-v1.js?v=[^\"'"'"']*#./chat-v2.js?v=hn-v2#' index.html
-          sed -i 's#./chat-theme-v1.js?v=[^\"'"'"']*#./chat-theme-v1.js?v=6b20382062efef3afcbc8084a6fd2853a3534f89#' index.html
           sed -i 's#hn-v16#hn-v17#g' sw.js
-          if ! grep -q '/chat-v2.js' sw.js; then
-            sed -i "s#'/chat-v1.js'#'/chat-v1.js','/chat-v2.js'#g" sw.js || true
-          fi
           rm -f chat-v1.js
 
       - name: Commit
