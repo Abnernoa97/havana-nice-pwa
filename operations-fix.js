@@ -99,7 +99,7 @@
     if(!document.getElementById('hnChatVideoControlsScript')){
       const controls=document.createElement('script');
       controls.id='hnChatVideoControlsScript';
-      controls.src='./chat-video-controls-v1.js?v=b2348c5518a7370907a9ae8cbfcf83d1cb92a1c0';
+      controls.src='./chat-video-controls-v1.js?v=1f552fc7a619103452657010bcd351e8ab57ddab';
       document.body.appendChild(controls);
     }
   }
