@@ -96,6 +96,12 @@
       lb.src='./chat-media-lightbox-v2.js?v=4ad414641140bf49dd788c047df033d6a45392c1';
       document.body.appendChild(lb);
     }
+    if(!document.getElementById('hnChatVideoControlsScript')){
+      const controls=document.createElement('script');
+      controls.id='hnChatVideoControlsScript';
+      controls.src='./chat-video-controls-v1.js?v=b2348c5518a7370907a9ae8cbfcf83d1cb92a1c0';
+      document.body.appendChild(controls);
+    }
   }
 
   installDeviceGate();
