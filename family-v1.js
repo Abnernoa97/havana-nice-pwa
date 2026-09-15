@@ -10,7 +10,7 @@ const FAMILY=[
 const SUPABASE_URL='https://xzfradccsxonmauinecl.supabase.co';
 const SUPABASE_KEY='sb_publishable_Ip5rGK0UVXIfOjs_RQ_LhA_c14foHN9';
 const MEDIA_FUNCTION=SUPABASE_URL+'/functions/v1/family-profile-media-v1';
-const DEVICE_MODULE='./musician-device-access-v1.js?v=43ddfa619ebbd4a631cc4b54afb127372bbaa938';
+const DEVICE_MODULE='./musician-device-access-v1.js?v=415d2212baeec5cd7d2a46cfc79b50f45a0256cf';
 let supabaseClient=null;
 let familyScreen=null;
 let profileScreen=null;
