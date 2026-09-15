@@ -115,3 +115,19 @@
   s.async=false;
   document.head.appendChild(s);
 })();
+
+/* iPhone installation guidance. iOS uses Safari's Add to Home Screen flow instead of beforeinstallprompt. */
+(function(){
+  var s=document.createElement('script');
+  s.src='./ios-install-v1.js?v=1';
+  s.async=false;
+  document.head.appendChild(s);
+})();
+
+/* Final media CSS override. Keeps shared photos/videos compact and opens photos in the existing lightbox. */
+(function(){
+  var s=document.createElement('script');
+  s.src='./chat-media-fix-v1.js?v=1';
+  s.async=false;
+  document.head.appendChild(s);
+})();
