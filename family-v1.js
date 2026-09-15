@@ -77,6 +77,7 @@
 
     document.querySelector('.experience')?.appendChild(familyScreen);
     familyScreen.querySelector('#familyBackButton')?.addEventListener('click',() => closeFamily(true));
+    window.dispatchEvent(new CustomEvent('hn-family-ready'));
 
     return familyScreen;
   }
