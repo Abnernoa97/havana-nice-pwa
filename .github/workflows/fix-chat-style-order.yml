@@ -1,0 +1,41 @@
+name: Fix chat style precedence
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/fix-chat-style-order.yml'
+      - 'index.html'
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.event.head_commit.message != 'Fix chat style precedence'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Put chat theme before chat renderer
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('index.html')
+          s=p.read_text()
+          a='<script src="./chat-v2.js?v=hn-v2"></script>'
+          b='<script src="./chat-theme-v1.js?v=6b20382062efef3afcbc8084a6fd2853a3534f89"></script>'
+          if a not in s or b not in s:
+              raise SystemExit('chat script pair not found')
+          pair=a+'\n'+b
+          if pair in s:
+              raise SystemExit(0)
+          s=s.replace(b+'\n'+a, pair, 1)
+          p.write_text(s)
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          git commit -m 'Fix chat style precedence' || exit 0
+          git push
