@@ -1,12 +1,19 @@
 /* HAVANA NICE — MUSICIAN DEVICE ACCESS V1
    Minimal device authorization layer for the musician PWA.
+   Shared Supabase fallback so device validation works even when the host
+   page has not exposed a global Supabase client yet.
 */
 const TOKEN_KEY='hn_musician_device_token_v1';
+const SUPABASE_URL='https://xzfradccsxonmauinecl.supabase.co';
+const SUPABASE_KEY='sb_publishable_Ip5rGK0UVXIfOjs_RQ_LhA_c14foHN9';
 let client=null;
 
-function getClient(){
+async function getClient(){
   if(client)return client;
   client=window.hnMusicianSupabase||window.hnSupabase||null;
+  if(client)return client;
+  const m=await import('https://esm.sh/@supabase/supabase-js@2');
+  client=m.createClient(SUPABASE_URL,SUPABASE_KEY);
   return client;
 }
 
@@ -33,7 +40,7 @@ export function getDeviceLabel(){
 }
 
 export async function requestAccess(username){
-  const sb=getClient();
+  const sb=await getClient();
   if(!sb)throw new Error('Supabase no disponible');
   const {data,error}=await sb.rpc('login_by_username',{p_username:username});
   if(error)throw error;
@@ -51,8 +58,8 @@ export async function requestAccess(username){
 }
 
 export async function validateSession(username){
-  const sb=getClient();
-  if(!sb)return null;
+  const sb=await getClient();
+  if(!sb)throw new Error('Supabase no disponible');
   return sb.rpc('validate_musician_device_session',{
     p_username:username,
     p_device_token:getDeviceToken()
