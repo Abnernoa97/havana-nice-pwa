@@ -98,15 +98,12 @@
     }
   }
 
-  /* Install before the deferred inline module runs so the existing login handler is gated. */
   installDeviceGate();
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init); else init();
 })();
 
-/* Last-musician memory. Loaded separately so the frozen authentication and realtime modules remain untouched. */
 (function(){ var s=document.createElement('script'); s.src='./session-memory-v2.js?v=20260913'; s.async=false; document.head.appendChild(s); })();
 
-/* Chat typing indicator loader. The indicator is isolated from chat_messages and uses Supabase Broadcast. */
 (function(){
   var s=document.createElement('script');
   s.src='./chat-typing-v2.js?v=3';
@@ -114,15 +111,14 @@
   document.head.appendChild(s);
 })();
 
-/* Chat history reconciliation guard. Realtime remains primary; this only repairs missed/incomplete history. */
+/* Realtime remains primary. This guard only reconciles on lifecycle events and once per minute as a safety net. */
 (function(){
   var s=document.createElement('script');
-  s.src='./chat-realtime-guard-v1.js?v=1';
+  s.src='./chat-realtime-guard-v1.js?v=2';
   s.async=false;
   document.head.appendChild(s);
 })();
 
-/* iPhone installation guidance. iOS uses Safari's Add to Home Screen flow instead of beforeinstallprompt. */
 (function(){
   var s=document.createElement('script');
   s.src='./ios-install-v1.js?v=1';
@@ -130,7 +126,6 @@
   document.head.appendChild(s);
 })();
 
-/* Final media CSS override. Keeps shared photos/videos compact and opens photos in the existing lightbox. */
 (function(){
   var s=document.createElement('script');
   s.src='./chat-media-fix-v1.js?v=1';
