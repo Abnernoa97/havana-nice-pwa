@@ -11,11 +11,100 @@
   ];
 
   let familyScreen = null;
+  let profileScreen = null;
   let historyArmed = false;
+  let profileHistoryArmed = false;
   let previousScreen = null;
   let videoWasMuted = true;
 
   const home = () => document.getElementById('homeScreen');
+
+  function ensureProfileStyles() {
+    if (document.getElementById('family-profile-inline-style')) return;
+    const style = document.createElement('style');
+    style.id = 'family-profile-inline-style';
+    style.textContent = `
+      .family-profile-screen { padding-bottom:max(76px,env(safe-area-inset-bottom)); overflow-y:auto; }
+      .family-profile-inner { width:min(100%,650px); min-height:100%; margin:0 auto; }
+      .family-profile-cover { position:relative; height:190px; border:1px solid rgba(229,189,98,.42); border-radius:12px 12px 0 0; background:linear-gradient(135deg,#102219,#18271d,#050806); overflow:visible; }
+      .family-profile-cover::after { content:''; position:absolute; inset:0; border-radius:12px 12px 0 0; background:linear-gradient(180deg,rgba(0,0,0,.04),rgba(0,0,0,.58)); pointer-events:none; }
+      .family-profile-avatar { position:absolute; left:24px; bottom:-56px; z-index:2; width:112px; height:112px; border:2px solid var(--gold); border-radius:50%; background:rgba(5,10,7,.9); box-shadow:0 0 0 5px rgba(2,3,2,.65),0 10px 28px rgba(0,0,0,.42); }
+      .family-profile-content { padding:72px 16px 28px; }
+      .family-profile-name { margin:0; color:var(--white); font-family:Georgia,"Times New Roman",serif; font-size:30px; font-weight:400; letter-spacing:.04em; line-height:1.05; text-transform:uppercase; }
+      .family-profile-role { margin:9px 0 0; color:rgba(244,241,232,.46); font-size:8px; letter-spacing:.22em; text-transform:uppercase; }
+      .family-profile-bio-box { margin-top:28px; min-height:105px; padding:18px; border:1px solid rgba(229,189,98,.25); border-radius:12px; background:rgba(0,0,0,.25); }
+      .family-profile-bio-title { margin:0 0 13px; color:var(--gold); font-size:8px; font-weight:500; letter-spacing:.20em; text-transform:uppercase; }
+      .family-profile-bio { min-height:52px; color:rgba(244,241,232,.68); font-size:13px; line-height:1.55; white-space:pre-wrap; }
+      .family-profile-placeholder { color:rgba(244,241,232,.20); font-size:10px; letter-spacing:.12em; text-transform:uppercase; }
+      .family-profile-back { width:100%; margin-top:16px; }
+      @media(max-width:520px){
+        .family-profile-cover{height:155px}
+        .family-profile-avatar{left:18px;bottom:-48px;width:96px;height:96px}
+        .family-profile-content{padding-top:62px}
+        .family-profile-name{font-size:25px}
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function buildProfile() {
+    if (profileScreen) return profileScreen;
+    ensureProfileStyles();
+
+    profileScreen = document.createElement('section');
+    profileScreen.id = 'familyProfileScreen';
+    profileScreen.className = 'screen family-profile-screen';
+    profileScreen.innerHTML = `
+      <div class="family-profile-inner">
+        <div class="family-profile-cover" aria-label="Foto de portada vacía">
+          <div class="family-profile-avatar" aria-label="Foto de perfil vacía"></div>
+        </div>
+        <div class="family-profile-content">
+          <h1 class="family-profile-name"></h1>
+          <p class="family-profile-role"></p>
+          <section class="family-profile-bio-box">
+            <h2 class="family-profile-bio-title">BIOGRAFÍA</h2>
+            <div class="family-profile-bio"><span class="family-profile-placeholder">Espacio reservado para la biografía</span></div>
+          </section>
+          <button class="back-button family-profile-back" type="button">Volver</button>
+        </div>
+      </div>
+    `;
+
+    document.querySelector('.experience')?.appendChild(profileScreen);
+    profileScreen.querySelector('.family-profile-back')?.addEventListener('click', () => closeProfile(true));
+    return profileScreen;
+  }
+
+  function openProfile(index, fromPopState = false) {
+    buildProfile();
+    const person = FAMILY[index] || FAMILY[0];
+    profileScreen.dataset.familyIndex = String(index);
+    profileScreen.querySelector('.family-profile-name').textContent = person.name;
+    profileScreen.querySelector('.family-profile-role').textContent = person.role;
+    profileScreen.querySelector('.family-profile-bio').innerHTML = '<span class="family-profile-placeholder">Espacio reservado para la biografía</span>';
+
+    document.querySelectorAll('.screen').forEach(screen => screen.classList.remove('is-active'));
+    profileScreen.classList.add('is-active');
+    profileScreen.scrollTop = 0;
+
+    if (!fromPopState && !profileHistoryArmed) {
+      history.pushState({ hnFamilyProfile:true, index }, '', location.href);
+      profileHistoryArmed = true;
+    }
+  }
+
+  function closeProfile(fromButton = false) {
+    if (!profileScreen?.classList.contains('is-active')) return;
+    profileScreen.classList.remove('is-active');
+    familyScreen?.classList.add('is-active');
+    if (fromButton && profileHistoryArmed) {
+      profileHistoryArmed = false;
+      history.back();
+    } else if (!fromButton) {
+      profileHistoryArmed = false;
+    }
+  }
 
   function buildFamily() {
     if (familyScreen) return familyScreen;
@@ -77,19 +166,24 @@
 
     document.querySelector('.experience')?.appendChild(familyScreen);
     familyScreen.querySelector('#familyBackButton')?.addEventListener('click',() => closeFamily(true));
-    window.dispatchEvent(new CustomEvent('hn-family-ready'));
+    familyScreen.addEventListener('click', event => {
+      const button = event.target.closest('.family-member');
+      if (!button) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const index = Number(button.dataset.familyIndex);
+      if (Number.isInteger(index)) openProfile(index, false);
+    }, true);
 
     return familyScreen;
   }
 
   function openFamily(fromPopState=false) {
     buildFamily();
-
     if (!fromPopState) {
       previousScreen = [...document.querySelectorAll('.screen.is-active')]
         .find(screen => screen !== familyScreen) || home();
     }
-
     document.querySelectorAll('.screen').forEach(screen => {
       if (screen !== familyScreen) screen.classList.remove('is-active');
     });
@@ -110,7 +204,6 @@
 
   function closeFamily(fromButton=false) {
     if (!familyScreen?.classList.contains('is-active')) return;
-
     familyScreen.classList.remove('is-active');
     const target = previousScreen || home();
     document.querySelectorAll('.screen').forEach(screen => screen.classList.remove('is-active'));
@@ -128,7 +221,11 @@
   }
 
   function wireNativeBack() {
-    window.addEventListener('popstate',() => {
+    window.addEventListener('popstate', () => {
+      if (profileScreen?.classList.contains('is-active')) {
+        closeProfile(false);
+        return;
+      }
       if (familyScreen?.classList.contains('is-active')) closeFamily(false);
     });
   }
@@ -136,7 +233,6 @@
   function init() {
     const modules = document.querySelector('.modules');
     if (!modules) return;
-
     const module = [...modules.querySelectorAll('.module')]
       .find(el => /FAMILIA|MÚSICOS|MUSICOS/i.test(el.textContent || ''));
     if (!module) return;
@@ -146,17 +242,17 @@
     module.querySelector('.module-title')?.replaceChildren(document.createTextNode('FAMILIA HAVANA NICE'));
     module.querySelector('.module-subtitle')?.replaceChildren(document.createTextNode('THE FAMILY'));
 
-    module.addEventListener('click',(event) => {
+    module.addEventListener('click', event => {
       event.preventDefault();
       event.stopPropagation();
       openFamily(false);
-    },true);
+    }, true);
 
     wireNativeBack();
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded',init,{once:true});
+    document.addEventListener('DOMContentLoaded', init, { once:true });
   } else {
     init();
   }
