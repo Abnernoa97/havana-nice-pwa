@@ -7,4 +7,4 @@ function init(){document.getElementById('hnMyDay')?.remove();const s=document.cr
 (function(){var s=document.createElement('script');s.src='./ios-install-v1.js?v=1';s.async=false;document.head.appendChild(s)})();
 (function(){var s=document.createElement('script');s.src='./chat-media-fix-v1.js?v=2';s.async=false;document.head.appendChild(s)})();
 (function(){var s=document.createElement('script');s.src='./chat-keyboard-v1.js?v=12712028b706893a35a904553bb51237d0623e9e';s.async=false;document.head.appendChild(s)})();
-(function(){var s=document.createElement('script');s.src='./family-profile-shell-v2.js?v=family-media-fix-20260915-2';s.async=false;document.head.appendChild(s)})();
+(function(){var s=document.createElement('script');s.src='./family-profile-media-ui-v1.js?v=f100683810555199e3aeee61921efff5cdd4db57';s.async=false;document.head.appendChild(s)})();
