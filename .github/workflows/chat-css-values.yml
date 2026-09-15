@@ -1,0 +1,77 @@
+name: Apply original chat CSS values
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.head_commit.message != 'Apply original chat CSS values' && github.event.head_commit.message != 'Remove temporary chat CSS patcher'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Restore original chat CSS and change values only
+        shell: bash
+        run: |
+          set -euo pipefail
+          git show 71faff9e5aecc283a1e96004754fcbdbd177f8b3:chat-v1.js > chat-v1.js
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('chat-v1.js')
+          s = p.read_text()
+          replacements = {
+            'linear-gradient(145deg,#0a1b12,#07100b)': 'linear-gradient(145deg,#0b1710,#08110c)',
+            'rgba(130,190,145,.55)': 'rgba(229,189,98,.30)',
+            '0 10px 28px rgba(0,0,0,.22)': '0 6px 18px rgba(0,0,0,.14)',
+            'linear-gradient(145deg,#0d2418,#09150e)': 'linear-gradient(145deg,#102017,#0c160f)',
+            'rgba(160,215,170,.72)': 'rgba(229,189,98,.46)',
+            'rgba(229,189,98,.32);background:#171717': 'rgba(229,189,98,.22);background:#151a17',
+            'rgba(244,241,232,.48)': 'rgba(244,241,232,.44)',
+            'rgba(244,241,232,.35)': 'rgba(244,241,232,.30)',
+            '#0d5a3d': '#173a2b',
+            'inset 0 0 0 1px rgba(255,241,168,.1),0 4px 18px rgba(0,0,0,.2)': 'inset 0 0 0 1px rgba(255,241,168,.05),0 4px 18px rgba(0,0,0,.12)',
+            '#e5bd62': '#d9b45f',
+            '#fff1a8': '#f3d77c',
+            '#f4f1e8': '#eee9df',
+            'rgba(244,241,232,.42)': 'rgba(244,241,232,.34)',
+            'rgba(244,241,232,.58)': 'rgba(244,241,232,.52)',
+            'rgba(229,189,98,.08)': 'rgba(229,189,98,.05)',
+            'rgba(229,189,98,.65)': 'rgba(229,189,98,.50)',
+            'rgba(0,0,0,.32)': 'rgba(0,0,0,.26)',
+            'rgba(244,241,232,.2)': 'rgba(244,241,232,.16)',
+            'rgba(244,241,232,.62)': 'rgba(244,241,232,.54)',
+            'rgba(229,189,98,.2)': 'rgba(229,189,98,.14)',
+            'rgba(229,189,98,.18)': 'rgba(229,189,98,.13)',
+            'rgba(0,0,0,.22)': 'rgba(0,0,0,.18)',
+            'rgba(229,189,98,.45)': 'rgba(229,189,98,.34)',
+            'rgba(0,0,0,.42)': 'rgba(0,0,0,.34)',
+            'rgba(244,241,232,.35)': 'rgba(244,241,232,.30)',
+            'rgba(0,0,0,.55)': 'rgba(0,0,0,.46)',
+            'font-weight:600': 'font-weight:500',
+          }
+          missing=[]
+          for old,new in replacements.items():
+            if old not in s:
+              missing.append(old)
+            else:
+              s=s.replace(old,new)
+          if missing:
+            raise SystemExit('Missing expected CSS values: ' + ' | '.join(missing))
+          p.write_text(s)
+          PY
+
+      - name: Commit
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add chat-v1.js
+          git diff --cached --check
+          git commit -m 'Apply original chat CSS values'
+          git push
