@@ -90,6 +90,12 @@
         const bg=document.createElement('script'); bg.id='hnMusicianBackgroundScript'; bg.src='./musician-background-v1.js?v=global2'; document.body.appendChild(bg);
       }
     });
+    if(!document.getElementById('hnChatMediaLightboxScript')){
+      const lb=document.createElement('script');
+      lb.id='hnChatMediaLightboxScript';
+      lb.src='./chat-media-lightbox-v2.js?v=01475a2b53b97017cf84407b2b0ae58e2b5060ea';
+      document.body.appendChild(lb);
+    }
   }
 
   /* Install before the deferred inline module runs so the existing login handler is gated. */
@@ -128,6 +134,15 @@
 (function(){
   var s=document.createElement('script');
   s.src='./chat-media-fix-v1.js?v=1';
+  s.async=false;
+  document.head.appendChild(s);
+})();
+
+/* Fullscreen photo viewer. Opens shared chat photos at their natural size within the device screen. */
+(function(){
+  var s=document.createElement('script');
+  s.id='hnChatMediaLightboxV2Loader';
+  s.src='./chat-media-lightbox-v2.js?v=01475a2b53b97017cf84407b2b0ae58e2b5060ea';
   s.async=false;
   document.head.appendChild(s);
 })();
