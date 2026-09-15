@@ -93,7 +93,7 @@
     if(!document.getElementById('hnChatMediaLightboxScript')){
       const lb=document.createElement('script');
       lb.id='hnChatMediaLightboxScript';
-      lb.src='./chat-media-lightbox-v2.js?v=01475a2b53b97017cf84407b2b0ae58e2b5060ea';
+      lb.src='./chat-media-lightbox-v2.js?v=4ad414641140bf49dd788c047df033d6a45392c1';
       document.body.appendChild(lb);
     }
   }
