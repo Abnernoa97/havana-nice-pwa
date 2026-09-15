@@ -1,13 +1,12 @@
 name: Apply lightweight chat visual style
 on:
-  issues:
-    types: [opened]
+  push:
+    branches: [main]
 permissions:
   contents: write
-  issues: write
 jobs:
   patch:
-    if: contains(github.event.issue.title, 'HN CHAT VISUAL PATCH')
+    if: github.event.head_commit.message == 'Run lightweight chat visual patch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -46,14 +45,4 @@ jobs:
           git add chat-v1.js
           git diff --cached --check
           git commit -m "Refine chat visual style"
-          git push
-      - name: Close trigger issue
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh issue close ${{ github.event.issue.number }} --repo ${{ github.repository }} --reason completed
-      - name: Remove temporary workflow
-        shell: bash
-        run: |
-          git rm .github/workflows/chat-visual-lightweight.yml
-          git commit -m "Remove temporary chat visual workflow"
           git push
