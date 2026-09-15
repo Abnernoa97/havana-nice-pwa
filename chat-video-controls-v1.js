@@ -1,8 +1,8 @@
-/* HAVANA NICE — CHAT VIDEO CONTROLS V2 */
+/* HAVANA NICE — CHAT VIDEO CONTROLS V3 */
 (function(){
   'use strict';
-  const STYLE_ID='hn-chat-video-controls-v2-style';
-  const BOUND='data-hn-video-controls-v2';
+  const STYLE_ID='hn-chat-video-controls-v3-style';
+  const BOUND='data-hn-video-controls-v3';
   let observer=null;
 
   function formatTime(value){
@@ -17,36 +17,34 @@
     const style=document.createElement('style');
     style.id=STYLE_ID;
     style.textContent=`
-      .hn-chat-video-controls-v2{position:fixed;left:12px;right:12px;bottom:max(18px,calc(env(safe-area-inset-bottom) + 12px));z-index:100005;display:flex;align-items:center;gap:9px;padding:9px 11px;border:1px solid rgba(229,189,98,.45);background:rgba(5,10,7,.88);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-sizing:border-box;border-radius:3px;pointer-events:auto;}
-      .hn-chat-video-time-v2{min-width:82px;color:#f3d77c;font:500 10px/1 Arial,sans-serif;font-variant-numeric:tabular-nums;letter-spacing:.04em;text-align:right;white-space:nowrap;}
-      .hn-chat-video-seek-v2{flex:1;min-width:70px;height:22px;margin:0;appearance:none;-webkit-appearance:none;background:transparent;accent-color:#d9b45f;cursor:pointer;touch-action:pan-x;}
-      .hn-chat-video-seek-v2::-webkit-slider-runnable-track{height:3px;background:rgba(244,241,232,.28);border-radius:3px;}
-      .hn-chat-video-seek-v2::-webkit-slider-thumb{appearance:none;-webkit-appearance:none;width:13px;height:13px;margin-top:-5px;border:1px solid #fff1a8;border-radius:50%;background:#d9b45f;}
-      .hn-chat-video-seek-v2::-moz-range-track{height:3px;background:rgba(244,241,232,.28);border-radius:3px;}
-      .hn-chat-video-seek-v2::-moz-range-thumb{width:13px;height:13px;border:1px solid #fff1a8;border-radius:50%;background:#d9b45f;}
-      .hn-chat-video-controls-v2 input{pointer-events:auto;}
-      .hn-chat-video-lightbox{position:fixed!important;}
+      .hn-chat-video-controls-v3{position:fixed;left:12px;right:12px;bottom:max(18px,calc(env(safe-area-inset-bottom) + 12px));z-index:300020;display:flex;align-items:center;gap:9px;padding:9px 11px;border:1px solid rgba(229,189,98,.45);background:rgba(5,10,7,.90);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-sizing:border-box;border-radius:3px;pointer-events:auto;}
+      .hn-chat-video-time-v3{min-width:82px;color:#f3d77c;font:500 10px/1 Arial,sans-serif;font-variant-numeric:tabular-nums;letter-spacing:.04em;text-align:right;white-space:nowrap;}
+      .hn-chat-video-seek-v3{flex:1;min-width:70px;height:24px;margin:0;appearance:none;-webkit-appearance:none;background:transparent;accent-color:#d9b45f;cursor:pointer;touch-action:pan-x;}
+      .hn-chat-video-seek-v3::-webkit-slider-runnable-track{height:3px;background:rgba(244,241,232,.28);border-radius:3px;}
+      .hn-chat-video-seek-v3::-webkit-slider-thumb{appearance:none;-webkit-appearance:none;width:14px;height:14px;margin-top:-5.5px;border:1px solid #fff1a8;border-radius:50%;background:#d9b45f;}
+      .hn-chat-video-seek-v3::-moz-range-track{height:3px;background:rgba(244,241,232,.28);border-radius:3px;}
+      .hn-chat-video-seek-v3::-moz-range-thumb{width:14px;height:14px;border:1px solid #fff1a8;border-radius:50%;background:#d9b45f;}
+      .hn-chat-video-controls-v3 input{pointer-events:auto;}
     `;
     document.head.appendChild(style);
   }
 
   function enhance(lightbox){
-    if(!lightbox||!lightbox.classList.contains('hn-chat-video-lightbox'))return;
+    if(!lightbox||lightbox.id!=='hnChatMediaLightboxV4')return;
     const video=lightbox.querySelector('video');
     if(!video||lightbox.hasAttribute(BOUND))return;
     lightbox.setAttribute(BOUND,'1');
 
     const controls=document.createElement('div');
-    controls.className='hn-chat-video-controls-v2';
+    controls.className='hn-chat-video-controls-v3';
     controls.setAttribute('role','group');
     controls.setAttribute('aria-label','Controles de video');
-    controls.innerHTML='<input class="hn-chat-video-seek-v2" type="range" min="0" max="1000" value="0" step="1" aria-label="Posición del video"><span class="hn-chat-video-time-v2">0:00 / 0:00</span>';
-    document.body.appendChild(controls);
+    controls.innerHTML='<input class="hn-chat-video-seek-v3" type="range" min="0" max="1000" value="0" step="1" aria-label="Posición del video"><span class="hn-chat-video-time-v3">0:00 / 0:00</span>';
+    lightbox.appendChild(controls);
 
-    const seek=controls.querySelector('.hn-chat-video-seek-v2');
-    const time=controls.querySelector('.hn-chat-video-time-v2');
+    const seek=controls.querySelector('.hn-chat-video-seek-v3');
+    const time=controls.querySelector('.hn-chat-video-time-v3');
     let seeking=false;
-
     const refresh=()=>{
       const duration=Number(video.duration)||0;
       const current=Number(video.currentTime)||0;
@@ -73,11 +71,13 @@
     controls.addEventListener('click',stop);
     controls.addEventListener('pointerdown',stop);
     controls.addEventListener('touchstart',stop,{passive:false});
-
     refresh();
   }
 
-  function scan(){document.querySelectorAll('.hn-chat-video-lightbox').forEach(enhance);}
+  function scan(){
+    const lightbox=document.getElementById('hnChatMediaLightboxV4');
+    if(lightbox)enhance(lightbox);
+  }
 
   function install(){
     installStyles();
