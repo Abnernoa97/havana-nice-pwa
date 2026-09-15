@@ -1,43 +1,41 @@
-name: Fix chat style precedence
+name: Fix chat live theme override
 
 on:
   push:
     branches: [main]
     paths:
       - '.github/workflows/fix-chat-style-order.yml'
-      - 'index.html'
+      - 'chat-theme-v1.js'
 
 permissions:
   contents: write
 
 jobs:
   fix:
-    if: github.event.head_commit.message != 'Fix chat style precedence'
+    if: github.event.head_commit.message != 'Fix chat live theme override'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Put chat theme before chat renderer
+      - name: Remove legacy chat color override
         shell: bash
         run: |
           set -euo pipefail
           python - <<'PY'
           from pathlib import Path
-          p=Path('index.html')
+          import re
+          p=Path('chat-theme-v1.js')
           s=p.read_text()
-          a='<script src="./chat-v2.js?v=hn-v2"></script>'
-          b='<script src="./chat-theme-v1.js?v=6b20382062efef3afcbc8084a6fd2853a3534f89"></script>'
-          desired=b+'\n'+a
-          current=a+'\n'+b
-          if desired in s:
-              raise SystemExit(0)
-          if current not in s:
-              raise SystemExit('chat script pair not found')
-          p.write_text(s.replace(current,desired,1))
+          pattern=r"const css=`.*?`;"
+          replacement="""const css=`#hn-chat-screen{--hn-chat-bg:#06110b;--hn-chat-own:#173a2b;--hn-chat-other:#151a17;--hn-chat-accent:#e5bd62;--hn-chat-text:#f4f1e8;background:#06110b!important;position:absolute;overflow:hidden}#hn-chat-screen::before{display:none!important}#hn-chat-screen .hn-chat-wrap{background:transparent!important;position:relative;z-index:1}#hn-chat-screen .hn-chat-bubble{border-color:rgba(229,189,98,.22)!important;background:#151a17!important}#hn-chat-screen .hn-chat-row.mine .hn-chat-bubble{background:#173a2b!important;border-color:#d9b45f!important}#hn-chat-screen .hn-chat-sender,#hn-chat-screen .hn-chat-audio-icon,#hn-chat-screen .hn-chat-recording-status,#hn-chat-screen .hn-chat-reply-label{color:#d9b45f!important}#hn-chat-screen .hn-chat-text,#hn-chat-screen .hn-chat-audio-label,#hn-chat-screen .hn-chat-input,#hn-chat-screen .hn-chat-recording,#hn-chat-screen .hn-chat-send,#hn-chat-screen .hn-chat-head-title{color:#f4f1e8!important}#hn-chat-screen .hn-chat-input{border-color:rgba(229,189,98,.34)!important;background:rgba(0,0,0,.34)!important}#hn-chat-screen .hn-chat-send{border-color:#d9b45f!important;color:#f4f1e8!important}#hn-chat-screen .hn-chat-list{background:transparent!important}#hn-chat-screen .hn-chat-recording{justify-content:flex-end}#hn-chat-screen .hn-chat-recording-status{display:none!important}#hn-chat-screen .hn-chat-mic.is-paused{border-color:#d9b45f!important;background:rgba(229,189,98,.16);color:#d9b45f!important}`;"""
+          ns,n=re.subn(pattern,replacement,s,count=1,flags=re.S)
+          if n!=1:
+              raise SystemExit('chat theme CSS block not found')
+          p.write_text(ns)
           PY
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add index.html
-          git commit -m 'Fix chat style precedence' || exit 0
+          git add chat-theme-v1.js
+          git commit -m 'Fix chat live theme override' || exit 0
           git push
 
 # trigger
