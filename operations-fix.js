@@ -137,12 +137,3 @@
   s.async=false;
   document.head.appendChild(s);
 })();
-
-/* Fullscreen photo viewer. Opens shared chat photos at their natural size within the device screen. */
-(function(){
-  var s=document.createElement('script');
-  s.id='hnChatMediaLightboxV2Loader';
-  s.src='./chat-media-lightbox-v2.js?v=01475a2b53b97017cf84407b2b0ae58e2b5060ea';
-  s.async=false;
-  document.head.appendChild(s);
-})();
