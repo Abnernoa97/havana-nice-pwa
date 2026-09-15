@@ -2,7 +2,7 @@
 (()=>{'use strict';
 const FAMILY=[
   ['FER & NOA','HAVANA NICE','fer-noa'],
-  ['ORLYS SHOW','MÚSICO','orlys-show'],
+  ['ORLYS SHOW','MÚSICO','orly-show'],
   ['JALI','MÚSICO','jali'],
   ['RAFA','MÚSICO','rafa'],
   ['ANDY REY','MÚSICO','andy-rey']
@@ -22,12 +22,11 @@ let currentProfile=null;
 let pending={avatar:null,cover:null};
 let previewUrls={avatar:null,cover:null};
 let realtimeChannel=null;
-
 const $=s=>document.querySelector(s);
 const experience=()=>$('.experience');
 const home=()=>$('#homeScreen');
 function username(){try{return String(JSON.parse(sessionStorage.getItem('hn_profile')||'{}').username||'').trim().toLowerCase()}catch(_){return ''}}
-function memberKey(){return ({fer:'fer-noa',orly:'orlys-show',jali:'jali',rafa:'rafa',andy:'andy-rey'})[username()]||null}
+function memberKey(){return ({fer:'fer-noa',orly:'orly-show',jali:'jali',rafa:'rafa',andy:'andy-rey'})[username()]||null}
 function deviceToken(){try{let t=localStorage.getItem(DEVICE_TOKEN_KEY);if(t&&t.length>=16)return t;t=crypto?.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random();localStorage.setItem(DEVICE_TOKEN_KEY,t);return t}catch(_){return ''}}
 async function db(){if(supabaseClient)return supabaseClient;const m=await import('https://esm.sh/@supabase/supabase-js@2');return supabaseClient=m.createClient(SUPABASE_URL,SUPABASE_KEY)}
 async function getProfile(key){const c=await db();const r=await c.from('family_profiles').select('id,member_key,name,role,bio,avatar_path,cover_path,active,sort_order,updated_at').eq('member_key',key).maybeSingle();if(r.error)throw r.error;return r.data}
@@ -56,8 +55,8 @@ function buildProfileScreen(){if(profileScreen)return;injectCss();profileScreen=
 async function openProfile(key,push=true){buildProfileScreen();const person=FAMILY.find(x=>x[2]===key);profileScreen.querySelector('.family-profile-name').textContent=person?.[0]||'';profileScreen.querySelector('.family-profile-role').textContent=person?.[1]||'';profileScreen.querySelector('.family-profile-bio').innerHTML='<span class="family-profile-placeholder">Biografía próximamente.</span>';renderMedia(profileScreen,null);const row=await getProfile(key).catch(()=>null);if(row){profileScreen.querySelector('.family-profile-name').textContent=row.name||person?.[0]||'';profileScreen.querySelector('.family-profile-role').textContent=row.role||person?.[1]||'';profileScreen.querySelector('.family-profile-bio').innerHTML=row.bio?String(row.bio).replace(/\n/g,'<br>'):'<span class="family-profile-placeholder">Biografía próximamente.</span>';renderMedia(profileScreen,row)}document.querySelectorAll('.screen').forEach(x=>x.classList.remove('is-active'));profileScreen.classList.add('is-active');if(push&&!profileHistory){history.pushState({hnFamilyProfile:key},'',location.href);profileHistory=true}}
 function closeProfile(back=false){profileScreen?.classList.remove('is-active');familyScreen?.classList.add('is-active');if(back&&profileHistory){profileHistory=false;history.back()}else profileHistory=false}
 function openFamily(push=true){buildFamilyScreen();document.querySelectorAll('.screen').forEach(x=>x.classList.remove('is-active'));familyScreen.classList.add('is-active');if(push&&!familyHistory){history.pushState({hnFamily:true},'',location.href);familyHistory=true}}
-function wireFamilyEntry(){const candidates=[...document.querySelectorAll('button,a,.module')];const target=candidates.find(el=>/FAMILIA\s+HAVANA\s+NICE/i.test(el.textContent||''));if(target&&!target.dataset.hnFamilyWired){target.dataset.hnFamilyWired='1';target.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();openFamily(true)},{capture:true})}}
+function wireFamilyEntry(){if(document.documentElement.dataset.hnFamilyRouter==='1')return;document.documentElement.dataset.hnFamilyRouter='1';document.addEventListener('click',e=>{const target=e.target?.closest?.('[data-module="MÚSICOS"], [data-module="FAMILIA HAVANA NICE"], [data-family-entry]');if(!target)return;e.preventDefault();e.stopImmediatePropagation();openFamily(true)},true)}
 function subscribeRealtime(){if(realtimeChannel)return;db().then(c=>{realtimeChannel=c.channel('family-profiles-ui').on('postgres_changes',{event:'*',schema:'public',table:'family_profiles'},payload=>{const row=payload.new;if(!row?.member_key)return;if(row.member_key===memberKey()){currentProfile=row;refreshHomeAvatar(row);if(editorScreen?.classList.contains('is-active')&&!pending.avatar&&!pending.cover)renderMedia(editorScreen,row)}if(profileScreen?.classList.contains('is-active')){const shown=profileScreen.querySelector('.family-profile-name')?.textContent||'';const person=FAMILY.find(x=>x[2]===row.member_key);if(person&&shown===person[0]){profileScreen.querySelector('.family-profile-bio').innerHTML=row.bio?String(row.bio).replace(/\n/g,'<br>'):'<span class="family-profile-placeholder">Biografía próximamente.</span>';renderMedia(profileScreen,row)}}}).subscribe()})}
-function boot(){injectCss();buildFamilyScreen();buildProfileScreen();buildEditor();wireFamilyEntry();installHomeProfile();subscribeRealtime();const observer=new MutationObserver(()=>{wireFamilyEntry();installHomeProfile()});observer.observe(document.body,{childList:true,subtree:true});window.addEventListener('popstate',()=>{if(editorHistory){editorHistory=false;closeEditor(false)}else if(profileHistory){profileHistory=false;closeProfile(false)}else if(familyHistory){familyHistory=false;closeFamily(false)}});window.hnFamilyOpen=openFamily;window.hnFamilyProfileOpen=openProfile;window.hnFamilyEditorOpen=openEditor}
+function boot(){injectCss();buildFamilyScreen();buildProfileScreen();buildEditor();wireFamilyEntry();installHomeProfile();subscribeRealtime();window.addEventListener('popstate',()=>{if(editorHistory){editorHistory=false;closeEditor(false)}else if(profileHistory){profileHistory=false;closeProfile(false)}else if(familyHistory){familyHistory=false;closeFamily(false)}});window.hnFamilyOpen=openFamily;window.hnFamilyProfileOpen=openProfile;window.hnFamilyEditorOpen=openEditor}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(boot,0),{once:true});else setTimeout(boot,0);
 })();
