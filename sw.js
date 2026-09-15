@@ -1,4 +1,4 @@
-const CACHE='hn-v14';
+const CACHE='hn-v15';
 const APP_SHELL=new Request('./index.html');
 const SUPABASE_CDN='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const SUPABASE_ESM='https://esm.sh/@supabase/supabase-js@2';
@@ -66,7 +66,7 @@ self.addEventListener('fetch',event=>{
     return;
   }
 
-  if(u.pathname.endsWith('/notifications-v5.js')||u.pathname.endsWith('/operations-fix.js')||u.pathname.endsWith('/ios-install-v1.js')||u.pathname.endsWith('/chat-media-fix-v1.js')){
+  if(u.pathname.endsWith('/notifications-v5.js')||u.pathname.endsWith('/operations-fix.js')||u.pathname.endsWith('/ios-install-v1.js')||u.pathname.endsWith('/chat-media-fix-v1.js')||u.pathname.endsWith('/chat-v1.js')||u.pathname.endsWith('/chat-theme-v1.js')){
     event.respondWith(fetch(event.request,{cache:'no-store'}).catch(()=>caches.match(event.request)));
     return;
   }
