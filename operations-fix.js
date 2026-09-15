@@ -93,13 +93,13 @@
     if(!document.getElementById('hnChatMediaLightboxScript')){
       const lb=document.createElement('script');
       lb.id='hnChatMediaLightboxScript';
-      lb.src='./chat-media-lightbox-v2.js?v=4ad414641140bf49dd788c047df033d6a45392c1';
+      lb.src='./chat-media-lightbox-v2.js?v=a25de84bc98b30201c6cb05d5804ea16b5b23342';
       document.body.appendChild(lb);
     }
     if(!document.getElementById('hnChatVideoControlsScript')){
       const controls=document.createElement('script');
       controls.id='hnChatVideoControlsScript';
-      controls.src='./chat-video-controls-v1.js?v=1f552fc7a619103452657010bcd351e8ab57ddab';
+      controls.src='./chat-video-controls-v1.js?v=0660457d2994a4ea5125d7b32bdee6e4205646bc';
       document.body.appendChild(controls);
     }
   }
