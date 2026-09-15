@@ -3,7 +3,6 @@
   'use strict';
 
   const STYLE_ID='hn-chat-media-fix-v2';
-  const MAX_VIDEO_SECONDS=5*60;
   const MAX_INPUT_BYTES=12*1024*1024;
   const TARGET_W=854;
   const TARGET_H=480;
@@ -35,16 +34,6 @@
       }
     `;
     document.head.appendChild(style);
-  }
-
-  function getVideoDuration(file){
-    return new Promise((resolve,reject)=>{
-      const url=URL.createObjectURL(file),video=document.createElement('video');
-      video.preload='metadata';
-      video.onloadedmetadata=()=>{const d=Number(video.duration)||0;URL.revokeObjectURL(url);resolve(d);};
-      video.onerror=()=>{URL.revokeObjectURL(url);reject(new Error('No se pudo leer el video.'));};
-      video.src=url;
-    });
   }
 
   function supportedMime(){
@@ -166,6 +155,12 @@
     return el;
   }
 
+  function dispatchOptimizedChange(input){
+    const synthetic=new Event('change',{bubbles:true});
+    Object.defineProperty(synthetic,'__hnOptimizedChange',{value:true});
+    input.dispatchEvent(synthetic);
+  }
+
   async function interceptMediaInput(event){
     const input=event.target;
     if(!(input instanceof HTMLInputElement)||input.type!=='file')return;
@@ -175,15 +170,16 @@
     const videoFiles=files.filter(file=>file.type.startsWith('video/'));
     if(!videoFiles.length)return;
 
-    let metas=[];
-    try{
-      metas=await Promise.all(videoFiles.map(readVideoMeta));
-    }catch(error){console.warn('HAVANA NICE video metadata read failed:',error);return;}
-    const work=videoFiles.filter((file,i)=>needsOptimization(file,metas[i]));
-    if(!work.length)return;
-
+    // Stop chat-v2's normal handler immediately. We resume it with a synthetic event below.
     event.preventDefault();
     event.stopImmediatePropagation();
+
+    let metas=[];
+    try{metas=await Promise.all(videoFiles.map(readVideoMeta));}
+    catch(error){console.warn('HAVANA NICE video metadata read failed:',error);dispatchOptimizedChange(input);return;}
+    const work=videoFiles.filter((file,i)=>needsOptimization(file,metas[i]));
+    if(!work.length){dispatchOptimizedChange(input);return;}
+
     const notice=createOptimizingNotice(input,work.length);
     try{
       const optimized=[];
@@ -196,17 +192,13 @@
       const transfer=new DataTransfer();
       optimized.forEach(file=>transfer.items.add(file));
       input.files=transfer.files;
-      const synthetic=new Event('change',{bubbles:true});
-      Object.defineProperty(synthetic,'__hnOptimizedChange',{value:true});
-      input.dispatchEvent(synthetic);
+      dispatchOptimizedChange(input);
     }catch(error){
       console.warn('HAVANA NICE video optimization failed:',error);
       const transfer=new DataTransfer();
       files.forEach(file=>transfer.items.add(file));
       input.files=transfer.files;
-      const synthetic=new Event('change',{bubbles:true});
-      Object.defineProperty(synthetic,'__hnOptimizedChange',{value:true});
-      input.dispatchEvent(synthetic);
+      dispatchOptimizedChange(input);
     }finally{
       input.removeAttribute('data-hn-optimizing');
       notice.remove();
