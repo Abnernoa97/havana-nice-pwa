@@ -138,3 +138,10 @@
   s.async=false;
   document.head.appendChild(s);
 })();
+
+(function(){
+  var s=document.createElement('script');
+  s.src='./chat-keyboard-v1.js?v=12712028b706893a35a904553bb51237d0623e9e';
+  s.async=false;
+  document.head.appendChild(s);
+})();
