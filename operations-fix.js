@@ -109,46 +109,9 @@
 })();
 
 (function(){ var s=document.createElement('script'); s.src='./session-memory-v2.js?v=20260913'; s.async=false; document.head.appendChild(s); })();
-
-(function(){
-  var s=document.createElement('script');
-  s.src='./chat-typing-v2.js?v=3';
-  s.async=false;
-  document.head.appendChild(s);
-})();
-
-/* Realtime remains primary. This guard only reconciles on lifecycle events and once per minute as a safety net. */
-(function(){
-  var s=document.createElement('script');
-  s.src='./chat-realtime-guard-v1.js?v=2';
-  s.async=false;
-  document.head.appendChild(s);
-})();
-
-(function(){
-  var s=document.createElement('script');
-  s.src='./ios-install-v1.js?v=1';
-  s.async=false;
-  document.head.appendChild(s);
-})();
-
-(function(){
-  var s=document.createElement('script');
-  s.src='./chat-media-fix-v1.js?v=2';
-  s.async=false;
-  document.head.appendChild(s);
-})();
-
-(function(){
-  var s=document.createElement('script');
-  s.src='./chat-keyboard-v1.js?v=12712028b706893a35a904553bb51237d0623e9e';
-  s.async=false;
-  document.head.appendChild(s);
-})();
-
-(function(){
-  var s=document.createElement('script');
-  s.src='./family-profile-shell-v2.js?v=088044d65174dee5d74902782bf62b4e0fa1b626';
-  s.async=false;
-  document.head.appendChild(s);
-})();
+(function(){ var s=document.createElement('script'); s.src='./chat-typing-v2.js?v=3'; s.async=false; document.head.appendChild(s); })();
+(function(){ var s=document.createElement('script'); s.src='./chat-realtime-guard-v1.js?v=2'; s.async=false; document.head.appendChild(s); })();
+(function(){ var s=document.createElement('script'); s.src='./ios-install-v1.js?v=1'; s.async=false; document.head.appendChild(s); })();
+(function(){ var s=document.createElement('script'); s.src='./chat-media-fix-v1.js?v=2'; s.async=false; document.head.appendChild(s); })();
+(function(){ var s=document.createElement('script'); s.src='./chat-keyboard-v1.js?v=12712028b706893a35a904553bb51237d0623e9e'; s.async=false; document.head.appendChild(s); })();
+(function(){ var s=document.createElement('script'); s.src='./family-profile-shell-v2.js?v=007859da3f54b731bb4b92d3a21f1be6deb39805'; s.async=false; document.head.appendChild(s); })();
