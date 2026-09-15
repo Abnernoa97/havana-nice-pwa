@@ -1,0 +1,39 @@
+name: Load refined chat visual
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/install-chat-visual.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Add visual module to musician app
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('index.html')
+          s=p.read_text()
+          tag='<script src="./chat-visual-v1.js?v=20260915" defer></script>'
+          if tag not in s:
+              marker='<script src="./chat-v1.js"'
+              i=s.find(marker)
+              if i < 0:
+                  raise SystemExit('chat-v1 loader not found')
+              end=s.find('</script>',i)
+              if end < 0:
+                  raise SystemExit('chat-v1 closing script not found')
+              end += len('</script>')
+              s=s[:end]+'\n'+tag+s[end:]
+              p.write_text(s)
+          PY
+      - name: Commit
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          git diff --cached --quiet || git commit -m 'Load refined Chat de Información visuals'
+          git push
