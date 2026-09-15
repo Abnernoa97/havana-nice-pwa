@@ -148,7 +148,7 @@
 
 (function(){
   var s=document.createElement('script');
-  s.src='./family-profiles-v1.js?v=01cdd560673bbac31fd2a8de8ba57259e79e339e';
+  s.src='./family-profile-shell-v2.js?v=088044d65174dee5d74902782bf62b4e0fa1b626';
   s.async=false;
   document.head.appendChild(s);
 })();
