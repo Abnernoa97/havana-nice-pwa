@@ -128,7 +128,7 @@
 
 (function(){
   var s=document.createElement('script');
-  s.src='./chat-media-fix-v1.js?v=1';
+  s.src='./chat-media-fix-v1.js?v=2';
   s.async=false;
   document.head.appendChild(s);
 })();
