@@ -19,15 +19,10 @@ jobs:
           s=p.read_text()
           tag='<script src="./chat-visual-v1.js?v=20260915" defer></script>'
           if tag not in s:
-              marker='<script src="./chat-v1.js"'
-              i=s.find(marker)
-              if i < 0:
-                  raise SystemExit('chat-v1 loader not found')
-              end=s.find('</script>',i)
-              if end < 0:
-                  raise SystemExit('chat-v1 closing script not found')
-              end += len('</script>')
-              s=s[:end]+'\n'+tag+s[end:]
+              pos=s.rfind('</body>')
+              if pos < 0:
+                  raise SystemExit('body closing tag not found')
+              s=s[:pos]+tag+'\n'+s[pos:]
               p.write_text(s)
           PY
       - name: Commit
