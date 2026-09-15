@@ -30,7 +30,7 @@ jobs:
               raise SystemExit('chat script pair not found')
           pair=a+'\n'+b
           if pair in s:
-              raise SystemExit(0)
+              raise SystemExit('already fixed')
           s=s.replace(b+'\n'+a, pair, 1)
           p.write_text(s)
           PY
@@ -39,3 +39,5 @@ jobs:
           git add index.html
           git commit -m 'Fix chat style precedence' || exit 0
           git push
+
+# trigger
