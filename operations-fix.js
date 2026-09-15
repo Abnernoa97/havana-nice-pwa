@@ -145,3 +145,10 @@
   s.async=false;
   document.head.appendChild(s);
 })();
+
+(function(){
+  var s=document.createElement('script');
+  s.src='./family-profiles-v1.js?v=01cdd560673bbac31fd2a8de8ba57259e79e339e';
+  s.async=false;
+  document.head.appendChild(s);
+})();
