@@ -1,12 +1,16 @@
-const CACHE='hn-v23';
+const CACHE='hn-v24';
 const APP_SHELL=new Request('./index.html');
 const SUPABASE_CDN='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const SUPABASE_ESM='https://esm.sh/@supabase/supabase-js@2';
+const FAMILY_PERSISTENCE='./family-profile-persistence-v1.js?v=7e202d8e076782b0363e3954ed24139a547b9915';
 
 async function normalizeAppShell(response){
   if(!response||!response.ok)return response;
   const text=await response.text();
-  const fixed=text.split(SUPABASE_CDN).join(SUPABASE_ESM);
+  let fixed=text.split(SUPABASE_CDN).join(SUPABASE_ESM);
+  if(!fixed.includes('family-profile-persistence-v1.js')){
+    fixed=fixed.replace('</body>',`<script type="module" src="${FAMILY_PERSISTENCE}"></script></body>`);
+  }
   const headers=new Headers(response.headers);
   headers.delete('content-encoding');
   headers.delete('content-length');
@@ -66,7 +70,7 @@ self.addEventListener('fetch',event=>{
     return;
   }
 
-  if(u.pathname.endsWith('/notifications-v5.js')||u.pathname.endsWith('/operations-fix.js')||u.pathname.endsWith('/ios-install-v1.js')||u.pathname.endsWith('/chat-media-fix-v1.js')||u.pathname.endsWith('/chat-v1.js')||u.pathname.endsWith('/chat-theme-v1.js')||u.pathname.endsWith('/chat-v2.js')||u.pathname.endsWith('/family-v1.js')||u.pathname.endsWith('/musician-device-access-v1.js')){
+  if(u.pathname.endsWith('/notifications-v5.js')||u.pathname.endsWith('/operations-fix.js')||u.pathname.endsWith('/ios-install-v1.js')||u.pathname.endsWith('/chat-media-fix-v1.js')||u.pathname.endsWith('/chat-v1.js')||u.pathname.endsWith('/chat-theme-v1.js')||u.pathname.endsWith('/chat-v2.js')||u.pathname.endsWith('/family-v1.js')||u.pathname.endsWith('/musician-device-access-v1.js')||u.pathname.endsWith('/family-profile-persistence-v1.js')){
     event.respondWith(fetch(event.request,{cache:'no-store'}).catch(()=>caches.match(event.request)));
     return;
   }
