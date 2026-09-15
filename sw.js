@@ -1,4 +1,4 @@
-const CACHE='hn-v15';
+const CACHE='hn-v16';
 const APP_SHELL=new Request('./index.html');
 const SUPABASE_CDN='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const SUPABASE_ESM='https://esm.sh/@supabase/supabase-js@2';
