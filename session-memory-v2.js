@@ -46,6 +46,14 @@
     }
   }
 
+  function showLogin(){
+    document.documentElement.classList.remove('hn-returning-musician');
+    const login=document.getElementById('loginScreen');
+    const home=document.getElementById('homeScreen');
+    if(login)login.classList.add('is-active');
+    if(home)home.classList.remove('is-active');
+  }
+
   function waitForSupabase(timeoutMs=8000){
     return new Promise(resolve=>{
       const started=Date.now();
@@ -67,6 +75,7 @@
 
     name.textContent=profile.username||'';
     role.textContent=profile.role||'Músico de HAVANA NICE';
+    document.documentElement.classList.remove('hn-returning-musician');
     login.classList.remove('is-active');
     home.classList.add('is-active');
     return true;
@@ -74,16 +83,24 @@
 
   async function restore(){
     if(restoring)return;
-    if(getProfile())return;
+    if(getProfile()){
+      document.documentElement.classList.remove('hn-returning-musician');
+      return;
+    }
 
     const saved=readSaved();
-    if(!saved)return;
+    if(!saved){
+      showLogin();
+      return;
+    }
 
     restoring=true;
     const supabase=await waitForSupabase();
 
     if(!supabase){
       restoring=false;
+      clear();
+      showLogin();
       return;
     }
 
@@ -93,6 +110,7 @@
       if(validation?.error||!validation?.data?.length||validation.data[0].status!=='authorized'){
         clear();
         sessionStorage.removeItem('hn_profile');
+        showLogin();
         return;
       }
 
@@ -110,6 +128,7 @@
       console.warn('HAVANA NICE last musician restore failed:',error);
       clear();
       sessionStorage.removeItem('hn_profile');
+      showLogin();
     }finally{
       restoring=false;
     }
