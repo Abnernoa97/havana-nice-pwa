@@ -1,9 +1,8 @@
-/* HAVANA NICE — CHAT KEYBOARD / COMPOSER FIX V1 */
+/* HAVANA NICE — CHAT KEYBOARD / COMPOSER FIX V2 */
 (() => {
   'use strict';
 
   const STYLE_ID = 'hn-chat-keyboard-fix-style';
-  let lastViewportHeight = 0;
   let raf = 0;
 
   function getChat() {
@@ -49,7 +48,6 @@
       chat.style.height = `${h}px`;
       chat.style.maxHeight = `${h}px`;
     }
-    lastViewportHeight = h;
     scheduleKeepVisible();
   }
 
@@ -98,11 +96,7 @@
     });
     observer.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] });
 
-    setInterval(() => {
-      const vv = window.visualViewport;
-      if (!vv) return;
-      if (Math.round(vv.height) !== lastViewportHeight) syncViewport();
-    }, 800);
+    syncViewport();
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind, { once: true });
