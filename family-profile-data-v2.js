@@ -10,6 +10,7 @@ const SUPABASE_KEY='sb_publishable_Ip5rGK0UVXIfOjs_RQ_LhA_c14foHN9';
 const MAP={fer:'fer-noa',orly:'orly-show',jali:'jali',rafa:'rafa',andy:'andy-rey'};
 let client=null;
 let channel=null;
+let lastKey='';
 const $=s=>document.querySelector(s);
 function username(){try{return String(JSON.parse(sessionStorage.getItem('hn_profile')||'{}').username||'').trim().toLowerCase()}catch(_){return ''}}
 function keyForUser(){return MAP[username()]||null}
@@ -21,8 +22,8 @@ async function refreshProfile(key){const root=$('#hnFamilyProfileScreen');if(!ke
 async function refreshHome(){const key=keyForUser(),b=$('.hn-home-profile-button');if(!key||!b)return;try{const row=await fetchProfile(key);if(row?.avatar_path)b.style.backgroundImage=`url("${mediaUrl(row.avatar_path,row.updated_at)}")`;else b.style.backgroundImage=''}catch(e){console.error('[HN family data]',e)}}
 async function openEditor(push){try{if(typeof window.hnFamilyEditorOpen==='function')await window.hnFamilyEditorOpen(push)}catch(e){console.error(e)}await refreshEditor()}
 async function openProfile(key,push){try{if(typeof window.hnFamilyProfileOpen==='function')await window.hnFamilyProfileOpen(key,push)}catch(e){console.error(e)}await refreshProfile(key)}
-function subscribe(){if(channel||!keyForUser())return;import('https://esm.sh/@supabase/supabase-js@2').then(m=>{client=m.createClient(SUPABASE_URL,SUPABASE_KEY);channel=client.channel('family-profile-data-v2').on('postgres_changes',{event:'UPDATE',schema:'public',table:'family_profiles'},payload=>{const row=payload.new;if(row?.member_key===keyForUser()){refreshEditor();refreshProfile(row.member_key);refreshHome()}}).subscribe()}).catch(e=>console.error('[HN family data realtime]',e))}
-function wire(){if(document.documentElement.dataset.hnFamilyDataV2==='1')return;document.documentElement.dataset.hnFamilyDataV2='1';document.addEventListener('click',e=>{const member=e.target?.closest?.('[data-member-key]');if(member){e.preventDefault();e.stopImmediatePropagation();openProfile(member.dataset.memberKey,true);return}const button=e.target?.closest?.('.hn-home-profile-button');if(button){e.preventDefault();e.stopImmediatePropagation();openEditor(true)}},true);refreshHome();setTimeout(refreshHome,500);setTimeout(refreshEditor,700);subscribe()}
-function boot(){wire()}
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
+function subscribe(key){if(!key||channel||key===lastKey)return;lastKey=key;import('https://esm.sh/@supabase/supabase-js@2').then(m=>{client=m.createClient(SUPABASE_URL,SUPABASE_KEY);channel=client.channel('family-profile-data-v2').on('postgres_changes',{event:'UPDATE',schema:'public',table:'family_profiles'},payload=>{const row=payload.new;if(row?.member_key===keyForUser()){refreshEditor();refreshProfile(row.member_key);refreshHome()}}).subscribe()}).catch(e=>console.error('[HN family data realtime]',e))}
+function refreshAll(){const key=keyForUser();if(!key)return;refreshHome();refreshEditor();const active=$('#hnFamilyProfileScreen');if(active)refreshProfile(active.dataset.memberKey||key);subscribe(key)}
+function wire(){if(document.documentElement.dataset.hnFamilyDataV2==='1')return;document.documentElement.dataset.hnFamilyDataV2='1';document.addEventListener('click',e=>{const member=e.target?.closest?.('[data-member-key]');if(member){e.preventDefault();e.stopImmediatePropagation();openProfile(member.dataset.memberKey,true);return}const button=e.target?.closest?.('.hn-home-profile-button');if(button){e.preventDefault();e.stopImmediatePropagation();openEditor(true)}},true);const observer=new MutationObserver(()=>{const key=keyForUser();if(key&&key!==lastKey){refreshAll()}else if(key&&$('.hn-home-profile-button')&&!$('.hn-home-profile-button').style.backgroundImage)refreshHome()});observer.observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['class','data-member-key']});refreshAll()}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',wire,{once:true});else wire();
 })();
