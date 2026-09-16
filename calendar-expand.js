@@ -13,7 +13,7 @@
       .calendar-event-card{cursor:pointer;position:relative;transition:border-color .16s ease,background .16s ease}
       .calendar-event-card::after{content:'+';position:absolute;top:14px;right:14px;color:var(--gold);font-size:17px;line-height:1;font-family:Georgia,serif;opacity:.8;transition:transform .16s ease}
       .calendar-event-card.is-expanded::after{content:'−';transform:none}
-      .calendar-event-card:not(.is-expanded) .calendar-event-details-m,.calendar-event-card:not(.is-expanded) .calendar-map-button{display:none}
+      .calendar-event-card:not(.is-expanded) .calendar-time-grid,.calendar-event-card:not(.is-expanded) .calendar-event-details-m{display:none}
       .calendar-event-card.is-expanded{border-color:rgba(229,189,98,.72)}
     `;
     document.head.appendChild(s);
