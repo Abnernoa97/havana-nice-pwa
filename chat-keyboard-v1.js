@@ -1,4 +1,4 @@
-/* HAVANA NICE — CHAT KEYBOARD / COMPOSER FIX V2 */
+/* HAVANA NICE — CHAT KEYBOARD / COMPOSER FIX V3 */
 (() => {
   'use strict';
 
@@ -13,6 +13,19 @@
     return getChat()?.querySelector('.hn-chat-compose') || null;
   }
 
+  function isKeyboardOpen(vv) {
+    if (!vv) return false;
+    const screenHeight = Math.max(window.innerHeight || 0, document.documentElement?.clientHeight || 0);
+    const visibleHeight = Math.max(0, vv.height || 0);
+    return screenHeight > 0 && (screenHeight - visibleHeight) > 120;
+  }
+
+  function syncKeyboardState(vv) {
+    const chat = getChat();
+    if (!chat) return;
+    chat.classList.toggle('hn-keyboard-open', isKeyboardOpen(vv));
+  }
+
   function scheduleKeepVisible() {
     cancelAnimationFrame(raf);
     raf = requestAnimationFrame(() => {
@@ -20,6 +33,8 @@
       const compose = getCompose();
       const vv = window.visualViewport;
       if (!chat || !compose || !chat.classList.contains('is-active')) return;
+
+      syncKeyboardState(vv);
 
       if (vv) {
         const rect = compose.getBoundingClientRect();
@@ -42,6 +57,9 @@
     if (!chat || !chat.classList.contains('is-active')) return;
     const vv = window.visualViewport;
     if (!vv) return;
+
+    syncKeyboardState(vv);
+
     const h = Math.round(vv.height);
     if (h > 0) {
       chat.style.setProperty('--hn-visual-height', `${h}px`);
@@ -61,6 +79,7 @@
       #hn-chat-screen.is-active .hn-chat-list{min-height:0!important;overflow-y:auto!important}
       #hn-chat-screen.is-active .hn-chat-compose{position:relative!important;z-index:20!important;flex:0 0 auto!important;padding-bottom:max(8px,env(safe-area-inset-bottom))!important;background:rgba(0,0,0,.18)!important}
       #hn-chat-screen.is-active .hn-chat-input-wrap{z-index:21!important}
+      #hn-chat-screen.is-active.hn-keyboard-open .hn-chat-head{display:none!important}
     `;
     document.head.appendChild(style);
   }
