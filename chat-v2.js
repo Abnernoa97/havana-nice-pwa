@@ -1,10 +1,11 @@
-/* HAVANA NICE — CHAT DE INFORMACIÓN / REAL TIME V5 */
+/* HAVANA NICE — CHAT DE INFORMACIÓN / REAL TIME V6 */
 (() => {
   'use strict';
 
   const CHAT_TABLE = 'chat_messages';
   const AUDIO_BUCKET = 'chat-audio';
   const MEDIA_BUCKET = 'chat-media';
+  const SETTINGS_RPC = 'get_chat_settings';
   const MAX_LENGTH = 1000;
   const MAX_MEDIA = 5;
   const MAX_VIDEO_SECONDS = 5 * 60;
@@ -17,6 +18,7 @@
   let mediaRecorder = null, audioChunks = [], recordingStartedAt = 0, recordingTimer = null;
   let pendingVoice = null, pendingMedia = [], pendingPreviewUrls = [];
   let chatReconnectTimer = null, chatReconnectDelay = 1000;
+  let chatSettings = {max_media_files: MAX_MEDIA, max_video_minutes: 5};
 
   const esc = value => String(value ?? '').replace(/[&<>'\"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','\"':'&quot;'}[ch]));
   const session = () => { try { return JSON.parse(sessionStorage.getItem('hn_profile') || 'null'); } catch (_) { return null; } };
@@ -72,13 +74,25 @@
     `;
   }
 
+  async function loadChatSettings(){
+    const sb=client();
+    if(!sb)return;
+    try{
+      const {data,error}=await sb.rpc(SETTINGS_RPC);
+      if(error)throw error;
+      const row=Array.isArray(data)?data[0]:data;
+      if(!row)return;
+      chatSettings={max_media_files:Math.min(10,Math.max(1,Number(row.max_media_files)||MAX_MEDIA)),max_video_minutes:Math.min(60,Math.max(1,Number(row.max_video_minutes)||5))};
+    }catch(error){console.warn('HAVANA NICE chat settings load failed:',error);}
+  }
+
   function buildScreen(){
     if(chatScreen){wireModule();return;}
     chatScreen=document.createElement('section');chatScreen.id='hn-chat-screen';chatScreen.className='screen hn-chat-screen';chatScreen.setAttribute('aria-label','Chat de información');
     chatScreen.innerHTML=`<div class="hn-chat-wrap"><header class="hn-chat-head"><h1 class="hn-chat-head-title">CHAT DE INFORMACIÓN</h1><p class="hn-chat-head-sub">MENSAJES DEL EQUIPO</p></header><div class="hn-chat-list" aria-live="polite"></div><div class="hn-chat-reply"><div class="hn-chat-reply-line"></div><div class="hn-chat-reply-copy"><div class="hn-chat-reply-label"></div><div class="hn-chat-reply-text"></div></div><button class="hn-chat-reply-close" type="button" aria-label="Cancelar respuesta">×</button></div><form class="hn-chat-compose"><div class="hn-chat-input-wrap"><textarea class="hn-chat-input" maxlength="1000" placeholder="ESCRIBE UN MENSAJE" aria-label="Mensaje"></textarea><button class="hn-chat-attach" type="button" aria-label="Adjuntar fotos o videos">＋</button><button class="hn-chat-mic" type="button" aria-label="Grabar nota de voz">◉</button><input class="hn-chat-media-input" type="file" accept="image/*,video/*" multiple hidden></div><div class="hn-chat-media-pending"></div><div class="hn-chat-recording"><span class="hn-chat-recording-status">GRABANDO</span><span class="hn-chat-recording-time">00:00</span></div><button class="hn-chat-send" type="submit">ENVIAR</button></form></div>`;
     document.querySelector('.experience')?.appendChild(chatScreen);listEl=chatScreen.querySelector('.hn-chat-list');inputEl=chatScreen.querySelector('.hn-chat-input');sendEl=chatScreen.querySelector('.hn-chat-send');micEl=chatScreen.querySelector('.hn-chat-mic');mediaEl=chatScreen.querySelector('.hn-chat-media-input');
     chatScreen.querySelector('.hn-chat-reply-close').addEventListener('click',closeReply);chatScreen.querySelector('.hn-chat-compose').addEventListener('submit',sendMessage);micEl.addEventListener('click',toggleRecording);chatScreen.querySelector('.hn-chat-attach').addEventListener('click',()=>mediaEl.click());mediaEl.addEventListener('change',e=>handleMediaFiles(e.target.files));inputEl.addEventListener('input',()=>{inputEl.style.height='auto';inputEl.style.height=Math.min(inputEl.scrollHeight,150)+'px';updateSendState();});
-    ensureStyles();wireModule();subscribe();loadMessages();
+    ensureStyles();wireModule();subscribe();loadMessages();loadChatSettings();
   }
 
   function render(){
@@ -111,11 +125,11 @@
   function stopRecording(){if(mediaRecorder&&mediaRecorder.state!=='inactive')mediaRecorder.stop();}
   function toggleRecording(){if(micEl?.disabled)return;if(mediaRecorder&&mediaRecorder.state==='recording')stopRecording();else startRecording();}
   function getVideoDuration(file){return new Promise((resolve,reject)=>{const url=URL.createObjectURL(file),video=document.createElement('video');video.preload='metadata';video.onloadedmetadata=()=>{const d=Number(video.duration)||0;URL.revokeObjectURL(url);resolve(d)};video.onerror=()=>{URL.revokeObjectURL(url);reject(new Error('No se pudo leer el video.'))};video.src=url;});}
-  async function handleMediaFiles(fileList){const files=[...fileList];if(!files.length)return;if(pendingVoice){pendingVoice=null;resetRecordingUI(false);}if(pendingMedia.length+files.length>MAX_MEDIA){alert(`Puedes subir máximo ${MAX_MEDIA} fotos/videos por envío.`);mediaEl.value='';return;}for(const file of files){if(!file.type.startsWith('image/')&&!file.type.startsWith('video/')){alert('Solo puedes subir fotos o videos.');continue;}if(file.type.startsWith('video/')){try{const duration=await getVideoDuration(file);if(!duration||duration>MAX_VIDEO_SECONDS){alert(`El video "${file.name}" supera el máximo de 5 minutos.`);continue;}}catch(_){alert(`No se pudo revisar el video "${file.name}".`);continue;}}pendingMedia.push(file);}mediaEl.value='';renderPendingMedia();updateSendState();}
+  async function handleMediaFiles(fileList){const files=[...fileList];if(!files.length)return;if(pendingVoice){pendingVoice=null;resetRecordingUI(false);}const maxMedia=Math.min(10,Math.max(1,Number(chatSettings.max_media_files)||MAX_MEDIA));if(pendingMedia.length+files.length>maxMedia){alert(`Puedes subir máximo ${maxMedia} fotos/videos por envío.`);mediaEl.value='';return;}for(const file of files){if(!file.type.startsWith('image/')&&!file.type.startsWith('video/')){alert('Solo puedes subir fotos o videos.');continue;}if(file.type.startsWith('video/')){try{const duration=await getVideoDuration(file);const maxSeconds=Math.min(60,Math.max(1,Number(chatSettings.max_video_minutes)||5))*60;if(!duration||duration>maxSeconds){alert(`El video "${file.name}" supera el máximo de ${Math.round(maxSeconds/60)} minutos.`);continue;}}catch(_){alert(`No se pudo revisar el video "${file.name}".`);continue;}}pendingMedia.push(file);}mediaEl.value='';renderPendingMedia();updateSendState();}
   function clearPendingPreviewUrls(){pendingPreviewUrls.forEach(url=>{try{URL.revokeObjectURL(url)}catch(_){}});pendingPreviewUrls=[];}
   function renderPendingMedia(){const box=chatScreen?.querySelector('.hn-chat-media-pending');if(!box)return;clearPendingPreviewUrls();if(!pendingMedia.length){box.classList.remove('is-visible');box.innerHTML='';return;}box.classList.add('is-visible');box.innerHTML=pendingMedia.map((file,i)=>{const url=URL.createObjectURL(file);pendingPreviewUrls.push(url);const tag=file.type.startsWith('video/')?'video':'img';return `<div class="hn-chat-pending-item"><${tag} src="${url}" ${tag==='video'?'muted':''}></${tag}><button class="hn-chat-pending-remove" type="button" data-index="${i}" aria-label="Eliminar archivo">×</button></div>`;}).join('');box.querySelectorAll('.hn-chat-pending-remove').forEach(btn=>btn.addEventListener('click',()=>{pendingMedia.splice(Number(btn.dataset.index),1);renderPendingMedia();updateSendState();}));}
 
-  async function removeUploadedObjects(sb,bucket,paths){if(!sb||!paths?.length)return;try{await sb.storage.from(bucket).remove(paths);}catch(error){console.warn('HAVANA NICE orphan cleanup failed:',error);}}
+  async function removeUploadedObjects(sb,bucket,paths){if(!sb||!paths?.length)return;try{const result=await sb.storage.from(bucket).remove(paths);if(result?.error)throw result.error;}catch(error){console.warn('HAVANA NICE orphan cleanup failed:',error);}}
   async function uploadVoiceNote(blob,duration){const sb=client(),p=currentProfile();if(!sb||!p?.id)throw new Error('Sesión no disponible.');const ext=blob.type.includes('mp4')?'m4a':blob.type.includes('ogg')?'ogg':'webm';const path=`${p.id}/${Date.now()}-${crypto.randomUUID()}.${ext}`;const up=await sb.storage.from(AUDIO_BUCKET).upload(path,blob,{contentType:blob.type||'audio/webm',upsert:false});if(up.error)throw up.error;try{const {data}=sb.storage.from(AUDIO_BUCKET).getPublicUrl(path);const ins=await sb.from(CHAT_TABLE).insert({profile_id:p.id,sender_name:p.username||'MIEMBRO',message:'',message_type:'audio',audio_url:data.publicUrl,audio_duration:duration});if(ins.error)throw ins.error;}catch(error){await removeUploadedObjects(sb,AUDIO_BUCKET,[path]);throw error;}}
   async function uploadMedia(){const sb=client(),p=currentProfile();if(!sb||!p?.id||!pendingMedia.length)return;const urls=[],types=[],paths=[];try{for(const file of pendingMedia){const ext=(file.name.split('.').pop()||'bin').toLowerCase(),path=`${p.id}/${Date.now()}-${crypto.randomUUID()}.${ext}`;const up=await sb.storage.from(MEDIA_BUCKET).upload(path,file,{contentType:file.type||'application/octet-stream',upsert:false});if(up.error)throw up.error;paths.push(path);const {data}=sb.storage.from(MEDIA_BUCKET).getPublicUrl(path);urls.push(data.publicUrl);types.push(file.type||'');}const ins=await sb.from(CHAT_TABLE).insert({profile_id:p.id,sender_name:p.username||'MIEMBRO',message:'',message_type:'media',media_urls:urls,media_types:types});if(ins.error)throw ins.error;pendingMedia=[];clearPendingPreviewUrls();renderPendingMedia();}catch(error){await removeUploadedObjects(sb,MEDIA_BUCKET,paths);throw error;}}
   function updateSendState(){if(!sendEl)return;sendEl.disabled=!!mediaRecorder||(!String(inputEl?.value||'').trim()&&!pendingVoice&&!pendingMedia.length);}
@@ -125,7 +139,7 @@
   function markRead(){try{localStorage.setItem(readKey(),new Date().toISOString());}catch(_){}updateUnread();}
   async function loadMessages(){const sb=client();if(!sb)return;const {data,error}=await sb.from(CHAT_TABLE).select('id,profile_id,sender_name,message,created_at,message_type,audio_url,audio_duration,media_urls,media_types,reply_to_message_id').order('created_at',{ascending:true}).limit(200);if(error){console.warn('HAVANA NICE chat load failed:',error);return;}messages=data||[];render();updateUnread();}
   window.hnChatReconcile=()=>loadMessages();
-  function subscribe(){const sb=client();if(!sb)return;clearTimeout(chatReconnectTimer);if(chatChannel){try{sb.removeChannel(chatChannel);}catch(_){}chatChannel=null;}chatChannel=sb.channel('hn-chat-realtime').on('postgres_changes',{event:'INSERT',schema:'public',table:CHAT_TABLE},payload=>{const row=payload.new;if(!messages.some(m=>String(m.id)===String(row.id))){messages.push(row);messages.sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));render();}if(chatScreen?.classList.contains('is-active'))markRead();else updateUnread();}).on('postgres_changes',{event:'DELETE',schema:'public',table:CHAT_TABLE},payload=>{const id=payload.old?.id;if(!id)return;const had=messages.some(m=>String(m.id)===String(id));messages=messages.filter(m=>String(m.id)!==String(id));if(replyTarget?.id===id)closeReply();if(had)render();else updateUnread();}).subscribe(status=>{if(status==='SUBSCRIBED'){chatReconnectDelay=1000;clearTimeout(chatReconnectTimer);}else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'||status==='CLOSED'){clearTimeout(chatReconnectTimer);chatReconnectTimer=setTimeout(()=>subscribe(),chatReconnectDelay);chatReconnectDelay=Math.min(chatReconnectDelay*2,10000);}});}
+  function subscribe(){const sb=client();if(!sb)return;clearTimeout(chatReconnectTimer);if(chatChannel){try{sb.removeChannel(chatChannel);}catch(_){}chatChannel=null;}chatChannel=sb.channel('hn-chat-realtime').on('postgres_changes',{event:'INSERT',schema:'public',table:CHAT_TABLE},payload=>{const row=payload.new;if(!messages.some(m=>String(m.id)===String(row.id))){messages.push(row);messages.sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));render();}if(chatScreen?.classList.contains('is-active'))markRead();else updateUnread();}).on('postgres_changes',{event:'DELETE',schema:'public',table:CHAT_TABLE},payload=>{const id=payload.old?.id;if(!id)return;const had=messages.some(m=>String(m.id)===String(id));messages=messages.filter(m=>String(m.id)!==String(id));if(replyTarget?.id===id)closeReply();if(had)render();else updateUnread();}).on('postgres_changes',{event:'UPDATE',schema:'public',table:'chat_settings'},()=>{loadChatSettings();}).subscribe(status=>{if(status==='SUBSCRIBED'){chatReconnectDelay=1000;clearTimeout(chatReconnectTimer);}else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'||status==='CLOSED'){clearTimeout(chatReconnectTimer);chatReconnectTimer=setTimeout(()=>subscribe(),chatReconnectDelay);chatReconnectDelay=Math.min(chatReconnectDelay*2,10000);}});}
   function closeReply(){replyTarget=null;chatScreen?.querySelector('.hn-chat-reply')?.classList.remove('is-visible');chatScreen?.querySelectorAll('.hn-chat-bubble.hn-chat-selected').forEach(el=>el.classList.remove('hn-chat-selected'));}
   function selectMessage(id){const message=messages.find(m=>String(m.id)===String(id));if(!message)return;replyTarget=message;chatScreen?.querySelectorAll('.hn-chat-bubble').forEach(el=>el.classList.toggle('hn-chat-selected',el.dataset.messageId===String(id)));const reply=chatScreen?.querySelector('.hn-chat-reply');if(reply){reply.classList.add('is-visible');const who=reply.querySelector('.hn-chat-reply-label'),text=reply.querySelector('.hn-chat-reply-text');if(who)who.textContent=`RESPONDER A ${message.sender_name||'MIEMBRO'}`;if(text)text.textContent=replyPreview(message);}inputEl?.focus();}
   function closeChat(fromButton=false){if(!chatScreen)return;if(mediaRecorder&&mediaRecorder.state==='recording'){try{mediaRecorder.stop();}catch(_){} }closeReply();chatScreen.classList.remove('is-active');if(previousScreen)previousScreen.classList.add('is-active');else document.getElementById('homeScreen')?.classList.add('is-active');const video=document.getElementById('backgroundVideo');if(video)video.muted=videoWasMuted;if(historyArmed&&fromButton){historyArmed=false;try{history.back();}catch(_){}}else if(!fromButton)historyArmed=false;}
@@ -133,6 +147,6 @@
   function wireModule(){const module=ensureHomeModule();if(!module||module.dataset.hnChatBound==='1')return;module.dataset.hnChatBound='1';module.addEventListener('click',()=>openChat());}
   window.addEventListener('popstate',e=>{if(historyArmed){historyArmed=false;closeChat(false);}});
   const observer=new MutationObserver(()=>wireModule());observer.observe(document.documentElement,{childList:true,subtree:true});
-  function init(){if(initialized)return;initialized=true;ensureStyles();wireModule();window.addEventListener('hn:session-ready',()=>{subscribe();loadMessages();});}
+  function init(){if(initialized)return;initialized=true;ensureStyles();wireModule();window.addEventListener('hn:session-ready',()=>{subscribe();loadMessages();loadChatSettings();});}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })();
