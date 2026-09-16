@@ -5,6 +5,6 @@ function init(){document.getElementById('hnMyDay')?.remove();const s=document.cr
 (function(){var s=document.createElement('script');s.src='./chat-typing-v2.js?v=3';s.async=false;document.head.appendChild(s)})();
 (function(){var s=document.createElement('script');s.src='./chat-realtime-guard-v1.js?v=2';s.async=false;document.head.appendChild(s)})();
 (function(){var s=document.createElement('script');s.src='./ios-install-v1.js?v=1';s.async=false;document.head.appendChild(s)})();
-(function(){var s=document.createElement('script');s.src='./chat-media-fix-v1.js?v=2';s.async=false;document.body.appendChild(s)})();
-(function(){var s=document.createElement('script');s.src='./chat-keyboard-v1.js?v=12712028b706893a35a904553bb51237d0623e9e';s.async=false;document.body.appendChild(s)})();
-(function(){var s=document.createElement('script');s.src='./family-profile-data-v2.js?v=473935bbb856e4425e5752c24a5b14d05a2b1498';s.async=false;document.body.appendChild(s)})();
+(function(){var s=document.createElement('script');s.src='./chat-media-fix-v1.js?v=2';s.async=false;document.head.appendChild(s)})();
+(function(){var s=document.createElement('script');s.src='./chat-keyboard-v1.js?v=12712028b706893a35a904553bb51237d0623e9e';s.async=false;document.head.appendChild(s)})();
+(function(){var s=document.createElement('script');s.src='./family-profile-data-v2.js?v=473935bbb856e4425e5752c24a5b14d05a2b1498';s.async=false;document.head.appendChild(s)})();
