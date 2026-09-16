@@ -1,0 +1,33 @@
+name: HN label-only update
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Update label
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          s = s.replace('data-module="MÚSICOS"', 'data-module="FAMILIA HAVANA NICE"', 1)
+          s = s.replace('>\n              Músicos\n', '>\n              Familia Havana Nice\n', 1)
+          p.write_text(s, encoding='utf-8')
+          PY
+          grep -n -A3 -B2 'FAMILIA HAVANA NICE' index.html
+          git rm .github/workflows/hn-label-update.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          git commit -m 'feat: rename musicians module to family Havana Nice'
+          git push
