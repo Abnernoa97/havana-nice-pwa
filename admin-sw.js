@@ -1,7 +1,7 @@
-const CACHE='hn-admin-v8';
-const FAMILY_ADMIN='./admin-family-v1.js?v=9abc141b29b92071ddacd08ddcccb9011b75c7b';
+const CACHE='hn-admin-v9';
+const FAMILY_ADMIN='./admin-family-v1.js?v=9abc141b29b92071ddacd08ddc2ccb9011b75c7b';
 const STORAGE_SUMMARY='./admin-storage-summary.js?v=f4a7adbaca65101c5417beb771b5d33033527d2b';
-async function normalizeAdmin(response){if(!response||!response.ok)return response;const text=await response.text();let fixed=text.includes('admin-family-v1.js')?text:text.replace('</body>',`<script src="${FAMILY_ADMIN}"></script></body>`);const h=new Headers(response.headers);h.delete('content-encoding');h.delete('content-length');h.set('content-type','text/html; charset=utf-8');return new Response(fixed,{status:response.status,statusText:response.statusText,headers:h})}
+async function normalizeAdmin(response){if(!response||!response.ok)return response;const text=await response.text();const fixed=text.includes('admin-family-v1.js')?text:text.replace('</body>',`<script src="${FAMILY_ADMIN}"></script></body>`);const h=new Headers(response.headers);h.delete('content-encoding');h.delete('content-length');h.set('content-type','text/html; charset=utf-8');return new Response(fixed,{status:response.status,statusText:response.statusText,headers:h})}
 async function refreshAdminShell(){try{const r=await fetch('./admin.html',{cache:'no-store'});if(!r.ok)return;const fixed=await normalizeAdmin(r);const c=await caches.open(CACHE);await c.put('./admin.html',fixed.clone())}catch(_) {}}
 self.addEventListener('install',e=>{e.waitUntil(refreshAdminShell());self.skipWaiting()});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));self.clients.claim()});
