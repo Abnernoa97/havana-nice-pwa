@@ -1,7 +1,4 @@
-/* HAVANA NICE — ADMIN SUMMARY REALTIME
-   Realtime summary sync. Uses the authenticated Admin Supabase client
-   when available and subscribes only to the tables that feed Summary.
-*/
+/* HAVANA NICE — ADMIN SUMMARY REALTIME */
 (function(){
   'use strict';
   let client=null,channel=null,started=false,reconnectTimer=null,refreshTimer=null;
@@ -35,18 +32,13 @@
       if(window.hnAdminSummaryRefresh)await window.hnAdminSummaryRefresh();
     }catch(e){console.warn('HN summary realtime refresh',e)}
   }
-  function scheduleRefresh(){
-    clearTimeout(refreshTimer);
-    refreshTimer=setTimeout(refresh,0);
-  }
-  function bind(table){
-    channel.on('postgres_changes',{event:'*',schema:'public',table},scheduleRefresh);
-  }
+  function scheduleRefresh(){clearTimeout(refreshTimer);refreshTimer=setTimeout(refresh,0)}
+  function bind(table){channel.on('postgres_changes',{event:'*',schema:'public',table},scheduleRefresh)}
   async function subscribe(){
     const c=await waitForAdminClient();
     if(channel){try{await c.removeChannel(channel)}catch(_) {}}
     channel=c.channel('hn-admin-summary-realtime');
-    ['notifications','repertoire_songs','calendar_events','calendar_event_recipients','chat_messages','musicians','musician_profiles','profiles'].forEach(bind);
+    ['notifications','repertoire_songs','calendar_events','calendar_event_recipients','chat_messages','profiles'].forEach(bind);
     channel.subscribe(function(status){
       if(status==='SUBSCRIBED')scheduleRefresh();
       else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'||status==='CLOSED'){
@@ -55,16 +47,7 @@
       }
     });
   }
-  async function init(){
-    if(started)return;
-    started=true;
-    await waitForAdminClient();
-    await refresh();
-    await subscribe();
-  }
-  function boot(){
-    if(!document.getElementById('app'))return;
-    init().catch(e=>console.warn('HN summary realtime init',e));
-  }
+  async function init(){if(started)return;started=true;await waitForAdminClient();await refresh();await subscribe()}
+  function boot(){if(!document.getElementById('app'))return;init().catch(e=>console.warn('HN summary realtime init',e))}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
 })();
