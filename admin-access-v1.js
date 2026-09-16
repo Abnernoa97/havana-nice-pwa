@@ -81,8 +81,31 @@
   function renderAlerts(rows){
     const el=document.getElementById('hnDaAlerts');if(!el)return;
     const list=(rows||[]).slice(0,12);
-    el.innerHTML=list.length?list.map(a=>`<div class="hn-da-alert ${a.read_at?'':'unread'}"><div class="hn-da-alert-title">${esc(a.title||'NUEVO ACCESO')} · ${esc(a.username)}</div><div class="hn-da-alert-msg">${esc(a.message)}</div><div class="hn-da-alert-date">${a.created_at?new Date(a.created_at).toLocaleString('es-MX'):''}</div>${a.read_at?'':'<div class="hn-da-actions"><button data-alert-read="'+esc(a.id)+'">MARCAR LEÍDA</button></div>'}</div>`).join(''):'<div class="hn-da-empty">Sin alertas nuevas</div>';
-    el.querySelectorAll('[data-alert-read]').forEach(btn=>btn.addEventListener('click',async()=>{btn.disabled=true;await sb.rpc('admin_mark_musician_access_alert_read',{p_alert_id:btn.dataset.alertRead});await load();}));
+    el.innerHTML=list.length?list.map(a=>`<div class="hn-da-alert ${a.read_at?'':'unread'}"><div class="hn-da-alert-title">${esc(a.title||'NUEVO ACCESO')} · ${esc(a.username)}</div><div class="hn-da-alert-msg">${esc(a.message)}</div><div class="hn-da-alert-date">${a.created_at?new Date(a.created_at).toLocaleString('es-MX'):''}</div><div class="hn-da-actions"><button data-alert-read="${esc(a.id)}">${a.read_at?'MARCAR NO LEÍDA':'MARCAR LEÍDA'}</button><button class="danger" data-alert-delete="${esc(a.id)}">ELIMINAR</button></div></div>`).join(''):'<div class="hn-da-empty">Sin alertas nuevas</div>';
+    el.querySelectorAll('[data-alert-read]').forEach(btn=>btn.addEventListener('click',async()=>{
+      btn.disabled=true;
+      if(btn.textContent==='MARCAR NO LEÍDA'){
+        const{error}=await sb.rpc('admin_mark_musician_access_alert_unread',{p_alert_id:btn.dataset.alertRead});
+        if(error){btn.disabled=false;return;}
+      }else{
+        const{error}=await sb.rpc('admin_mark_musician_access_alert_read',{p_alert_id:btn.dataset.alertRead});
+        if(error){btn.disabled=false;return;}
+      }
+      await load();
+    }));
+    el.querySelectorAll('[data-alert-delete]').forEach(btn=>btn.addEventListener('click',async()=>{
+      const id=btn.dataset.alertDelete;
+      if(!id||!confirm('¿Eliminar esta alerta de acceso?'))return;
+      btn.disabled=true;
+      const{data,error}=await sb.rpc('admin_delete_musician_access_alert',{p_alert_id:id});
+      if(error||data!==true){
+        const m=document.getElementById('hnDaMsg');
+        if(m)m.textContent='No se pudo eliminar la alerta';
+        btn.disabled=false;
+        return;
+      }
+      await load();
+    }));
   }
   function subscribe(){
     if(channel||!sb)return;
