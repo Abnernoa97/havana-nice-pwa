@@ -7,14 +7,21 @@
   let previousScreen = null;
   let videoWasMuted = true;
 
+  const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   const home = () => document.getElementById('homeScreen');
   const calendar = () => document.getElementById('calendarScreen');
   const legacyModule = () => document.getElementById('moduleScreen');
+
+  function setIOSCalendarMode(active) {
+    if (!isIOS || !document.documentElement) return;
+    document.documentElement.classList.toggle('hn-ios-calendar-open', !!active);
+  }
 
   function closeCalendar(fromButton = false) {
     const screen = calendar();
     if (!screen) return;
     screen.classList.remove('is-active');
+    setIOSCalendarMode(false);
     if (previousScreen) previousScreen.classList.add('is-active');
     else home()?.classList.add('is-active');
     const video = document.getElementById('backgroundVideo');
@@ -36,6 +43,7 @@
     });
     legacyModule()?.classList.remove('is-active');
     screen.classList.add('is-active');
+    setIOSCalendarMode(true);
     const video = document.getElementById('backgroundVideo');
     if (video) {
       videoWasMuted = !!video.muted;
@@ -62,7 +70,11 @@
     if (!document.getElementById('hn-calendar-nav-style')) {
       const style = document.createElement('style');
       style.id = 'hn-calendar-nav-style';
-      style.textContent = `.hn-calendar-back{flex:0 0 auto;width:100%;height:44px;margin-top:8px;border:1px solid rgba(229,189,98,.35);border-radius:0;background:rgba(0,0,0,.25);color:rgba(244,241,232,.72);font-size:9px;letter-spacing:.2em;text-transform:uppercase;cursor:pointer}`;
+      style.textContent = `
+        .hn-calendar-back{flex:0 0 auto;width:100%;height:44px;margin-top:8px;border:1px solid rgba(229,189,98,.35);border-radius:0;background:rgba(0,0,0,.25);color:rgba(244,241,232,.72);font-size:9px;letter-spacing:.2em;text-transform:uppercase;cursor:pointer}
+        html.hn-ios-calendar-open .screen:not(#calendarScreen){opacity:0!important;visibility:hidden!important;pointer-events:none!important;transform:none!important;transition:none!important}
+        html.hn-ios-calendar-open #calendarScreen{opacity:1!important;visibility:visible!important;pointer-events:auto!important;transform:none!important;transition:none!important;z-index:20!important}
+      `;
       document.head.appendChild(style);
     }
   }
@@ -84,6 +96,7 @@
       ensureButton(screen);
       if (screen.classList.contains('is-active')) {
         legacyModule()?.classList.remove('is-active');
+        setIOSCalendarMode(true);
       }
     }
   }
