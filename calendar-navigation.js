@@ -85,7 +85,17 @@
       .find(x => x.dataset.module === 'CALENDARIO DE EVENTOS');
     if (!module) return false;
     bound = true;
-    module.addEventListener('click', () => openCalendar());
+    if (isIOS) {
+      // iOS-only interception: the legacy generic module handler otherwise opens
+      // moduleScreen first, leaving its Repertoire content visible during the transition.
+      module.addEventListener('click', event => {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        openCalendar();
+      }, true);
+    } else {
+      module.addEventListener('click', () => openCalendar());
+    }
     return true;
   }
 
