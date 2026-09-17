@@ -1,4 +1,4 @@
-/* HAVANA NICE — iOS INSTALL GUIDE V1 */
+/* HAVANA NICE — iOS INSTALL GUIDE V2 */
 (function(){
   'use strict';
   const isIOS=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
@@ -6,16 +6,25 @@
   const isStandalone=window.matchMedia?.('(display-mode: standalone)').matches||window.navigator.standalone===true;
   if(isStandalone)return;
 
-  function addAppleIcon(){
-    if(document.querySelector('link[rel="apple-touch-icon"]'))return;
-    const link=document.createElement('link');
-    link.rel='apple-touch-icon';
-    link.href='./havana-nice-icon-192.png';
-    document.head.appendChild(link);
-    const title=document.createElement('meta');
-    title.name='apple-mobile-web-app-title';
-    title.content='HAVANA NICE';
-    document.head.appendChild(title);
+  function addIOSMeta(){
+    if(!document.querySelector('link[rel="apple-touch-icon"]')){
+      const link=document.createElement('link');
+      link.rel='apple-touch-icon';
+      link.href='./havana-nice-icon-192.png';
+      document.head.appendChild(link);
+    }
+    if(!document.querySelector('meta[name="apple-mobile-web-app-title"]')){
+      const title=document.createElement('meta');
+      title.name='apple-mobile-web-app-title';
+      title.content='HAVANA NICE';
+      document.head.appendChild(title);
+    }
+    if(!document.querySelector('link[rel="manifest"]')){
+      const manifest=document.createElement('link');
+      manifest.rel='manifest';
+      manifest.href='./manifest.json';
+      document.head.appendChild(manifest);
+    }
   }
 
   function showGuide(){
@@ -27,15 +36,15 @@
       <section class="hn-ios-card" role="dialog" aria-modal="true" aria-labelledby="hnIOSInstallTitle">
         <button class="hn-ios-close" type="button" aria-label="Cerrar">×</button>
         <div class="hn-ios-eyebrow">HAVANA NICE</div>
-        <h2 id="hnIOSInstallTitle">INSTALAR EN IPHONE</h2>
-        <p class="hn-ios-copy">En iPhone, Safari no muestra un botón automático de instalación. Hazlo desde Compartir:</p>
+        <h2 id="hnIOSInstallTitle">INSTALAR COMO APP</h2>
+        <p class="hn-ios-copy">En iPhone, la instalación se hace desde Safari y después HAVANA NICE se abrirá sin la barra del navegador.</p>
         <ol class="hn-ios-steps">
           <li><b>1.</b><span>Abre esta página en <strong>Safari</strong>.</span></li>
           <li><b>2.</b><span>Toca <strong>Compartir</strong> <span class="hn-ios-share">□↑</span>.</span></li>
           <li><b>3.</b><span>Elige <strong>Agregar a Inicio</strong>.</span></li>
           <li><b>4.</b><span>Activa <strong>Abrir como app web</strong> y toca <strong>Agregar</strong>.</span></li>
         </ol>
-        <p class="hn-ios-note">Si estás en Chrome u otro navegador del iPhone, abre el mismo enlace en Safari para instalarla.</p>
+        <p class="hn-ios-note">Después de agregarla a Inicio, abre HAVANA NICE desde su nuevo icono. Esa es la versión que funciona como app.</p>
         <button class="hn-ios-done" type="button">ENTENDIDO</button>
       </section>`;
     const style=document.createElement('style');
@@ -62,24 +71,39 @@
     wrap.querySelector('.hn-ios-backdrop').addEventListener('click',close);
   }
 
-  function installButton(){
-    if(document.getElementById('hnIOSInstallButton'))return;
+  function makeButton(id,label){
+    if(document.getElementById(id))return null;
     const button=document.createElement('button');
-    button.id='hnIOSInstallButton';
+    button.id=id;
     button.type='button';
-    button.textContent='INSTALAR EN IPHONE';
-    button.setAttribute('aria-label','Ver instrucciones para instalar HAVANA NICE en iPhone');
+    button.textContent=label;
+    button.setAttribute('aria-label','Ver instrucciones para instalar HAVANA NICE como app en iPhone');
     button.addEventListener('click',showGuide);
-    const style=document.createElement('style');
-    style.textContent=`#hnIOSInstallButton{display:block;width:min(100%,400px);height:46px;margin:12px auto 0;border:1px solid rgba(229,189,98,.45);background:rgba(0,0,0,.28);color:#fff1a8;font-size:9px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;cursor:pointer;}#hnIOSInstallButton:active{transform:scale(.985);}`;
-    document.head.appendChild(style);
-    const loginArea=document.querySelector('.login-area');
-    if(loginArea){loginArea.appendChild(button);return;}
-    const loginScreen=document.getElementById('loginScreen');
-    if(loginScreen){const inner=loginScreen.querySelector('.screen-inner')||loginScreen;inner.appendChild(button);return;}
-    document.body.appendChild(button);
+    return button;
   }
 
-  function init(){addAppleIcon();installButton();}
+  function installButtons(){
+    if(document.getElementById('hnIOSInstallButton'))return;
+    const style=document.createElement('style');
+    style.id='hn-ios-install-button-style';
+    style.textContent=`
+      #hnIOSInstallButton{display:block;width:min(100%,400px);height:46px;margin:12px auto 0;border:1px solid rgba(229,189,98,.45);background:rgba(0,0,0,.28);color:#fff1a8;font-size:9px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;cursor:pointer;}
+      #hnIOSInstallButton:active{transform:scale(.985);}
+      #hnIOSHomeInstallButton{display:block;width:min(100%,400px);height:42px;margin:13px auto 0;border:1px solid rgba(229,189,98,.55);background:rgba(0,0,0,.24);color:#fff1a8;font-size:9px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;cursor:pointer;}
+      #hnIOSHomeInstallButton:active{transform:scale(.985);}
+    `;
+    document.head.appendChild(style);
+
+    const loginArea=document.querySelector('.login-area');
+    const loginButton=makeButton('hnIOSInstallButton','INSTALAR COMO APP');
+    if(loginArea&&loginButton)loginArea.appendChild(loginButton);
+
+    const homeScreen=document.getElementById('homeScreen');
+    const homeInner=homeScreen?.querySelector('.screen-inner');
+    const homeButton=makeButton('hnIOSHomeInstallButton','INSTALAR HAVANA NICE COMO APP');
+    if(homeInner&&homeButton)homeInner.appendChild(homeButton);
+  }
+
+  function init(){addIOSMeta();installButtons();}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })();
