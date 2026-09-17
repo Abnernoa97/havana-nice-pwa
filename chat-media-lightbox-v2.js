@@ -1,13 +1,14 @@
-/* HAVANA NICE — CHAT MEDIA LIGHTBOX V6
+/* HAVANA NICE — CHAT MEDIA LIGHTBOX V7
    Photos + videos. Native back closes fullscreen and returns to the chat.
-   iOS return transition is isolated to prevent a one-frame flash of the chat media.
+   iOS return transition keeps the fullscreen layer covering the chat until
+   the previous screen has rendered, preventing the one-frame media flash.
 */
 (function(){
   'use strict';
-  if(window.__hnChatMediaLightboxV6)return;
-  window.__hnChatMediaLightboxV6=true;
+  if(window.__hnChatMediaLightboxV7)return;
+  window.__hnChatMediaLightboxV7=true;
 
-  const STYLE='hn-chat-media-lightbox-v6-style';
+  const STYLE='hn-chat-media-lightbox-v7-style';
   const HISTORY_KEY='hnChatMediaLightbox';
   const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent||'')||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
   let overlay=null, image=null, video=null;
@@ -19,17 +20,18 @@
     const style=document.createElement('style');
     style.id=STYLE;
     style.textContent=`
-      #hnChatMediaLightboxV6{position:fixed;inset:0;z-index:300000;display:none;background:rgba(0,0,0,.97);padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);box-sizing:border-box;touch-action:none;overflow:hidden;}
-      #hnChatMediaLightboxV6.is-open{display:block;}
-      #hnChatMediaLightboxV6 img,#hnChatMediaLightboxV6 video{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);display:block;width:auto;height:auto;max-width:calc(100vw - 20px);max-height:calc(100dvh - 20px);object-fit:contain;object-position:center center;user-select:none;-webkit-user-drag:none;outline:none;margin:0;}
-      #hnChatMediaLightboxV6 [hidden]{display:none!important;}
-      #hnChatMediaLightboxV6 video{cursor:pointer;background:#000;}
-      #hnChatMediaLightboxV6 .hn-chat-media-lb-close{position:absolute;top:max(14px,calc(env(safe-area-inset-top) + 8px));right:max(14px,calc(env(safe-area-inset-right) + 8px));width:46px;height:46px;border:1px solid rgba(229,189,98,.8);border-radius:50%;background:rgba(0,0,0,.62);color:#fff1a8;font-size:29px;line-height:1;display:flex;align-items:center;justify-content:center;z-index:300010;}
+      #hnChatMediaLightboxV7{position:fixed;inset:0;z-index:300000;display:none;background:rgba(0,0,0,.97);padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);box-sizing:border-box;touch-action:none;overflow:hidden;}
+      #hnChatMediaLightboxV7.is-open{display:block;}
+      #hnChatMediaLightboxV7 img,#hnChatMediaLightboxV7 video{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);display:block;width:auto;height:auto;max-width:calc(100vw - 20px);max-height:calc(100dvh - 20px);object-fit:contain;object-position:center center;user-select:none;-webkit-user-drag:none;outline:none;margin:0;}
+      #hnChatMediaLightboxV7 [hidden]{display:none!important;}
+      #hnChatMediaLightboxV7 video{cursor:pointer;background:#000;}
+      #hnChatMediaLightboxV7 .hn-chat-media-lb-close{position:absolute;top:max(14px,calc(env(safe-area-inset-top) + 8px));right:max(14px,calc(env(safe-area-inset-right) + 8px));width:46px;height:46px;border:1px solid rgba(229,189,98,.8);border-radius:50%;background:rgba(0,0,0,.62);color:#fff1a8;font-size:29px;line-height:1;display:flex;align-items:center;justify-content:center;z-index:300010;}
       #hn-chat-screen.hn-ios-lb-returning{visibility:hidden!important;}
+      #hnChatMediaLightboxV7.hn-ios-lb-covering{display:block!important;}
     `;
     document.head.appendChild(style);
     overlay=document.createElement('div');
-    overlay.id='hnChatMediaLightboxV6';
+    overlay.id='hnChatMediaLightboxV7';
     overlay.setAttribute('role','dialog');
     overlay.setAttribute('aria-modal','true');
     overlay.setAttribute('aria-label','Contenido multimedia a pantalla completa');
@@ -85,6 +87,7 @@
       image.src=src;
     }
     overlay.classList.add('is-open');
+    overlay.classList.remove('hn-ios-lb-covering');
     document.documentElement.style.overflow='hidden';
     document.body.style.overflow='hidden';
     armHistory();
@@ -92,7 +95,7 @@
 
   function finishClose(){
     historyArmed=false;
-    overlay?.classList.remove('is-open');
+    overlay?.classList.remove('is-open','hn-ios-lb-covering');
     clearMedia();
     document.documentElement.style.overflow='';
     document.body.style.overflow='';
@@ -118,9 +121,23 @@
   function closeFromHistory(){
     if(!overlay?.classList.contains('is-open'))return;
     handlingHistory=true;
-    hideIOSReturnFrame();
+    if(isIOS){
+      hideIOSReturnFrame();
+      overlay.classList.add('hn-ios-lb-covering');
+      clearMedia();
+      historyArmed=false;
+      document.documentElement.style.overflow='';
+      document.body.style.overflow='';
+      requestAnimationFrame(function(){
+        requestAnimationFrame(function(){
+          overlay.classList.remove('is-open','hn-ios-lb-covering');
+          revealIOSReturnFrame();
+          handlingHistory=false;
+        });
+      });
+      return;
+    }
     finishClose();
-    revealIOSReturnFrame();
     handlingHistory=false;
   }
 
@@ -135,9 +152,23 @@
         handlingHistory=false;
       }
     }
-    hideIOSReturnFrame();
+    if(isIOS){
+      hideIOSReturnFrame();
+      overlay.classList.add('hn-ios-lb-covering');
+      clearMedia();
+      historyArmed=false;
+      document.documentElement.style.overflow='';
+      document.body.style.overflow='';
+      requestAnimationFrame(function(){
+        requestAnimationFrame(function(){
+          overlay.classList.remove('is-open','hn-ios-lb-covering');
+          revealIOSReturnFrame();
+          handlingHistory=false;
+        });
+      });
+      return;
+    }
     finishClose();
-    revealIOSReturnFrame();
     handlingHistory=false;
   }
 
@@ -168,9 +199,8 @@
     const isLightboxState=!!e.state?.[HISTORY_KEY];
     if(!overlay?.classList.contains('is-open'))return;
     if(historyArmed||isLightboxState||handlingHistory){
-      handlingHistory=true;
-      closeFromHistory();
       e.stopImmediatePropagation();
+      closeFromHistory();
     }
   },true);
 
