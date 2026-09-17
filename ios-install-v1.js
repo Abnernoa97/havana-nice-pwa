@@ -1,9 +1,30 @@
-/* HAVANA NICE — iOS INSTALL GUIDE V1 */
+/* HAVANA NICE — iOS INSTALL + LAYOUT V2 */
 (function(){
   'use strict';
-  const isIOS=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+  const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
   if(!isIOS)return;
+
+  function installIOSLayout(){
+    if(document.getElementById('hn-ios-layout-style'))return;
+    const style=document.createElement('style');
+    style.id='hn-ios-layout-style';
+    style.textContent=`
+      html,body{height:100%;min-height:100%;}
+      .screen{box-sizing:border-box!important;-webkit-box-sizing:border-box!important;max-width:100vw;max-height:100dvh;overflow:hidden;overscroll-behavior:none;}
+      .screen.is-active{z-index:10!important;}
+      .screen:not(.is-active){z-index:0!important;visibility:hidden!important;pointer-events:none!important;}
+      #calendarScreen{box-sizing:border-box!important;-webkit-box-sizing:border-box!important;overflow:hidden!important;}
+      #calendarScreen.is-active{z-index:20!important;}
+      #moduleScreen:not(.is-active){z-index:0!important;}
+      #moduleScreen.is-active{z-index:20!important;}
+      #homeScreen.is-active{z-index:20!important;}
+      #chatScreen.is-active,#hn-chat-screen.is-active{z-index:20!important;}
+    `;
+    document.head.appendChild(style);
+  }
+
   const isStandalone=window.matchMedia?.('(display-mode: standalone)').matches||window.navigator.standalone===true;
+  installIOSLayout();
   if(isStandalone)return;
 
   function addAppleIcon(){
