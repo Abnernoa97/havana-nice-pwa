@@ -1,22 +1,22 @@
-/* HAVANA NICE — CHAT MEDIA DISPLAY + VIDEO OPTIMIZATION V4
+/* HAVANA NICE — CHAT MEDIA DISPLAY + VIDEO OPTIMIZATION V5
    This module owns media rendering + upload optimization only.
    Fullscreen photo/video viewing is owned exclusively by chat-media-lightbox-v2.js.
 */
 (function(){
   'use strict';
 
-  const STYLE_ID='hn-chat-media-fix-v4';
+  const STYLE_ID='hn-chat-media-fix-v5';
   const MAX_INPUT_BYTES=12*1024*1024;
   const TARGET_W=854;
   const TARGET_H=480;
   const TARGET_FPS=24;
   const VIDEO_BPS=750000;
   const AUDIO_BPS=64000;
+  const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent||'')||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
 
   function installStyles(){
-    if(document.getElementById(STYLE_ID))return;
-    const style=document.createElement('style');
-    style.id=STYLE_ID;
+    let style=document.getElementById(STYLE_ID);
+    if(!style){style=document.createElement('style');style.id=STYLE_ID;document.head.appendChild(style);}
     style.textContent=`
       .hn-chat-media-grid{align-items:start!important;}
       .hn-chat-media-grid .hn-chat-media-item{width:min(100%,280px)!important;height:190px!important;min-height:0!important;max-height:190px!important;}
@@ -30,6 +30,23 @@
       .hn-chat-media-grid:has(> .hn-chat-media-item:only-child){width:min(100%,280px)!important;max-width:100%!important;}
       .hn-chat-media-grid:has(> .hn-chat-media-item:only-child) .hn-chat-media-item{width:100%!important;height:190px!important;max-width:100%!important;}
       .hn-chat-bubble:has(.hn-chat-media-grid){max-width:min(88%,300px)!important;padding:4px!important;}
+
+      /* iOS only: re-assert the media geometry whenever the chat is reopened.
+         Android keeps the existing media rules above unchanged. */
+      #hn-chat-screen.hn-ios-chat-media .hn-chat-bubble:has(.hn-chat-media-grid){max-width:min(94%,340px)!important;}
+      #hn-chat-screen.hn-ios-chat-media .hn-chat-media-grid{width:100%!important;max-width:100%!important;}
+      #hn-chat-screen.hn-ios-chat-media .hn-chat-media-grid .hn-chat-media-item{width:100%!important;height:190px!important;max-width:100%!important;min-width:0!important;}
+      #hn-chat-screen.hn-ios-chat-media .hn-chat-media-grid .hn-chat-media-item img,
+      #hn-chat-screen.hn-ios-chat-media .hn-chat-media-grid .hn-chat-media-item video,
+      #hn-chat-screen.hn-ios-chat-media .hn-chat-media-grid .hn-chat-photo-button,
+      #hn-chat-screen.hn-ios-chat-media .hn-chat-media-grid .hn-chat-photo-button img{width:100%!important;height:100%!important;max-width:100%!important;max-height:190px!important;object-fit:cover!important;}
+      #hn-chat-screen.hn-ios-chat-media .hn-chat-media-grid:has(> .hn-chat-media-item:only-child){width:min(100%,340px)!important;}
+      #hn-chat-screen.hn-ios-chat-media .hn-chat-media-grid:has(> .hn-chat-media-item:only-child) .hn-chat-media-item{width:100%!important;height:220px!important;max-height:220px!important;}
+      #hn-chat-screen.hn-ios-chat-media .hn-chat-media-grid:has(> .hn-chat-media-item:only-child) .hn-chat-media-item img,
+      #hn-chat-screen.hn-ios-chat-media .hn-chat-media-grid:has(> .hn-chat-media-item:only-child) .hn-chat-media-item video,
+      #hn-chat-screen.hn-ios-chat-media .hn-chat-media-grid:has(> .hn-chat-media-item:only-child) .hn-chat-photo-button,
+      #hn-chat-screen.hn-ios-chat-media .hn-chat-media-grid:has(> .hn-chat-media-item:only-child) .hn-chat-photo-button img{max-height:220px!important;}
+
       @media (min-width:600px){
         .hn-chat-media-grid .hn-chat-media-item{width:240px!important;height:180px!important;max-height:180px!important;}
         .hn-chat-media-grid .hn-chat-media-item img,
@@ -39,7 +56,17 @@
         .hn-chat-bubble:has(.hn-chat-media-grid){max-width:510px!important;}
       }
     `;
-    document.head.appendChild(style);
+  }
+
+  function syncIOSClass(){
+    if(!isIOS)return;
+    const chat=document.getElementById('hn-chat-screen');
+    if(chat)chat.classList.add('hn-ios-chat-media');
+  }
+
+  function stabilizeLayout(){
+    installStyles();
+    syncIOSClass();
   }
 
   function readVideoMeta(file){
@@ -55,13 +82,7 @@
 
   function supportedMime(){
     if(!window.MediaRecorder)return '';
-    return [
-      'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
-      'video/mp4',
-      'video/webm;codecs=vp8,opus',
-      'video/webm;codecs=vp9,opus',
-      'video/webm'
-    ].find(type=>MediaRecorder.isTypeSupported(type))||'';
+    return ['video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/mp4','video/webm;codecs=vp8,opus','video/webm;codecs=vp9,opus','video/webm'].find(type=>MediaRecorder.isTypeSupported(type))||'';
   }
 
   function needsOptimization(file,meta){
@@ -101,7 +122,7 @@
         recorder.ondataavailable=e=>{if(e.data?.size)chunks.push(e.data)};
         recorder.onerror=()=>reject(new Error('No se pudo comprimir el video.'));
         recorder.onstop=()=>{cancelAnimationFrame(drawHandle);const blob=new Blob(chunks,{type:mime});if(!blob.size)reject(new Error('El video comprimido quedó vacío.'));else resolve(blob)};
-        video.onended=()=>{try{recorder.stop()}catch(_) {}};
+        video.onended=()=>{try{recorder.stop()}catch(_){}};
         recorder.start(1000);draw();video.play().catch(reject);
       });
       if(result.size>=file.size*.92)return file;
@@ -149,10 +170,18 @@
   }
 
   function install(){
-    installStyles();
+    stabilizeLayout();
     if(document.documentElement.dataset.hnVideoOptimizerInstalled==='1')return;
     document.documentElement.dataset.hnVideoOptimizerInstalled='1';
-    document.addEventListener('change',event=>{interceptMediaInput(event)}, {capture:true});
+    document.addEventListener('change',event=>{interceptMediaInput(event)},{capture:true});
+    const observer=new MutationObserver(()=>{
+      const chat=document.getElementById('hn-chat-screen');
+      if(!chat)return;
+      if(isIOS&&!chat.classList.contains('hn-ios-chat-media'))chat.classList.add('hn-ios-chat-media');
+      if(chat.classList.contains('is-active'))stabilizeLayout();
+    });
+    observer.observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['class']});
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden)stabilizeLayout()},{passive:true});
   }
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
