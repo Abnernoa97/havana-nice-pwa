@@ -1,4 +1,4 @@
-/* HAVANA NICE — CHAT KEYBOARD / COMPOSER FIX V4 */
+/* HAVANA NICE — CHAT KEYBOARD / COMPOSER FIX V5 */
 (() => {
   'use strict';
 
@@ -17,6 +17,10 @@
     return getChat()?.querySelector('.hn-chat-compose') || null;
   }
 
+  function getList() {
+    return getChat()?.querySelector('.hn-chat-list') || null;
+  }
+
   function isKeyboardOpen(vv) {
     if (!vv) return false;
     const screenHeight = Math.max(window.innerHeight || 0, document.documentElement?.clientHeight || 0);
@@ -31,6 +35,20 @@
     chat.classList.toggle('hn-keyboard-open', open);
     chat.classList.toggle('hn-ios-keyboard', isIOS && open);
     return open;
+  }
+
+  function scrollChatToBottom() {
+    if (!isIOS) return;
+    const chat = getChat();
+    const list = getList();
+    if (!chat || !list || !chat.classList.contains('is-active')) return;
+    const move = () => {
+      try { list.scrollTop = list.scrollHeight; } catch (_) {}
+    };
+    requestAnimationFrame(() => {
+      move();
+      requestAnimationFrame(move);
+    });
   }
 
   function syncIOSComposer(vv) {
@@ -156,6 +174,10 @@
       if (e.target?.matches?.('.hn-chat-input')) {
         setTimeout(syncViewport, 80);
         setTimeout(syncViewport, 260);
+        if (isIOS) {
+          setTimeout(scrollChatToBottom, 120);
+          setTimeout(scrollChatToBottom, 300);
+        }
       }
     }, { passive: true });
 
@@ -163,6 +185,11 @@
       if (e.target?.matches?.('.hn-chat-compose')) {
         setTimeout(syncViewport, 80);
         setTimeout(syncViewport, 260);
+        if (isIOS) {
+          setTimeout(scrollChatToBottom, 100);
+          setTimeout(scrollChatToBottom, 300);
+          setTimeout(scrollChatToBottom, 600);
+        }
       }
     }, { passive: true });
 
