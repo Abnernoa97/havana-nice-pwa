@@ -1,8 +1,8 @@
-const CACHE='hn-v36';
+const CACHE='hn-v37';
 const APP_SHELL=new Request('./index.html');
 const SUPABASE_CDN='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const SUPABASE_ESM='https://esm.sh/@supabase/supabase-js@2';
-const FAMILY_DATA='./family-profile-data-v2.js?v=family-list-owner-20260917';
+const FAMILY_DATA='./family-profile-data-v2.js?v=family-identity-20260917-2';
 async function normalizeAppShell(response){if(!response||!response.ok)return response;const text=await response.text();let fixed=text.split(SUPABASE_CDN).join(SUPABASE_ESM);if(!fixed.includes('family-profile-data-v2.js'))fixed=fixed.replace('</body>',`<script src="${FAMILY_DATA}"></script></body>`);const headers=new Headers(response.headers);headers.delete('content-encoding');headers.delete('content-length');headers.set('content-type','text/html; charset=utf-8');return new Response(fixed,{status:response.status,statusText:response.statusText,headers})}
 async function updateAppShell(){try{const response=await fetch('./index.html',{cache:'no-store'});if(!response.ok)return;const fixed=await normalizeAppShell(response);const cache=await caches.open(CACHE);await cache.put(APP_SHELL,fixed.clone())}catch(_){}}
 self.addEventListener('install',event=>{self.skipWaiting();event.waitUntil(updateAppShell())});
