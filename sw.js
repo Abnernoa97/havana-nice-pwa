@@ -104,9 +104,11 @@ async function networkFirstAsset(request){
 async function networkWithCacheFallback(request){
   try{
     const response=await fetch(request);
-    if(response&&response.ok&&new URL(request.url).origin===self.location.origin){
-      const cache=await caches.open(CACHE);
-      await cache.put(request,response.clone());
+    if(response&&response.ok&&response.status!==206&&new URL(request.url).origin===self.location.origin){
+      try{
+        const cache=await caches.open(CACHE);
+        await cache.put(request,response.clone());
+      }catch(_){}
     }
     return response;
   }catch(_){
