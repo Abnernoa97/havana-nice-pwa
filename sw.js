@@ -1,9 +1,9 @@
-const CACHE='hn-v41';
+const CACHE='hn-v42';
 const APP_SHELL=new Request('./index.html');
 const SUPABASE_CDN='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const SUPABASE_ESM='https://esm.sh/@supabase/supabase-js@2';
 const IS_IOS=/iPad|iPhone|iPod/.test(self.navigator?.userAgent||'')||((self.navigator?.platform||'')==='MacIntel'&&(self.navigator?.maxTouchPoints||0)>1);
-const FAMILY_IOS_VERSION='ios-family-20260918-1843';
+const FAMILY_IOS_VERSION='ios-family-20260918-1849';
 async function normalizeAppShell(response){if(!response||!response.ok)return response;const text=await response.text();let fixed=text.split(SUPABASE_CDN).join(SUPABASE_ESM);if(IS_IOS)fixed=fixed.replace(/\.\/family-v1\.js\?v=[^"']+/g,'./family-v1.js?v='+FAMILY_IOS_VERSION);if(!fixed.includes('family-ios-diagnostic-v1.js'))fixed=fixed.replace('</body>','<script src="./family-ios-diagnostic-v1.js?v='+FAMILY_IOS_VERSION+'"></script></body>');const headers=new Headers(response.headers);headers.delete('content-encoding');headers.delete('content-length');headers.set('content-type','text/html; charset=utf-8');headers.set('cache-control','no-store');return new Response(fixed,{status:response.status,statusText:response.statusText,headers})}
 async function updateAppShell(){try{const response=await fetch('./index.html',{cache:'no-store'});if(!response.ok)return;const fixed=await normalizeAppShell(response);const cache=await caches.open(CACHE);await cache.put(APP_SHELL,fixed.clone())}catch(_){}}
 self.addEventListener('install',event=>{self.skipWaiting();event.waitUntil(updateAppShell())});
