@@ -1,12 +1,15 @@
-/* HAVANA NICE — CHAT MEDIA DISPLAY + VIDEO OPTIMIZATION V4
-   This module owns media rendering + upload optimization only.
-   Fullscreen photo/video viewing is owned exclusively by chat-media-lightbox-v2.js.
+/* HAVANA NICE — CHAT MEDIA DISPLAY + MEDIA OPTIMIZATION V5
+   Owns chat photo/video sizing and client-side media optimization.
+   Fullscreen viewing remains owned by chat-media-lightbox-v2.js.
 */
 (function(){
   'use strict';
 
-  const STYLE_ID='hn-chat-media-fix-v4';
+  const STYLE_ID='hn-chat-media-fix-v5';
   const MAX_INPUT_BYTES=12*1024*1024;
+  const IMAGE_MAX_EDGE=1600;
+  const IMAGE_QUALITY=.82;
+  const IMAGE_OPTIMIZE_BYTES=900*1024;
   const TARGET_W=854;
   const TARGET_H=480;
   const TARGET_FPS=24;
@@ -14,29 +17,25 @@
   const AUDIO_BPS=64000;
 
   function installStyles(){
+    document.getElementById('hn-chat-media-fix-v4')?.remove();
     if(document.getElementById(STYLE_ID))return;
     const style=document.createElement('style');
     style.id=STYLE_ID;
     style.textContent=`
-      .hn-chat-media-grid{align-items:start!important;}
-      .hn-chat-media-grid .hn-chat-media-item{width:min(100%,280px)!important;height:190px!important;min-height:0!important;max-height:190px!important;}
-      .hn-chat-media-grid .hn-chat-media-item img,
-      .hn-chat-media-grid .hn-chat-media-item video,
-      .hn-chat-media-grid .hn-chat-photo-button,
-      .hn-chat-media-grid .hn-chat-photo-button img{width:100%!important;height:100%!important;max-width:100%!important;max-height:190px!important;object-fit:cover!important;}
-      .hn-chat-media-grid .hn-chat-media-item video{cursor:zoom-in!important;pointer-events:auto!important;}
+      .hn-chat-bubble:has(.hn-chat-media-grid){width:auto!important;max-width:min(88vw,360px)!important;padding:4px!important;}
+      .hn-chat-media-grid{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:5px!important;align-items:start!important;width:min(82vw,340px)!important;max-width:100%!important;margin-top:3px!important;}
+      .hn-chat-media-grid:has(> .hn-chat-media-item:only-child){display:block!important;width:min(82vw,340px)!important;}
+      .hn-chat-media-grid .hn-chat-media-item{position:relative!important;width:100%!important;height:auto!important;min-width:0!important;min-height:0!important;max-width:none!important;max-height:none!important;overflow:hidden!important;background:#090909!important;}
+      .hn-chat-media-grid .hn-chat-photo-button{display:block!important;width:100%!important;height:auto!important;padding:0!important;border:0!important;background:transparent!important;line-height:0!important;}
+      .hn-chat-media-grid .hn-chat-photo-button img,
+      .hn-chat-media-grid .hn-chat-media-item img{display:block!important;width:100%!important;height:auto!important;max-width:100%!important;max-height:430px!important;object-fit:contain!important;background:#090909!important;}
+      .hn-chat-media-grid .hn-chat-media-item video{display:block!important;width:100%!important;height:auto!important;aspect-ratio:4/3!important;max-width:100%!important;max-height:320px!important;object-fit:cover!important;background:#000!important;cursor:zoom-in!important;pointer-events:auto!important;}
       .hn-chat-media-grid .hn-chat-media-item video::-webkit-media-controls{display:none!important;}
       .hn-chat-media-grid .hn-chat-media-item video::-webkit-media-controls-panel{display:none!important;}
-      .hn-chat-media-grid:has(> .hn-chat-media-item:only-child){width:min(100%,280px)!important;max-width:100%!important;}
-      .hn-chat-media-grid:has(> .hn-chat-media-item:only-child) .hn-chat-media-item{width:100%!important;height:190px!important;max-width:100%!important;}
-      .hn-chat-bubble:has(.hn-chat-media-grid){max-width:min(88%,300px)!important;padding:4px!important;}
       @media (min-width:600px){
-        .hn-chat-media-grid .hn-chat-media-item{width:240px!important;height:180px!important;max-height:180px!important;}
-        .hn-chat-media-grid .hn-chat-media-item img,
-        .hn-chat-media-grid .hn-chat-media-item video,
-        .hn-chat-media-grid .hn-chat-photo-button,
-        .hn-chat-media-grid .hn-chat-photo-button img{max-height:180px!important;}
-        .hn-chat-bubble:has(.hn-chat-media-grid){max-width:510px!important;}
+        .hn-chat-bubble:has(.hn-chat-media-grid){max-width:520px!important;}
+        .hn-chat-media-grid{width:min(72vw,480px)!important;}
+        .hn-chat-media-grid:has(> .hn-chat-media-item:only-child){width:min(72vw,420px)!important;}
       }
     `;
     document.head.appendChild(style);
@@ -64,7 +63,7 @@
     ].find(type=>MediaRecorder.isTypeSupported(type))||'';
   }
 
-  function needsOptimization(file,meta){
+  function needsVideoOptimization(file,meta){
     if(!file?.type?.startsWith('video/'))return false;
     if(file.size>MAX_INPUT_BYTES)return true;
     const w=Number(meta?.width)||0,h=Number(meta?.height)||0;
@@ -72,12 +71,13 @@
   }
 
   function makeOutputName(file,mime){
-    const base=(file.name||'video').replace(/\.[^.]+$/,'');
+    const base=(file.name||'media').replace(/\.[^.]+$/,'');
+    if(mime.startsWith('image/'))return `${base}-hn.webp`;
     return `${base}-hn.${mime.includes('mp4')?'mp4':'webm'}`;
   }
 
   async function optimizeVideo(file,meta){
-    if(!needsOptimization(file,meta))return file;
+    if(!needsVideoOptimization(file,meta))return file;
     if(!HTMLCanvasElement.prototype.captureStream||!window.MediaRecorder)return file;
     const mime=supportedMime();
     if(!mime)return file;
@@ -110,9 +110,38 @@
     finally{try{video.pause()}catch(_){}URL.revokeObjectURL(sourceUrl)}
   }
 
+  function loadImage(file){
+    return new Promise((resolve,reject)=>{
+      const url=URL.createObjectURL(file),img=new Image();
+      img.onload=()=>resolve({img,url});
+      img.onerror=()=>{URL.revokeObjectURL(url);reject(new Error('No se pudo leer la foto.'))};
+      img.src=url;
+    });
+  }
+
+  async function optimizeImage(file){
+    if(!file?.type?.startsWith('image/'))return file;
+    let loaded=null;
+    try{
+      loaded=await loadImage(file);
+      const img=loaded.img,w=img.naturalWidth||img.width,h=img.naturalHeight||img.height;
+      if(!w||!h)return file;
+      if(file.size<=IMAGE_OPTIMIZE_BYTES&&Math.max(w,h)<=IMAGE_MAX_EDGE)return file;
+      const scale=Math.min(1,IMAGE_MAX_EDGE/Math.max(w,h));
+      const width=Math.max(1,Math.round(w*scale)),height=Math.max(1,Math.round(h*scale));
+      const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;
+      const ctx=canvas.getContext('2d',{alpha:true});if(!ctx)return file;
+      ctx.drawImage(img,0,0,width,height);
+      const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/webp',IMAGE_QUALITY));
+      if(!blob?.size||blob.size>=file.size*.95)return file;
+      return new File([blob],makeOutputName(file,'image/webp'),{type:'image/webp',lastModified:Date.now()});
+    }catch(error){console.warn('HAVANA NICE photo optimization skipped:',error);return file}
+    finally{if(loaded?.url)URL.revokeObjectURL(loaded.url)}
+  }
+
   function createOptimizingNotice(input,count){
-    const id='hn-video-optimizing-notice';document.getElementById(id)?.remove();
-    const el=document.createElement('div');el.id=id;el.textContent=`OPTIMIZANDO ${count===1?'VIDEO':'VIDEOS'}…`;
+    const id='hn-media-optimizing-notice';document.getElementById(id)?.remove();
+    const el=document.createElement('div');el.id=id;el.textContent=`OPTIMIZANDO ${count===1?'ARCHIVO':'ARCHIVOS'}…`;
     el.style.cssText='position:fixed;left:50%;bottom:max(22px,env(safe-area-inset-bottom));transform:translateX(-50%);z-index:100001;padding:10px 15px;border:1px solid rgba(229,189,98,.55);background:#0b1710;color:#f3d77c;font:500 9px/1.2 Arial,sans-serif;letter-spacing:.16em;pointer-events:none;box-shadow:0 8px 24px rgba(0,0,0,.35);';
     document.body.appendChild(el);input?.setAttribute('data-hn-optimizing','1');return el;
   }
@@ -127,32 +156,31 @@
     const input=event.target;
     if(!(input instanceof HTMLInputElement)||input.type!=='file')return;
     if(!input.classList.contains('hn-chat-media-input')||event.__hnOptimizedChange)return;
-    const files=[...(input.files||[])],videoFiles=files.filter(file=>file.type.startsWith('video/'));
-    if(!videoFiles.length)return;
+    const files=[...(input.files||[])];if(!files.length)return;
+    const candidates=files.filter(file=>file.type.startsWith('image/')||file.type.startsWith('video/'));
+    if(!candidates.length)return;
     event.preventDefault();event.stopImmediatePropagation();
-    let metas=[];
-    try{metas=await Promise.all(videoFiles.map(readVideoMeta))}catch(error){console.warn('HAVANA NICE video metadata read failed:',error);dispatchOptimizedChange(input);return}
-    const work=videoFiles.filter((file,i)=>needsOptimization(file,metas[i]));
-    if(!work.length){dispatchOptimizedChange(input);return}
-    const notice=createOptimizingNotice(input,work.length);
+    const notice=createOptimizingNotice(input,candidates.length);
     try{
       const optimized=[];
       for(const file of files){
-        if(!file.type.startsWith('video/')){optimized.push(file);continue}
-        optimized.push(await optimizeVideo(file,await readVideoMeta(file)));
+        if(file.type.startsWith('image/'))optimized.push(await optimizeImage(file));
+        else if(file.type.startsWith('video/'))optimized.push(await optimizeVideo(file,await readVideoMeta(file)));
+        else optimized.push(file);
       }
+      if(typeof DataTransfer==='undefined')throw new Error('DataTransfer no disponible');
       const transfer=new DataTransfer();optimized.forEach(file=>transfer.items.add(file));input.files=transfer.files;dispatchOptimizedChange(input);
     }catch(error){
-      console.warn('HAVANA NICE video optimization failed:',error);
-      const transfer=new DataTransfer();files.forEach(file=>transfer.items.add(file));input.files=transfer.files;dispatchOptimizedChange(input);
+      console.warn('HAVANA NICE media optimization failed:',error);
+      dispatchOptimizedChange(input);
     }finally{input.removeAttribute('data-hn-optimizing');notice.remove()}
   }
 
   function install(){
     installStyles();
-    if(document.documentElement.dataset.hnVideoOptimizerInstalled==='1')return;
-    document.documentElement.dataset.hnVideoOptimizerInstalled='1';
-    document.addEventListener('change',event=>{interceptMediaInput(event)},{capture:true});
+    if(document.documentElement.dataset.hnMediaOptimizerInstalled==='1')return;
+    document.documentElement.dataset.hnMediaOptimizerInstalled='1';
+    document.addEventListener('change',interceptMediaInput,{capture:true});
   }
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
