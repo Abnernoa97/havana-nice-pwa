@@ -8,6 +8,6 @@ function init(){const s=document.createElement('style');s.textContent='.module,.
 (function(){var s=document.createElement('script');s.src='./chat-realtime-guard-v1.js?v=7edbf360d985a8ce064d8bd2f04d68b5aa026d62';s.async=false;document.head.appendChild(s)})();
 (function(){var s=document.createElement('script');s.src='./ios-install-v1.js?v=72b630c25c9dbca9220acdebdab48bc002191f9d';s.async=false;document.head.appendChild(s)})();
 (function(){var s=document.createElement('script');s.src='./chat-video-fast-path-v1.js?v=988a1b978ae2f54e3feaebfa56d09afa3993b1a6';s.async=false;document.head.appendChild(s)})();
-(function(){var s=document.createElement('script');s.src='./chat-media-fix-v1.js?v=4a90e4d194bd7e17da8977c391c58ccf40ecc0d9';s.async=false;document.head.appendChild(s)})();
+(function(){var s=document.createElement('script');s.src='./chat-media-fix-v1.js?v=4a706655d66a41564b2de837de2155d7128ecb4a';s.async=false;document.head.appendChild(s)})();
 (function(){var s=document.createElement('script');s.src='./chat-video-poster-cache-v1.js?v=9ed0a61eb1ab758504c665038f5ad7a50e5090e6';s.async=false;document.head.appendChild(s)})();
 (function(){var s=document.createElement('script');s.src='./chat-keyboard-v1.js?v=9264af2797639e7b263bd754b82a76caece56c58';s.async=false;document.head.appendChild(s)})();
