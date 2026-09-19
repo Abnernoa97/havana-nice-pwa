@@ -1,9 +1,9 @@
-/* HAVANA NICE — UNIFIED SERVICE WORKER V10
+/* HAVANA NICE — UNIFIED SERVICE WORKER V11
    One worker for musicians + admin + push.
-   Critical runtime files are network-first/no-cache while online.
-   Old unified caches are purged on activation so devices cannot stay pinned to stale app code.
+   Every same-origin JavaScript runtime is network-first/no-cache while online.
+   Old app caches are purged on activation so devices cannot stay pinned to stale code.
 */
-const CACHE='hn-unified-v10';
+const CACHE='hn-unified-v11';
 const MUSICIAN_SHELL='./index.html';
 const ADMIN_SHELL='./admin.html';
 const MUSICIAN_SHELL_REQUEST=new Request(MUSICIAN_SHELL);
@@ -134,7 +134,8 @@ self.addEventListener('fetch',event=>{
     return;
   }
 
-  if(url.origin===self.location.origin&&FRESH_PATHS.has(url.pathname)){
+  const sameOriginScript=url.origin===self.location.origin&&url.pathname.endsWith('.js');
+  if(url.origin===self.location.origin&&(FRESH_PATHS.has(url.pathname)||sameOriginScript)){
     event.respondWith(networkFirstAsset(event.request));
     return;
   }
