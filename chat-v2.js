@@ -1,7 +1,7 @@
-/* HAVANA NICE — CHAT DE INFORMACIÓN / REAL TIME V10
+/* HAVANA NICE — CHAT DE INFORMACIÓN / REAL TIME V11
    Local-first history + incremental sync + progressive paging.
    Confirmed video messages render as lightweight poster cards only; the full video
-   is loaded exclusively by Chat Media V10 when the user opens it.
+   is loaded exclusively by Chat Media when the user opens it.
 */
 (() => {
   'use strict';
@@ -27,6 +27,7 @@
   let activeProfileId=null, historyRestoredFor=null, historyDB=null;
   let loadFlight=null, syncRevision=0, syncedAt=0;
   let loadingOlder=false, hasMore=true, oldestLoadedAt=null;
+  let followingLatest=true, userScrollIntentUntil=0, userScrollIntentTimer=null;
   const liveChanges=new Map();
   const HISTORY_TTL=7*24*60*60*1000;
   const MESSAGE_FIELDS='id,profile_id,sender_name,message,created_at,message_type,audio_url,audio_duration,media_urls,media_types,media_posters,media_playback_urls,reply_to_message_id';
@@ -79,7 +80,7 @@
   function ensureChatIdentity(){
     const id=String(currentProfile()?.id||'');
     if(id===activeProfileId)return id;
-    activeProfileId=id;historyRestoredFor=null;messages=[];syncedAt=0;oldestLoadedAt=null;hasMore=true;loadingOlder=false;
+    activeProfileId=id;historyRestoredFor=null;messages=[];syncedAt=0;oldestLoadedAt=null;hasMore=true;loadingOlder=false;followingLatest=true;
     syncRevision++;liveChanges.clear();loadFlight=null;clearOutgoing();
     if(listEl){releaseLocalImages(listEl);listEl.replaceChildren();}
     return id;
@@ -221,20 +222,34 @@
     catch(error){console.warn('HAVANA NICE chat settings load failed:',error);}
   }
 
+  function markUserScrollIntent(){
+    userScrollIntentUntil=Date.now()+900;
+    clearTimeout(userScrollIntentTimer);
+    userScrollIntentTimer=setTimeout(()=>{userScrollIntentUntil=0;},950);
+  }
+  function distanceFromBottom(){
+    if(!listEl)return Infinity;
+    return Math.max(0,listEl.scrollHeight-listEl.scrollTop-listEl.clientHeight);
+  }
+  function isNearBottom(threshold=120){return distanceFromBottom()<threshold;}
+
   function buildScreen(){
     if(chatScreen){wireModule();return;}
     chatScreen=document.createElement('section');chatScreen.id='hn-chat-screen';chatScreen.className='screen hn-chat-screen';chatScreen.setAttribute('aria-label','Chat de información');
     chatScreen.innerHTML=`<div class="hn-chat-wrap"><header class="hn-chat-head"><h1 class="hn-chat-head-title">CHAT DE INFORMACIÓN</h1><p class="hn-chat-head-sub">MENSAJES DEL EQUIPO</p></header><div class="hn-chat-list" aria-live="polite"></div><div class="hn-chat-reply"><div class="hn-chat-reply-line"></div><div class="hn-chat-reply-copy"><div class="hn-chat-reply-label"></div><div class="hn-chat-reply-text"></div></div><button class="hn-chat-reply-close" type="button" aria-label="Cancelar respuesta">×</button></div><form class="hn-chat-compose"><div class="hn-chat-input-wrap"><textarea class="hn-chat-input" maxlength="1000" placeholder="ESCRIBE UN MENSAJE" aria-label="Mensaje"></textarea><button class="hn-chat-attach" type="button" aria-label="Adjuntar fotos o videos">＋</button><button class="hn-chat-mic" type="button" aria-label="Grabar nota de voz">◉</button><input class="hn-chat-media-input" type="file" accept="image/*,video/*" multiple hidden></div><div class="hn-chat-media-pending"></div><div class="hn-chat-recording"><span class="hn-chat-recording-status">GRABANDO</span><span class="hn-chat-recording-time">00:00</span></div><button class="hn-chat-send" type="submit">ENVIAR</button></form></div>`;
     document.querySelector('.experience')?.appendChild(chatScreen);listEl=chatScreen.querySelector('.hn-chat-list');inputEl=chatScreen.querySelector('.hn-chat-input');sendEl=chatScreen.querySelector('.hn-chat-send');micEl=chatScreen.querySelector('.hn-chat-mic');mediaEl=chatScreen.querySelector('.hn-chat-media-input');
     chatScreen.querySelector('.hn-chat-reply-close').addEventListener('click',closeReply);chatScreen.querySelector('.hn-chat-compose').addEventListener('submit',sendMessage);micEl.addEventListener('click',toggleRecording);chatScreen.querySelector('.hn-chat-attach').addEventListener('click',()=>{if(!sending)mediaEl.click();});mediaEl.addEventListener('change',e=>{if(!sending)handleMediaFiles(e.target.files)});inputEl.addEventListener('input',()=>{inputEl.style.height='auto';inputEl.style.height=Math.min(inputEl.scrollHeight,150)+'px';updateSendState();});
-    listEl.addEventListener('scroll',()=>{if(listEl.scrollTop<90)void loadOlderMessages();},{passive:true});
+    ['touchstart','pointerdown','wheel'].forEach(type=>listEl.addEventListener(type,markUserScrollIntent,{passive:true}));
+    listEl.addEventListener('scroll',()=>{if(Date.now()<userScrollIntentUntil)followingLatest=isNearBottom(120);if(listEl.scrollTop<90)void loadOlderMessages();},{passive:true});
     ensureStyles();wireModule();void restoreHistory();subscribe();loadMessages();loadChatSettings();
   }
 
   function scrollToLatest(){
     if(!listEl||!chatScreen?.classList.contains('is-active'))return;
-    const move=()=>{try{listEl.scrollTop=listEl.scrollHeight;}catch(_){}};
-    requestAnimationFrame(()=>{move();requestAnimationFrame(move);});[80,250,600].forEach(delay=>setTimeout(move,delay));
+    followingLatest=true;
+    const move=()=>{if(!followingLatest)return;try{listEl.scrollTop=listEl.scrollHeight;}catch(_){}};
+    requestAnimationFrame(()=>{move();requestAnimationFrame(move);});
+    setTimeout(move,80);
     listEl.querySelectorAll('img').forEach(img=>{if(img.complete)return;if(img.dataset.hnScrollBound==='1')return;img.dataset.hnScrollBound='1';img.addEventListener('load',move,{once:true});});
   }
 
@@ -246,7 +261,7 @@
   function render(forceBottom=false){
     if(!listEl)return;
     if(!messages.length&&!outgoing){releaseLocalImages(listEl);listEl.innerHTML='<div class="hn-chat-empty">AÚN NO HAY MENSAJES</div>';return;}
-    const nearBottom=listEl.scrollHeight-listEl.scrollTop-listEl.clientHeight<120;
+    const nearBottom=isNearBottom(120);
     const existing=new Map([...listEl.children].map(node=>[node.dataset.chatKey,node]));
     const desired=[];let lastDay='';
     messages.forEach((message,index)=>{
@@ -332,7 +347,7 @@
     const task=(async()=>{try{
       const {data,error}=await sb.from(CHAT_TABLE).select(MESSAGE_FIELDS).order('created_at',{ascending:false}).limit(PAGE_SIZE);if(activeProfileId!==id)return;if(error){console.warn('HAVANA NICE chat load failed:',error);return;}
       const rows=new Map((data||[]).map(row=>[String(row.id),row]));for(const [key,change] of liveChanges){if(change.revision<=revision)continue;if(change.deleted)rows.delete(key);else rows.set(key,change.row);}
-      messages=[...rows.values()].sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));oldestLoadedAt=messages[0]?.created_at||null;hasMore=(data||[]).length===PAGE_SIZE;syncRevision++;syncedAt=Date.now();for(const [key,change] of liveChanges)if(change.revision<=revision)liveChanges.delete(key);persistHistory();render(!!chatScreen?.classList.contains('is-active'));updateUnread();
+      messages=[...rows.values()].sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));oldestLoadedAt=messages[0]?.created_at||null;hasMore=(data||[]).length===PAGE_SIZE;syncRevision++;syncedAt=Date.now();for(const [key,change] of liveChanges)if(change.revision<=revision)liveChanges.delete(key);persistHistory();render(false);updateUnread();
     }catch(error){console.warn('HAVANA NICE chat reconcile failed:',error);}})();
     loadFlight=task;try{await task;}finally{if(loadFlight===task)loadFlight=null;}
   }
@@ -348,11 +363,11 @@
   }
 
   window.hnChatReconcile=()=>{if(Date.now()-syncedAt<1500)return;return loadMessages();};
-  function subscribe(){const sb=client(),owner=ensureChatIdentity();if(!sb||!owner)return;clearTimeout(chatReconnectTimer);if(chatChannel){try{sb.removeChannel(chatChannel);}catch(_){}chatChannel=null;}chatChannel=sb.channel('hn-chat-realtime').on('postgres_changes',{event:'INSERT',schema:'public',table:CHAT_TABLE},payload=>{if(owner!==String(currentProfile()?.id||''))return;const row=payload.new;noteLiveChange(row);if(!messages.some(m=>String(m.id)===String(row.id))){messages.push(row);messages.sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));persistHistory();render(true);}if(chatScreen?.classList.contains('is-active'))markRead();else updateUnread();}).on('postgres_changes',{event:'DELETE',schema:'public',table:CHAT_TABLE},payload=>{if(owner!==String(currentProfile()?.id||''))return;const id=payload.old?.id;if(!id)return;noteLiveChange({id},true);const had=messages.some(m=>String(m.id)===String(id));messages=messages.filter(m=>String(m.id)!==String(id));if(replyTarget?.id===id)closeReply();persistHistory();if(had)render();else updateUnread();}).on('postgres_changes',{event:'UPDATE',schema:'public',table:'chat_settings'},()=>{loadChatSettings();}).subscribe(status=>{if(status==='SUBSCRIBED'){chatReconnectDelay=1000;clearTimeout(chatReconnectTimer);void loadMessages();}else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'||status==='CLOSED'){clearTimeout(chatReconnectTimer);chatReconnectTimer=setTimeout(()=>subscribe(),chatReconnectDelay);chatReconnectDelay=Math.min(chatReconnectDelay*2,10000);}});}
+  function subscribe(){const sb=client(),owner=ensureChatIdentity();if(!sb||!owner)return;clearTimeout(chatReconnectTimer);if(chatChannel){try{sb.removeChannel(chatChannel);}catch(_){}chatChannel=null;}chatChannel=sb.channel('hn-chat-realtime').on('postgres_changes',{event:'INSERT',schema:'public',table:CHAT_TABLE},payload=>{if(owner!==String(currentProfile()?.id||''))return;const row=payload.new;noteLiveChange(row);if(!messages.some(m=>String(m.id)===String(row.id))){messages.push(row);messages.sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));persistHistory();render(false);}if(chatScreen?.classList.contains('is-active'))markRead();else updateUnread();}).on('postgres_changes',{event:'DELETE',schema:'public',table:CHAT_TABLE},payload=>{if(owner!==String(currentProfile()?.id||''))return;const id=payload.old?.id;if(!id)return;noteLiveChange({id},true);const had=messages.some(m=>String(m.id)===String(id));messages=messages.filter(m=>String(m.id)!==String(id));if(replyTarget?.id===id)closeReply();persistHistory();if(had)render();else updateUnread();}).on('postgres_changes',{event:'UPDATE',schema:'public',table:'chat_settings'},()=>{loadChatSettings();}).subscribe(status=>{if(status==='SUBSCRIBED'){chatReconnectDelay=1000;clearTimeout(chatReconnectTimer);void loadMessages();}else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'||status==='CLOSED'){clearTimeout(chatReconnectTimer);chatReconnectTimer=setTimeout(()=>subscribe(),chatReconnectDelay);chatReconnectDelay=Math.min(chatReconnectDelay*2,10000);}});}
   function closeReply(){replyTarget=null;chatScreen?.querySelector('.hn-chat-reply')?.classList.remove('is-visible');chatScreen?.querySelectorAll('.hn-chat-bubble.hn-chat-selected').forEach(el=>el.classList.remove('hn-chat-selected'));}
   function selectMessage(id){const message=messages.find(m=>String(m.id)===String(id));if(!message)return;replyTarget=message;chatScreen?.querySelectorAll('.hn-chat-bubble').forEach(el=>el.classList.toggle('hn-chat-selected',el.dataset.messageId===String(id)));const reply=chatScreen?.querySelector('.hn-chat-reply');if(reply){reply.classList.add('is-visible');const who=reply.querySelector('.hn-chat-reply-label'),text=reply.querySelector('.hn-chat-reply-text');if(who)who.textContent=`RESPONDER A ${message.sender_name||'MIEMBRO'}`;if(text)text.textContent=replyPreview(message);}inputEl?.focus();}
   function closeChat(fromButton=false){if(!chatScreen)return;if(mediaRecorder&&mediaRecorder.state==='recording'){try{mediaRecorder.stop();}catch(_){} }closeReply();chatScreen.classList.remove('is-active');if(previousScreen)previousScreen.classList.add('is-active');else document.getElementById('homeScreen')?.classList.add('is-active');const video=document.getElementById('backgroundVideo');if(video)video.muted=videoWasMuted;if(historyArmed&&fromButton){historyArmed=false;try{history.back();}catch(_){}}else if(!fromButton)historyArmed=false;}
-  function openChat(fromPopState=false){buildScreen();previousScreen=document.querySelector('.screen.is-active:not(#hn-chat-screen)')||document.getElementById('homeScreen');document.querySelectorAll('.screen').forEach(s=>{if(s!==chatScreen)s.classList.remove('is-active')});chatScreen.classList.add('is-active');void restoreHistory();markRead();render(true);const video=document.getElementById('backgroundVideo');if(video){videoWasMuted=!!video.muted;video.muted=true;video.play().catch(()=>{});}if(!fromPopState&&!historyArmed){try{history.pushState({...history.state,hnChat:true},'',location.href);historyArmed=true;}catch(_){}}setTimeout(()=>inputEl?.focus(),250);}
+  function openChat(fromPopState=false){buildScreen();previousScreen=document.querySelector('.screen.is-active:not(#hn-chat-screen)')||document.getElementById('homeScreen');document.querySelectorAll('.screen').forEach(s=>{if(s!==chatScreen)s.classList.remove('is-active')});chatScreen.classList.add('is-active');followingLatest=true;void restoreHistory();markRead();render(true);const video=document.getElementById('backgroundVideo');if(video){videoWasMuted=!!video.muted;video.muted=true;video.play().catch(()=>{});}if(!fromPopState&&!historyArmed){try{history.pushState({...history.state,hnChat:true},'',location.href);historyArmed=true;}catch(_){}}setTimeout(()=>inputEl?.focus(),250);}
   function wireModule(){const module=ensureHomeModule();if(!module||module.dataset.hnChatBound==='1')return;module.dataset.hnChatBound='1';module.addEventListener('click',()=>openChat());}
   window.addEventListener('popstate',()=>{if(historyArmed){historyArmed=false;closeChat(false);}});
   const observer=new MutationObserver(()=>wireModule());observer.observe(document.documentElement,{childList:true,subtree:true});
