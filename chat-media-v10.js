@@ -1,6 +1,7 @@
-/* HAVANA NICE — CHAT MEDIA V10.2
+/* HAVANA NICE — CHAT MEDIA V10.3
    Single iPhone-first media layer.
    History = JPG cards only. Full video loads only in fullscreen.
+   New videos are handed to the server-side FFmpeg worker after upload.
 */
 (function(){
   'use strict';
@@ -8,11 +9,70 @@
   window.__hnChatMediaV10=true;
 
   const INPUT='.hn-chat-media-input',BUCKET='chat-media',STYLE='hn-chat-media-v10-style',VIEWER='hnChatMediaV10',HISTORY='hnChatMediaV10';
+  const PROCESSOR_ORIGIN='https://havana-nice-video-processor-42rmju.v2.appdeploy.ai';
+  const PROCESSOR_URL=PROCESSOR_ORIGIN+'/';
+  const TOKEN_KEY='hn_musician_device_token_v1';
   const MAX_EDGE=640,QUALITY=.76,TIMEOUT=9000;
   let selection=[],generation=0;
   let overlay,image,poster,video,spinner,play,errorBox,historyArmed=false,closing=false;
+  let processorFrame=null,processorReady=false;
+  const processorQueue=new Map();
   const sb=()=>window.hnSupabase||window.hnMusicianSupabase||window.supabaseClient||window.supabase||null;
   const isVideo=file=>!!file?.type?.startsWith('video/');
+
+  function sessionProfile(){try{return JSON.parse(sessionStorage.getItem('hn_profile')||'null')}catch(_){return null}}
+  function deviceToken(){try{return localStorage.getItem(TOKEN_KEY)||''}catch(_){return ''}}
+  function ensureProcessor(){
+    if(processorFrame?.isConnected)return processorFrame;
+    processorReady=false;
+    const frame=document.createElement('iframe');
+    frame.id='hnVideoProcessorWorker';
+    frame.src=PROCESSOR_URL;
+    frame.tabIndex=-1;
+    frame.setAttribute('aria-hidden','true');
+    frame.style.cssText='position:fixed;width:1px;height:1px;left:-10px;top:-10px;border:0;opacity:0;pointer-events:none;z-index:-1;';
+    document.body.appendChild(frame);
+    processorFrame=frame;
+    return frame;
+  }
+  function flushProcessorQueue(){
+    if(!processorReady||!processorFrame?.contentWindow)return;
+    for(const entry of processorQueue.values()){
+      if(entry.sent)continue;
+      try{
+        processorFrame.contentWindow.postMessage(entry.payload,PROCESSOR_ORIGIN);
+        entry.sent=true;
+      }catch(error){console.warn('HAVANA NICE video worker postMessage failed:',error)}
+    }
+  }
+  function queueTranscode(sourceUrl){
+    const profile=sessionProfile(),token=deviceToken();
+    if(!sourceUrl||!profile?.id||!profile?.username||token.length<16)return false;
+    if(processorQueue.has(sourceUrl))return true;
+    processorQueue.set(sourceUrl,{sent:false,payload:{type:'HN_TRANSCODE_VIDEO',sourceUrl,profileId:String(profile.id),username:String(profile.username),deviceToken:token}});
+    ensureProcessor();
+    flushProcessorQueue();
+    return true;
+  }
+  function clearProcessor(){
+    processorQueue.clear();processorReady=false;
+    try{processorFrame?.remove()}catch(_){}
+    processorFrame=null;
+  }
+  function handleProcessorMessage(event){
+    if(event.origin!==PROCESSOR_ORIGIN)return;
+    const data=event.data||{};
+    if(data.type==='HN_PROCESSOR_READY'){
+      processorReady=true;
+      flushProcessorQueue();
+      return;
+    }
+    if((data.type==='HN_TRANSCODE_DONE'||data.type==='HN_TRANSCODE_FAILED')&&data.sourceUrl){
+      processorQueue.delete(String(data.sourceUrl));
+      if(data.type==='HN_TRANSCODE_FAILED')console.warn('HAVANA NICE video processor could not optimize:',data.sourceUrl);
+      setTimeout(()=>{try{window.hnChatReconcile?.()}catch(_){}},150);
+    }
+  }
 
   function posterUrl(videoUrl){try{const u=new URL(videoUrl);u.pathname=u.pathname+'.poster.jpg';u.search='';u.hash='';return u.toString()}catch(_){return ''}}
   function objectPath(videoUrl){try{const u=new URL(videoUrl),marker='/storage/v1/object/public/'+BUCKET+'/',i=u.pathname.indexOf(marker);return i<0?'':decodeURIComponent(u.pathname.slice(i+marker.length))}catch(_){return ''}}
@@ -89,6 +149,16 @@
   function handleClick(e){const remove=e.target.closest?.('.hn-chat-pending-remove');if(remove&&selection.length){const i=Number(remove.dataset.index);if(Number.isInteger(i)&&i>=0){revoke(selection[i]);selection.splice(i,1)}return}const videoButton=e.target.closest?.('.hn-video-card');if(videoButton){e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();openVideo(videoButton.dataset.videoUrl,videoButton.dataset.posterUrl);return}const photo=e.target.closest?.('.hn-chat-photo-button');if(photo){const img=photo.querySelector('img'),src=img?.currentSrc||img?.src||photo.dataset.photoUrl;if(src){e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();openPhoto(src)}}}
   function handleImageEvent(e){const img=e.target;if(!(img instanceof HTMLImageElement)||!img.closest?.('.hn-video-card'))return;const button=img.closest('.hn-video-card');if(e.type==='load')button.classList.add('has-poster');else{button.classList.remove('has-poster');img.remove()}}
 
-  function install(){installStyles();ensureViewer();document.addEventListener('change',handleChange,true);document.addEventListener('click',handleClick,true);document.addEventListener('load',handleImageEvent,true);document.addEventListener('error',handleImageEvent,true);window.addEventListener('hn:session-logout',clearSelection);window.addEventListener('popstate',e=>{if(!overlay?.classList.contains('is-open'))return;if(historyArmed||e.state?.[HISTORY]||closing){e.stopImmediatePropagation();finishClose();closing=false}},true);window.hnChatMediaV10={prepare,ensurePoster,persistPoster,posterUrl,paintPending,clearSelection,openPhoto,openVideo}}
+  function install(){
+    installStyles();ensureViewer();
+    document.addEventListener('change',handleChange,true);
+    document.addEventListener('click',handleClick,true);
+    document.addEventListener('load',handleImageEvent,true);
+    document.addEventListener('error',handleImageEvent,true);
+    window.addEventListener('message',handleProcessorMessage);
+    window.addEventListener('hn:session-logout',()=>{clearSelection();clearProcessor()});
+    window.addEventListener('popstate',e=>{if(!overlay?.classList.contains('is-open'))return;if(historyArmed||e.state?.[HISTORY]||closing){e.stopImmediatePropagation();finishClose();closing=false}},true);
+    window.hnChatMediaV10={prepare,ensurePoster,persistPoster,posterUrl,paintPending,clearSelection,openPhoto,openVideo,queueTranscode};
+  }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
 })();
