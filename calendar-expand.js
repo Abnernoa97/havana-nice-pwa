@@ -1,41 +1,115 @@
-/* HAVANA NICE — CALENDAR EXPAND
-   Instant accordion interaction for musician calendar cards.
-   Keeps expanded state across realtime/polling re-renders.
+/* HAVANA NICE — CALENDAR EXPAND V2
+   Reliable accordion interaction for musician calendar cards.
+   Works even when calendar-v1 does not provide data-event-id.
+   Uses a real touch button for iPhone instead of a pseudo-element only.
 */
 (function(){
   'use strict';
+
   const openIds=new Set();
+  const BUTTON_CLASS='hn-calendar-expand-button';
+
   function injectStyle(){
     if(document.getElementById('hnCalendarExpandStyle'))return;
     const s=document.createElement('style');
     s.id='hnCalendarExpandStyle';
     s.textContent=`
-      .calendar-event-card{cursor:pointer;position:relative;transition:border-color .16s ease,background .16s ease}
-      .calendar-event-card::after{content:'+';position:absolute;top:14px;right:14px;color:var(--gold);font-size:17px;line-height:1;font-family:Georgia,serif;opacity:.8;transition:transform .16s ease}
-      .calendar-event-card.is-expanded::after{content:'−';transform:none}
-      .calendar-event-card:not(.is-expanded) .calendar-time-grid,.calendar-event-card:not(.is-expanded) .calendar-event-details-m{display:none}
+      .calendar-event-card{cursor:pointer;position:relative;transition:border-color .16s ease,background .16s ease;padding-right:54px!important}
+      .calendar-event-card:not(.is-expanded) .calendar-time-grid,
+      .calendar-event-card:not(.is-expanded) .calendar-event-details-m,
+      .calendar-event-card:not(.is-expanded) .calendar-map-button{display:none!important}
       .calendar-event-card.is-expanded{border-color:rgba(229,189,98,.72)}
+      .${BUTTON_CLASS}{
+        position:absolute!important;top:8px!important;right:8px!important;
+        width:42px!important;height:42px!important;margin:0!important;padding:0!important;
+        display:flex!important;align-items:center!important;justify-content:center!important;
+        border:0!important;border-radius:50%!important;background:transparent!important;
+        color:var(--gold)!important;font:400 25px/1 Georgia,serif!important;
+        -webkit-appearance:none!important;appearance:none!important;
+        touch-action:manipulation!important;-webkit-tap-highlight-color:transparent!important;
+        z-index:4!important;
+      }
+      .${BUTTON_CLASS}:active{background:rgba(229,189,98,.10)!important}
     `;
     document.head.appendChild(s);
   }
-  function restore(){
-    document.querySelectorAll('.calendar-event-card[data-event-id]').forEach(card=>{
-      card.classList.toggle('is-expanded',openIds.has(card.dataset.eventId));
+
+  function hash(value){
+    let h=2166136261;
+    for(let i=0;i<value.length;i++){
+      h^=value.charCodeAt(i);
+      h=Math.imul(h,16777619);
+    }
+    return (h>>>0).toString(36);
+  }
+
+  function ensureEventId(card,index){
+    if(card.dataset.eventId)return card.dataset.eventId;
+    const day=card.querySelector('.calendar-event-day')?.textContent?.trim()||'';
+    const title=card.querySelector('.calendar-event-title-m')?.textContent?.trim()||'';
+    const venue=card.querySelector('.calendar-event-venue')?.textContent?.trim()||'';
+    const id='calendar-'+hash(`${day}|${title}|${venue}|${index}`);
+    card.dataset.eventId=id;
+    return id;
+  }
+
+  function applyState(card,id){
+    const expanded=openIds.has(id);
+    card.classList.toggle('is-expanded',expanded);
+    const button=card.querySelector('.'+BUTTON_CLASS);
+    if(button){
+      button.textContent=expanded?'−':'+';
+      button.setAttribute('aria-expanded',expanded?'true':'false');
+      button.setAttribute('aria-label',expanded?'Ocultar información del evento':'Ver información del evento');
+    }
+  }
+
+  function toggle(card){
+    if(!card)return;
+    const cards=[...document.querySelectorAll('.calendar-event-card')];
+    const id=ensureEventId(card,Math.max(0,cards.indexOf(card)));
+    if(openIds.has(id))openIds.delete(id);else openIds.add(id);
+    applyState(card,id);
+  }
+
+  function decorate(){
+    document.querySelectorAll('.calendar-event-card').forEach((card,index)=>{
+      const id=ensureEventId(card,index);
+      let button=card.querySelector('.'+BUTTON_CLASS);
+      if(!button){
+        button=document.createElement('button');
+        button.type='button';
+        button.className=BUTTON_CLASS;
+        button.addEventListener('click',event=>{
+          event.preventDefault();
+          event.stopPropagation();
+          toggle(card);
+        });
+        card.appendChild(button);
+      }
+      applyState(card,id);
     });
   }
+
   function init(){
     injectStyle();
-    document.addEventListener('click',function(event){
-      const card=event.target.closest('.calendar-event-card');
+    decorate();
+
+    document.addEventListener('click',event=>{
+      const card=event.target.closest?.('.calendar-event-card');
       if(!card)return;
       if(event.target.closest('a,button,input,textarea,select'))return;
-      const id=card.dataset.eventId;
-      if(!id)return;
-      if(openIds.has(id))openIds.delete(id);else openIds.add(id);
-      card.classList.toggle('is-expanded',openIds.has(id));
+      toggle(card);
     },false);
-    window.addEventListener('hn-calendar-updated',restore);
-    restore();
+
+    window.addEventListener('hn-calendar-updated',decorate);
+
+    const observer=new MutationObserver(mutations=>{
+      if(mutations.some(m=>[...m.addedNodes].some(node=>node.nodeType===1&&(node.matches?.('.calendar-event-card')||node.querySelector?.('.calendar-event-card')))))decorate();
+    });
+    observer.observe(document.body,{childList:true,subtree:true});
   }
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
+
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});
+  else init();
 })();
