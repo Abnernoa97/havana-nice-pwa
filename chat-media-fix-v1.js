@@ -1,11 +1,11 @@
-/* HAVANA NICE — CHAT MEDIA DISPLAY + MEDIA OPTIMIZATION V5
+/* HAVANA NICE — CHAT MEDIA DISPLAY + MEDIA OPTIMIZATION V6
    Owns chat photo/video sizing and client-side media optimization.
    Fullscreen viewing remains owned by chat-media-lightbox-v2.js.
 */
 (function(){
   'use strict';
 
-  const STYLE_ID='hn-chat-media-fix-v5';
+  const STYLE_ID='hn-chat-media-fix-v6';
   const MAX_INPUT_BYTES=12*1024*1024;
   const IMAGE_MAX_EDGE=1600;
   const IMAGE_QUALITY=.82;
@@ -16,13 +16,28 @@
   const VIDEO_BPS=750000;
   const AUDIO_BPS=64000;
 
+  function isIOS(){
+    const ua=navigator.userAgent||'';
+    return /iPad|iPhone|iPod/i.test(ua)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+  }
+
+  function markMediaBubbles(root=document){
+    const scope=root&&root.querySelectorAll?root:document;
+    scope.querySelectorAll('.hn-chat-media-grid').forEach(grid=>{
+      const bubble=grid.closest('.hn-chat-bubble');
+      if(bubble)bubble.classList.add('hn-chat-media-bubble');
+    });
+  }
+
   function installStyles(){
     document.getElementById('hn-chat-media-fix-v4')?.remove();
+    document.getElementById('hn-chat-media-fix-v5')?.remove();
     if(document.getElementById(STYLE_ID))return;
+    if(isIOS())document.documentElement.classList.add('hn-chat-media-ios');
     const style=document.createElement('style');
     style.id=STYLE_ID;
     style.textContent=`
-      .hn-chat-bubble:has(.hn-chat-media-grid){width:auto!important;max-width:min(88vw,360px)!important;padding:4px!important;}
+      .hn-chat-media-bubble{width:auto!important;max-width:min(88vw,360px)!important;padding:4px!important;}
       .hn-chat-media-grid{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:5px!important;align-items:start!important;width:min(82vw,340px)!important;max-width:100%!important;margin-top:3px!important;}
       .hn-chat-media-grid .hn-chat-media-item{position:relative!important;width:100%!important;height:auto!important;min-width:0!important;min-height:0!important;max-width:none!important;max-height:none!important;overflow:hidden!important;background:#090909!important;}
       .hn-chat-media-grid .hn-chat-media-item:only-child{grid-column:1/-1!important;width:100%!important;}
@@ -32,12 +47,32 @@
       .hn-chat-media-grid .hn-chat-media-item video{display:block!important;width:100%!important;height:auto!important;aspect-ratio:4/3!important;max-width:100%!important;max-height:320px!important;object-fit:cover!important;background:#000!important;cursor:zoom-in!important;pointer-events:auto!important;}
       .hn-chat-media-grid .hn-chat-media-item video::-webkit-media-controls{display:none!important;}
       .hn-chat-media-grid .hn-chat-media-item video::-webkit-media-controls-panel{display:none!important;}
+      .hn-chat-media-ios .hn-chat-media-bubble{width:88%!important;max-width:360px!important;}
+      .hn-chat-media-ios .hn-chat-media-grid{width:100%!important;max-width:none!important;}
       @media (min-width:600px){
-        .hn-chat-bubble:has(.hn-chat-media-grid){max-width:520px!important;}
+        .hn-chat-media-bubble{max-width:520px!important;}
         .hn-chat-media-grid{width:min(72vw,480px)!important;}
+        .hn-chat-media-ios .hn-chat-media-bubble{width:72%!important;max-width:520px!important;}
+        .hn-chat-media-ios .hn-chat-media-grid{width:100%!important;}
       }
     `;
     document.head.appendChild(style);
+  }
+
+  function installBubbleMarker(){
+    markMediaBubbles();
+    if(document.documentElement.dataset.hnChatMediaBubbleMarker==='1')return;
+    document.documentElement.dataset.hnChatMediaBubbleMarker='1';
+    const observer=new MutationObserver(mutations=>{
+      for(const mutation of mutations){
+        for(const node of mutation.addedNodes){
+          if(!(node instanceof Element))continue;
+          if(node.matches?.('.hn-chat-media-grid'))markMediaBubbles(node.parentElement||document);
+          else if(node.querySelector?.('.hn-chat-media-grid'))markMediaBubbles(node);
+        }
+      }
+    });
+    observer.observe(document.documentElement,{childList:true,subtree:true});
   }
 
   function readVideoMeta(file){
@@ -93,7 +128,7 @@
       const canvasStream=canvas.captureStream(TARGET_FPS);
       let sourceStream=null;try{sourceStream=typeof video.captureStream==='function'?video.captureStream():null}catch(_){sourceStream=null}
       if(sourceStream?.getAudioTracks?.().length)sourceStream.getAudioTracks().forEach(track=>canvasStream.addTrack(track));
-      const recorder=new MediaRecorder(canvasStream,{mimeType,videoBitsPerSecond:VIDEO_BPS,audioBitsPerSecond:AUDIO_BPS});
+      const recorder=new MediaRecorder(canvasStream,{mimeType:mime,videoBitsPerSecond:VIDEO_BPS,audioBitsPerSecond:AUDIO_BPS});
       const chunks=[];let drawHandle=0;
       const draw=()=>{if(video.readyState>=2)ctx.drawImage(video,0,0,width,height);drawHandle=requestAnimationFrame(draw)};
       const result=await new Promise((resolve,reject)=>{
@@ -177,6 +212,7 @@
 
   function install(){
     installStyles();
+    installBubbleMarker();
     if(document.documentElement.dataset.hnMediaOptimizerInstalled==='1')return;
     document.documentElement.dataset.hnMediaOptimizerInstalled='1';
     document.addEventListener('change',interceptMediaInput,{capture:true});
