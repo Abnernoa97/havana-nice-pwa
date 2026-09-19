@@ -10,4 +10,5 @@ function init(){const s=document.createElement('style');s.textContent='.module,.
 (function(){var s=document.createElement('script');s.src='./chat-video-fast-path-v1.js?v=022c0e95c055badd9ffe2c54f4d61e8f19ab970b';s.async=false;document.head.appendChild(s)})();
 (function(){var s=document.createElement('script');s.src='./chat-media-fix-v1.js?v=4a706655d66a41564b2de837de2155d7128ecb4a';s.async=false;document.head.appendChild(s)})();
 (function(){var s=document.createElement('script');s.src='./chat-video-poster-cache-v1.js?v=32344a3f345214cd3ae706c99b7a1125f06da8fa';s.async=false;document.head.appendChild(s)})();
+(function(){var s=document.createElement('script');s.src='./chat-video-persisted-poster-v1.js?v=9020a3e25d35808feda42ad1944f24b82c75283e';s.async=false;document.head.appendChild(s)})();
 (function(){var s=document.createElement('script');s.src='./chat-keyboard-v1.js?v=9264af2797639e7b263bd754b82a76caece56c58';s.async=false;document.head.appendChild(s)})();
