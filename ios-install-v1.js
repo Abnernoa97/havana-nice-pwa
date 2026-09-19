@@ -1,4 +1,4 @@
-/* HAVANA NICE — iOS INSTALL + LAYOUT V2 */
+/* HAVANA NICE — iOS INSTALL + LAYOUT V3 */
 (function(){
   'use strict';
   const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
@@ -19,6 +19,54 @@
       #moduleScreen.is-active{z-index:20!important;}
       #homeScreen.is-active{z-index:20!important;}
       #chatScreen.is-active,#hn-chat-screen.is-active{z-index:20!important;}
+
+      /* iPhone home: keep HAVANA NICE / BIENVENIDO / NAME / ROLE visually separated. */
+      #homeScreen .home-top{
+        top:max(18px,env(safe-area-inset-top))!important;
+        left:max(20px,env(safe-area-inset-left))!important;
+        right:max(20px,env(safe-area-inset-right))!important;
+        align-items:flex-start!important;
+      }
+      #homeScreen .home-brand{
+        font-size:18px!important;
+        line-height:1!important;
+        letter-spacing:.15em!important;
+      }
+      #homeScreen .home-inner{
+        width:min(100%,720px)!important;
+        margin:0 auto!important;
+        padding-top:70px!important;
+      }
+      #homeScreen .welcome{
+        margin:0 0 26px!important;
+        text-align:center!important;
+      }
+      #homeScreen .welcome-small{
+        margin:0 0 11px!important;
+        font-size:9px!important;
+        line-height:1.25!important;
+        letter-spacing:.38em!important;
+      }
+      #homeScreen .welcome-name{
+        margin:0!important;
+        font-size:clamp(46px,13vw,74px)!important;
+        line-height:.92!important;
+        letter-spacing:-.035em!important;
+      }
+      #homeScreen .welcome-role{
+        margin:13px 0 0!important;
+        font-size:9px!important;
+        line-height:1.45!important;
+        letter-spacing:.20em!important;
+      }
+
+      @media(max-height:720px){
+        #homeScreen .home-inner{padding-top:56px!important;}
+        #homeScreen .welcome{margin-bottom:19px!important;}
+        #homeScreen .welcome-small{margin-bottom:8px!important;}
+        #homeScreen .welcome-name{font-size:clamp(42px,12vw,64px)!important;}
+        #homeScreen .welcome-role{margin-top:9px!important;}
+      }
     `;
     document.head.appendChild(style);
   }
