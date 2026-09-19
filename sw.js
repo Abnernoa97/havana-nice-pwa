@@ -1,8 +1,8 @@
-/* HAVANA NICE — UNIFIED SERVICE WORKER V4
+/* HAVANA NICE — UNIFIED SERVICE WORKER V5
    One worker for musicians + admin + push.
-   Chat Media V10 assets and server video-processing bridge are network-first.
+   Current Chat assets are network-first; retired chat video files are purged by the cache version bump.
 */
-const CACHE='hn-unified-v4';
+const CACHE='hn-unified-v5';
 const MUSICIAN_SHELL='./index.html';
 const ADMIN_SHELL='./admin.html';
 const MUSICIAN_SHELL_REQUEST=new Request(MUSICIAN_SHELL);
@@ -14,7 +14,7 @@ const FAMILY_IOS_VERSION='ios-family-20260918-clean';
 
 const FRESH_PATHS=new Set([
   '/notifications-v5.js','/operations-fix.js','/ios-install-v1.js',
-  '/chat-v2.js','/chat-media-v10.js','/chat-video-processing-v1.js','/chat-media-fix-v1.js','/chat-video-placeholder.svg',
+  '/chat-v2.js','/chat-media-v10.js','/chat-video-processing-v1.js','/chat-media-fix-v1.js',
   '/chat-typing-v2.js','/chat-realtime-guard-v1.js','/chat-keyboard-v1.js',
   '/family-v1.js',
   '/musician-device-access-v1.js','/musician-push.js','/musician-background-v1.js',
