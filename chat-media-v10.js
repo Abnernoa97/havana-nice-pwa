@@ -1,7 +1,8 @@
-/* HAVANA NICE — CHAT MEDIA V10.3
+/* HAVANA NICE — CHAT MEDIA V10.4
    Single iPhone-first media layer.
    History = JPG cards only. Full video loads only in fullscreen.
    New videos are handed to the server-side FFmpeg worker after upload.
+   Video processing realtime now lives here; no separate bridge module.
 */
 (function(){
   'use strict';
@@ -12,10 +13,12 @@
   const PROCESSOR_ORIGIN='https://havana-nice-video-processor-42rmju.v2.appdeploy.ai';
   const PROCESSOR_URL=PROCESSOR_ORIGIN+'/';
   const TOKEN_KEY='hn_musician_device_token_v1';
+  const TABLE='chat_messages';
   const MAX_EDGE=640,QUALITY=.76,TIMEOUT=9000;
   let selection=[],generation=0;
   let overlay,image,poster,video,spinner,play,errorBox,historyArmed=false,closing=false;
   let processorFrame=null,processorReady=false;
+  let processingChannel=null,processingOwner='';
   const processorQueue=new Map();
   const sb=()=>window.hnSupabase||window.hnMusicianSupabase||window.supabaseClient||window.supabase||null;
   const isVideo=file=>!!file?.type?.startsWith('video/');
@@ -72,6 +75,59 @@
       if(data.type==='HN_TRANSCODE_FAILED')console.warn('HAVANA NICE video processor could not optimize:',data.sourceUrl);
       setTimeout(()=>{try{window.hnChatReconcile?.()}catch(_){}},150);
     }
+  }
+
+  function queueFromRow(row){
+    const p=sessionProfile();
+    if(!p?.id||String(row?.profile_id||'')!==String(p.id)||row?.message_type!=='media')return;
+    const urls=Array.isArray(row.media_urls)?row.media_urls:[];
+    const types=Array.isArray(row.media_types)?row.media_types:[];
+    const playbacks=Array.isArray(row.media_playback_urls)?row.media_playback_urls:[];
+    const statuses=Array.isArray(row.media_statuses)?row.media_statuses:[];
+    urls.forEach((url,index)=>{
+      if(!String(types[index]||'').startsWith('video/'))return;
+      const playback=String(playbacks[index]||'');
+      const status=String(statuses[index]||'');
+      if(status==='ready'&&playback&&playback!==url)return;
+      queueTranscode(String(url));
+    });
+  }
+  function applyPlaybackUpdate(row){
+    const urls=Array.isArray(row?.media_urls)?row.media_urls:[];
+    const playbacks=Array.isArray(row?.media_playback_urls)?row.media_playback_urls:[];
+    urls.forEach((url,index)=>{
+      const playback=String(playbacks[index]||'');
+      if(!playback||playback===url)return;
+      document.querySelectorAll('.hn-video-card').forEach(button=>{
+        if(String(button.dataset.videoUrl||'')===String(url))button.dataset.videoUrl=playback;
+      });
+    });
+    setTimeout(()=>{try{window.hnChatReconcile?.()}catch(_){}},120);
+    setTimeout(()=>{try{window.hnChatReconcile?.()}catch(_){}},1800);
+  }
+  function stopProcessingRealtime(){
+    const client=sb();
+    if(processingChannel&&client){try{client.removeChannel(processingChannel)}catch(_){}}
+    processingChannel=null;processingOwner='';
+  }
+  function startProcessingRealtime(){
+    const client=sb(),p=sessionProfile();
+    if(!client||!p?.id)return;
+    const id=String(p.id);
+    if(processingChannel&&processingOwner===id)return;
+    stopProcessingRealtime();processingOwner=id;
+    processingChannel=client.channel('hn-chat-media-processing-'+id.slice(0,8))
+      .on('postgres_changes',{event:'INSERT',schema:'public',table:TABLE},payload=>{
+        if(processingOwner!==String(sessionProfile()?.id||''))return;
+        queueFromRow(payload.new);
+      })
+      .on('postgres_changes',{event:'UPDATE',schema:'public',table:TABLE},payload=>{
+        if(processingOwner!==String(sessionProfile()?.id||''))return;
+        const row=payload.new;
+        if(String(row?.profile_id||'')!==processingOwner)return;
+        applyPlaybackUpdate(row);
+      })
+      .subscribe();
   }
 
   function posterUrl(videoUrl){try{const u=new URL(videoUrl);u.pathname=u.pathname+'.poster.jpg';u.search='';u.hash='';return u.toString()}catch(_){return ''}}
@@ -156,9 +212,12 @@
     document.addEventListener('load',handleImageEvent,true);
     document.addEventListener('error',handleImageEvent,true);
     window.addEventListener('message',handleProcessorMessage);
-    window.addEventListener('hn:session-logout',()=>{clearSelection();clearProcessor()});
+    window.addEventListener('hn:session-ready',startProcessingRealtime);
+    window.addEventListener('hn:session-logout',()=>{stopProcessingRealtime();clearSelection();clearProcessor()});
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden)startProcessingRealtime()});
     window.addEventListener('popstate',e=>{if(!overlay?.classList.contains('is-open'))return;if(historyArmed||e.state?.[HISTORY]||closing){e.stopImmediatePropagation();finishClose();closing=false}},true);
     window.hnChatMediaV10={prepare,ensurePoster,persistPoster,posterUrl,paintPending,clearSelection,openPhoto,openVideo,queueTranscode};
+    startProcessingRealtime();
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
 })();
