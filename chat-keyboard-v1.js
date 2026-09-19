@@ -1,4 +1,4 @@
-/* HAVANA NICE — CHAT KEYBOARD / COMPOSER V6 */
+/* HAVANA NICE — CHAT KEYBOARD / COMPOSER V7 */
 (() => {
   'use strict';
 
@@ -73,7 +73,7 @@
     requestAnimationFrame(() => {
       const height = Math.ceil(compose.getBoundingClientRect().height || 0);
       chat.style.setProperty('--hn-compose-height', `${height}px`);
-      chat.style.setProperty('--hn-chat-bottom-space', `${Math.round(keyboardHeight + height + 16)}px`);
+      chat.style.setProperty('--hn-chat-bottom-space', `${Math.round(keyboardHeight + height + 10)}px`);
     });
   }
 
@@ -131,23 +131,40 @@
     const style = document.createElement('style');
     style.id = STYLE_ID;
     style.textContent = `
-      #hn-chat-screen.is-active{box-sizing:border-box!important}
-      #hn-chat-screen.is-active .hn-chat-wrap{min-height:0!important}
-      #hn-chat-screen.is-active .hn-chat-list{min-height:0!important;overflow-y:auto!important}
+      #hn-chat-screen.is-active{
+        box-sizing:border-box!important;
+        padding-bottom:0!important;
+      }
+      #hn-chat-screen.is-active .hn-chat-wrap{
+        min-height:0!important;
+        height:100%!important;
+        padding-bottom:0!important;
+      }
+      #hn-chat-screen.is-active .hn-chat-list{
+        min-height:0!important;
+        overflow-y:auto!important;
+        padding-bottom:68px!important;
+        scroll-padding-bottom:68px!important;
+      }
 
+      /* Always pinned to the real bottom edge, WhatsApp style. */
       #hn-chat-screen.is-active .hn-chat-compose{
-        z-index:40!important;
-        flex:0 0 auto!important;
+        position:fixed!important;
+        z-index:400!important;
+        left:max(4px,env(safe-area-inset-left))!important;
+        right:max(4px,env(safe-area-inset-right))!important;
+        bottom:0!important;
+        width:auto!important;
+        max-width:none!important;
+        min-height:0!important;
+        margin:0!important;
+        padding:4px 2px max(4px,env(safe-area-inset-bottom))!important;
         display:grid!important;
         grid-template-columns:minmax(0,1fr) 54px!important;
         grid-auto-flow:row!important;
         column-gap:8px!important;
-        row-gap:7px!important;
+        row-gap:6px!important;
         align-items:end!important;
-        width:100%!important;
-        min-height:0!important;
-        margin:0!important;
-        padding:7px 4px max(7px,env(safe-area-inset-bottom))!important;
         border:0!important;
         background:#f4f0e8!important;
         box-shadow:none!important;
@@ -155,7 +172,7 @@
       }
 
       #hn-chat-screen.is-active .hn-chat-input-wrap{
-        z-index:41!important;
+        z-index:401!important;
         grid-column:1!important;
         position:relative!important;
         display:block!important;
@@ -305,27 +322,28 @@
       #hn-chat-screen.is-active.hn-keyboard-open .hn-chat-head{display:none!important}
 
       #hn-chat-screen.is-active.hn-ios-keyboard .hn-chat-compose{
-        position:fixed!important;
-        left:max(6px,env(safe-area-inset-left))!important;
-        right:max(6px,env(safe-area-inset-right))!important;
+        left:max(4px,env(safe-area-inset-left))!important;
+        right:max(4px,env(safe-area-inset-right))!important;
         bottom:var(--hn-keyboard-height,0px)!important;
-        width:auto!important;
-        max-width:none!important;
-        margin:0!important;
-        padding-left:2px!important;
-        padding-right:2px!important;
+        padding-bottom:4px!important;
       }
       #hn-chat-screen.is-active.hn-ios-keyboard .hn-chat-list{
-        padding-bottom:var(--hn-chat-bottom-space,150px)!important;
-        scroll-padding-bottom:var(--hn-chat-bottom-space,150px)!important;
+        padding-bottom:var(--hn-chat-bottom-space,140px)!important;
+        scroll-padding-bottom:var(--hn-chat-bottom-space,140px)!important;
       }
 
       @media(max-width:430px){
         #hn-chat-screen.is-active .hn-chat-compose{
           grid-template-columns:minmax(0,1fr) 50px!important;
           column-gap:7px!important;
+          left:max(2px,env(safe-area-inset-left))!important;
+          right:max(2px,env(safe-area-inset-right))!important;
           padding-left:1px!important;
           padding-right:1px!important;
+        }
+        #hn-chat-screen.is-active .hn-chat-list{
+          padding-bottom:62px!important;
+          scroll-padding-bottom:62px!important;
         }
         #hn-chat-screen.is-active .hn-chat-input-wrap,
         #hn-chat-screen.is-active .hn-chat-input{height:50px!important;min-height:50px!important}
@@ -359,8 +377,8 @@
     normalizeComposer();
 
     const vv = window.visualViewport;
-    if (vv && !vv.dataset?.hnKeyboardBoundV6) {
-      try { vv.dataset.hnKeyboardBoundV6 = '1'; } catch (_) {}
+    if (vv && !vv.dataset?.hnKeyboardBoundV7) {
+      try { vv.dataset.hnKeyboardBoundV7 = '1'; } catch (_) {}
       vv.addEventListener('resize', syncViewport, { passive: true });
       vv.addEventListener('scroll', syncViewport, { passive: true });
     }
