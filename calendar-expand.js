@@ -1,6 +1,6 @@
-/* HAVANA NICE — CALENDAR EXPAND V2
+/* HAVANA NICE — CALENDAR EXPAND V3
    Reliable accordion interaction for musician calendar cards.
-   Works even when calendar-v1 does not provide data-event-id.
+   Google Maps stays visible even when the accordion is collapsed.
    Uses a real touch button for iPhone instead of a pseudo-element only.
 */
 (function(){
@@ -16,9 +16,25 @@
     s.textContent=`
       .calendar-event-card{cursor:pointer;position:relative;transition:border-color .16s ease,background .16s ease;padding-right:54px!important}
       .calendar-event-card:not(.is-expanded) .calendar-time-grid,
-      .calendar-event-card:not(.is-expanded) .calendar-event-details-m,
-      .calendar-event-card:not(.is-expanded) .calendar-map-button{display:none!important}
+      .calendar-event-card:not(.is-expanded) .calendar-event-details-m{display:none!important}
       .calendar-event-card.is-expanded{border-color:rgba(229,189,98,.72)}
+      .calendar-event-card .calendar-map-button{
+        display:block!important;
+        margin-top:12px!important;
+        padding:10px 12px!important;
+        border:1px solid rgba(229,189,98,.52)!important;
+        color:var(--gold-light)!important;
+        background:rgba(0,0,0,.18)!important;
+        text-align:left!important;
+        text-transform:none!important;
+        letter-spacing:0!important;
+        font-size:10px!important;
+        line-height:1.35!important;
+        overflow-wrap:anywhere!important;
+        word-break:break-word!important;
+        text-decoration:none!important;
+        cursor:pointer!important;
+      }
       .${BUTTON_CLASS}{
         position:absolute!important;top:8px!important;right:8px!important;
         width:42px!important;height:42px!important;margin:0!important;padding:0!important;
@@ -53,6 +69,15 @@
     return id;
   }
 
+  function normalizeMapLink(card){
+    const link=card.querySelector('.calendar-map-button');
+    if(!link)return;
+    const href=String(link.getAttribute('href')||'').trim();
+    if(!href)return;
+    link.textContent=href;
+    link.setAttribute('aria-label','Abrir ubicación en Google Maps');
+  }
+
   function applyState(card,id){
     const expanded=openIds.has(id);
     card.classList.toggle('is-expanded',expanded);
@@ -75,6 +100,7 @@
   function decorate(){
     document.querySelectorAll('.calendar-event-card').forEach((card,index)=>{
       const id=ensureEventId(card,index);
+      normalizeMapLink(card);
       let button=card.querySelector('.'+BUTTON_CLASS);
       if(!button){
         button=document.createElement('button');
