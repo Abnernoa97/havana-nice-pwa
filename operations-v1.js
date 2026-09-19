@@ -7,4 +7,28 @@
 (function(){
   'use strict';
   window.__hnOperationsV2=true;
+
+  const FAMILY_ROLES={
+    'FER & NOA':'HAVANA NICE',
+    'ORLYS SHOW':'PERCUSIONISTA Y DIRECTOR MUSICAL',
+    'JALI':'PRESIDENTE DE JATIBONICO',
+    'RAFA':'ALCALDE DE SANTA FE',
+    'ANDY REY':'GERENTE DE LIVERPOOL'
+  };
+
+  function applyFamilyRoles(root=document){
+    root.querySelectorAll?.('.family-member').forEach(card=>{
+      const name=card.querySelector('.family-name')?.textContent?.trim().toUpperCase();
+      const role=card.querySelector('.family-role');
+      if(role&&FAMILY_ROLES[name])role.textContent=FAMILY_ROLES[name];
+    });
+  }
+
+  function initFamilyRoles(){
+    applyFamilyRoles();
+    new MutationObserver(()=>applyFamilyRoles()).observe(document.body,{childList:true,subtree:true});
+  }
+
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initFamilyRoles,{once:true});
+  else initFamilyRoles();
 })();
