@@ -1,10 +1,11 @@
-/* HAVANA NICE — CHAT KEYBOARD / COMPOSER V7 */
+/* HAVANA NICE — CHAT KEYBOARD / COMPOSER V8 */
 (() => {
   'use strict';
 
   const STYLE_ID = 'hn-chat-keyboard-fix-style';
   let raf = 0;
   let bound = false;
+  let composerResizeObserver = null;
 
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent || '') ||
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -37,6 +38,28 @@
     return open;
   }
 
+  function syncComposerMetrics() {
+    const chat = getChat();
+    const compose = getCompose();
+    if (!chat || !compose) return;
+    requestAnimationFrame(() => {
+      const height = Math.max(56, Math.ceil(compose.getBoundingClientRect().height || 0));
+      chat.style.setProperty('--hn-compose-height', `${height}px`);
+    });
+  }
+
+  function bindComposerResize() {
+    const compose = getCompose();
+    if (!compose || typeof ResizeObserver === 'undefined') {
+      syncComposerMetrics();
+      return;
+    }
+    composerResizeObserver?.disconnect();
+    composerResizeObserver = new ResizeObserver(syncComposerMetrics);
+    composerResizeObserver.observe(compose);
+    syncComposerMetrics();
+  }
+
   function scrollChatToBottom() {
     if (!isIOS) return;
     const chat = getChat();
@@ -57,9 +80,9 @@
     if (!chat || !compose || !isIOS) return;
 
     const open = syncKeyboardState(vv);
+    syncComposerMetrics();
     if (!open) {
       chat.style.removeProperty('--hn-keyboard-height');
-      chat.style.removeProperty('--hn-compose-height');
       chat.style.removeProperty('--hn-chat-bottom-space');
       return;
     }
@@ -71,7 +94,7 @@
     chat.style.setProperty('--hn-keyboard-height', `${Math.round(keyboardHeight)}px`);
 
     requestAnimationFrame(() => {
-      const height = Math.ceil(compose.getBoundingClientRect().height || 0);
+      const height = Math.max(56, Math.ceil(compose.getBoundingClientRect().height || 0));
       chat.style.setProperty('--hn-compose-height', `${height}px`);
       chat.style.setProperty('--hn-chat-bottom-space', `${Math.round(keyboardHeight + height + 10)}px`);
     });
@@ -85,6 +108,7 @@
       const vv = window.visualViewport;
       if (!chat || !compose || !chat.classList.contains('is-active')) return;
 
+      syncComposerMetrics();
       const open = syncKeyboardState(vv);
       if (isIOS) {
         syncIOSComposer(vv);
@@ -109,6 +133,7 @@
     const vv = window.visualViewport;
     if (!vv) return;
 
+    syncComposerMetrics();
     const open = syncKeyboardState(vv);
 
     if (isIOS) {
@@ -143,13 +168,8 @@
       #hn-chat-screen.is-active .hn-chat-list{
         min-height:0!important;
         overflow-y:auto!important;
-        padding-bottom:68px!important;
-        scroll-padding-bottom:68px!important;
-      }
-      #hn-chat-screen.is-active .hn-chat-time,
-      #hn-chat-screen.is-active .hn-chat-row.mine .hn-chat-time{
-        color:#d4af37!important;
-        font-weight:600!important;
+        padding-bottom:calc(var(--hn-compose-height,86px) + 10px)!important;
+        scroll-padding-bottom:calc(var(--hn-compose-height,86px) + 10px)!important;
       }
 
       /* Always pinned to the real bottom edge, WhatsApp style. */
@@ -346,10 +366,6 @@
           padding-left:1px!important;
           padding-right:1px!important;
         }
-        #hn-chat-screen.is-active .hn-chat-list{
-          padding-bottom:62px!important;
-          scroll-padding-bottom:62px!important;
-        }
         #hn-chat-screen.is-active .hn-chat-input-wrap,
         #hn-chat-screen.is-active .hn-chat-input{height:50px!important;min-height:50px!important}
         #hn-chat-screen.is-active .hn-chat-input{border-radius:25px!important;padding-left:16px!important;padding-right:50px!important;font-size:16px!important}
@@ -373,6 +389,7 @@
     }
     const attach = chat.querySelector('.hn-chat-attach');
     if (attach) attach.setAttribute('aria-label', 'Adjuntar');
+    syncComposerMetrics();
   }
 
   function bind() {
@@ -380,13 +397,16 @@
     bound = true;
     installStyles();
     normalizeComposer();
+    bindComposerResize();
 
     const vv = window.visualViewport;
-    if (vv && !vv.dataset?.hnKeyboardBoundV7) {
-      try { vv.dataset.hnKeyboardBoundV7 = '1'; } catch (_) {}
+    if (vv && !vv.dataset?.hnKeyboardBoundV8) {
+      try { vv.dataset.hnKeyboardBoundV8 = '1'; } catch (_) {}
       vv.addEventListener('resize', syncViewport, { passive: true });
       vv.addEventListener('scroll', syncViewport, { passive: true });
     }
+
+    window.addEventListener('resize', syncComposerMetrics, { passive: true });
 
     document.addEventListener('focusin', e => {
       if (e.target?.matches?.('.hn-chat-input')) {
@@ -424,6 +444,7 @@
       attributeFilter: ['class']
     });
 
+    syncComposerMetrics();
     syncViewport();
   }
 
