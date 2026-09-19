@@ -135,7 +135,6 @@
       #hn-chat-screen.is-active .hn-chat-wrap{min-height:0!important}
       #hn-chat-screen.is-active .hn-chat-list{min-height:0!important;overflow-y:auto!important}
 
-      /* WhatsApp-like bottom composer: one slim row, long input, one round action button. */
       #hn-chat-screen.is-active .hn-chat-compose{
         z-index:40!important;
         flex:0 0 auto!important;
@@ -159,6 +158,8 @@
         z-index:41!important;
         grid-column:1!important;
         position:relative!important;
+        display:block!important;
+        grid-template-columns:none!important;
         width:100%!important;
         min-width:0!important;
         height:52px!important;
@@ -166,6 +167,8 @@
       }
 
       #hn-chat-screen.is-active .hn-chat-input{
+        grid-column:auto!important;
+        grid-row:auto!important;
         display:block!important;
         width:100%!important;
         height:52px!important;
@@ -194,8 +197,9 @@
         text-transform:none!important;
       }
 
-      /* Attachment lives inside the input, like WhatsApp. */
       #hn-chat-screen.is-active .hn-chat-attach{
+        grid-column:auto!important;
+        grid-row:auto!important;
         position:absolute!important;
         right:8px!important;
         bottom:5px!important;
@@ -222,8 +226,9 @@
         filter:grayscale(1)!important;
       }
 
-      /* Mic occupies the right-side WhatsApp action circle while the composer is empty. */
       #hn-chat-screen.is-active .hn-chat-mic{
+        grid-column:auto!important;
+        grid-row:auto!important;
         position:absolute!important;
         right:-62px!important;
         bottom:-1px!important;
@@ -265,9 +270,9 @@
       }
       #hn-chat-screen.is-active .hn-chat-mic.is-recording{background:#8d2929!important;color:#fff!important}
 
-      /* Send takes exactly the same circle as the mic once there is content. */
       #hn-chat-screen.is-active .hn-chat-send{
         grid-column:2!important;
+        grid-row:auto!important;
         width:54px!important;
         height:54px!important;
         min-width:54px!important;
@@ -291,21 +296,14 @@
         line-height:54px!important;
         transform:translateX(1px)!important;
       }
-      #hn-chat-screen.is-active .hn-chat-send:disabled{
-        display:none!important;
-      }
-      #hn-chat-screen.is-active .hn-chat-compose:has(.hn-chat-send:not(:disabled)) .hn-chat-mic{
-        display:none!important;
-      }
+      #hn-chat-screen.is-active .hn-chat-send:disabled{display:none!important}
+      #hn-chat-screen.is-active .hn-chat-compose:has(.hn-chat-send:not(:disabled)) .hn-chat-mic{display:none!important}
 
       #hn-chat-screen.is-active .hn-chat-media-pending,
-      #hn-chat-screen.is-active .hn-chat-recording{
-        grid-column:1 / -1!important;
-      }
+      #hn-chat-screen.is-active .hn-chat-recording{grid-column:1 / -1!important}
 
       #hn-chat-screen.is-active.hn-keyboard-open .hn-chat-head{display:none!important}
 
-      /* iOS: pin the composer to the visible viewport with WhatsApp-like edge spacing. */
       #hn-chat-screen.is-active.hn-ios-keyboard .hn-chat-compose{
         position:fixed!important;
         left:max(6px,env(safe-area-inset-left))!important;
