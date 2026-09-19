@@ -21,8 +21,39 @@
     return /iPad|iPhone|iPod/i.test(ua)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
   }
 
+  let previewObserver=null;
+  function prepareIOSVideoPreviews(scope){
+    if(!isIOS())return;
+    if(!previewObserver&&typeof IntersectionObserver!=='undefined'){
+      previewObserver=new IntersectionObserver(entries=>{
+        entries.forEach(entry=>{
+          if(!entry.isIntersecting)return;
+          const video=entry.target;
+          video.dataset.hnPreviewVisible='1';
+          showIOSVideoFrame(video);
+          previewObserver.unobserve(video);
+        });
+      });
+    }
+    scope.querySelectorAll('.hn-chat-media-item video,.hn-chat-pending-item video').forEach(video=>{
+      if(video.dataset.hnPreviewBound==='1')return;
+      video.dataset.hnPreviewBound='1';video.playsInline=true;video.preload='metadata';
+      video.addEventListener('loadedmetadata',()=>showIOSVideoFrame(video),{once:true});
+      if(previewObserver)previewObserver.observe(video);
+      else{video.dataset.hnPreviewVisible='1';showIOSVideoFrame(video);}
+    });
+  }
+  function showIOSVideoFrame(video){
+    if(video.dataset.hnPreviewVisible!=='1'||video.dataset.hnPreviewDone==='1'||video.readyState<1)return;
+    if(!video.paused||video.currentTime>0||video.poster)return;
+    const duration=Number(video.duration);
+    if(!Number.isFinite(duration)||duration<=0)return;
+    try{video.currentTime=Math.min(0.1,duration/2);video.dataset.hnPreviewDone='1';}catch(_){}
+  }
+
   function markMediaBubbles(root=document){
     const scope=root&&root.querySelectorAll?root:document;
+    prepareIOSVideoPreviews(scope);
     scope.querySelectorAll('.hn-chat-media-grid').forEach(grid=>{
       const bubble=grid.closest('.hn-chat-bubble');
       if(bubble)bubble.classList.add('hn-chat-media-bubble');
@@ -67,6 +98,7 @@
       for(const mutation of mutations){
         for(const node of mutation.addedNodes){
           if(!(node instanceof Element))continue;
+          if(isIOS())prepareIOSVideoPreviews(node.parentElement||node);
           if(node.matches?.('.hn-chat-media-grid'))markMediaBubbles(node.parentElement||document);
           else if(node.querySelector?.('.hn-chat-media-grid'))markMediaBubbles(node);
         }
