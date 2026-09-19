@@ -1,4 +1,4 @@
-/* HAVANA NICE — CHAT MEDIA DISPLAY + MEDIA OPTIMIZATION V6
+/* HAVANA NICE — CHAT MEDIA DISPLAY + MEDIA OPTIMIZATION V7
    Owns chat photo/video sizing and client-side media optimization.
    Fullscreen viewing remains owned by chat-media-lightbox-v2.js.
 */
@@ -7,9 +7,9 @@
 
   const STYLE_ID='hn-chat-media-fix-v6';
   const MAX_INPUT_BYTES=12*1024*1024;
-  const IMAGE_MAX_EDGE=1600;
-  const IMAGE_QUALITY=.82;
-  const IMAGE_OPTIMIZE_BYTES=900*1024;
+  const IMAGE_MAX_EDGE=1280;
+  const IMAGE_QUALITY=.78;
+  const IMAGE_OPTIMIZE_BYTES=250*1024;
   const TARGET_W=854;
   const TARGET_H=480;
   const TARGET_FPS=24;
@@ -168,7 +168,9 @@
       ctx.drawImage(img,0,0,width,height);
       const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/webp',IMAGE_QUALITY));
       if(!blob?.size||blob.size>=file.size*.95)return file;
-      return new File([blob],makeOutputName(file,'image/webp'),{type:'image/webp',lastModified:Date.now()});
+      const mime=blob.type||'image/webp';
+      const name=(file.name||'photo').replace(/\.[^.]+$/,'')+'-hn.'+(mime==='image/webp'?'webp':mime==='image/jpeg'?'jpg':'png');
+      return new File([blob],name,{type:mime,lastModified:Date.now()});
     }catch(error){console.warn('HAVANA NICE photo optimization skipped:',error);return file}
     finally{if(loaded?.url)URL.revokeObjectURL(loaded.url)}
   }
