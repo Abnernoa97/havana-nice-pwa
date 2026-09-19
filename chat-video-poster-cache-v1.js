@@ -94,12 +94,12 @@
           video.onseeked=()=>capture();
           try{video.currentTime=Math.min(.18,duration/3);return;}catch(_){}
         }
-        capture();
+        if(video.readyState>=2)capture();
       };
       timer=setTimeout(()=>finish(null),CAPTURE_TIMEOUT);
-      video.crossOrigin='anonymous';video.muted=true;video.playsInline=true;video.preload='auto';
+      video.crossOrigin='anonymous';video.muted=true;video.playsInline=true;video.preload='metadata';
       video.onloadeddata=seekOrCapture;
-      video.onloadedmetadata=()=>{if(video.readyState>=2)seekOrCapture();};
+      video.onloadedmetadata=seekOrCapture;
       video.onerror=()=>finish(null);
       video.src=url;
       try{video.load()}catch(_){finish(null);}
