@@ -1,67 +1,121 @@
-/* HAVANA NICE — CHAT VIDEO FAST PATH V1
-   Pure videos skip client-side re-encoding and use the local file for an immediate preview.
-   Remote/cached posters remain owned by chat-video-poster-cache-v1.js.
+/* HAVANA NICE — CHAT VIDEO FAST PATH V2
+   Videos never enter the slow client-side re-encoding path.
+   A lightweight poster is generated from the local file and reused for pending/outgoing UI.
+   The selected thumbnail is hidden while the large ENVIANDO bubble is visible.
 */
 (function(){
   'use strict';
 
   const INPUT_SELECTOR='.hn-chat-media-input';
-  const MAX_EDGE=480;
-  const QUALITY=.66;
-  const bound=new WeakSet();
+  const MAX_EDGE=520;
+  const QUALITY=.72;
+  const POSTER_TIMEOUT=9000;
+  let selection=[];
+  let selectionGeneration=0;
+  let observer=null;
 
-  function source(video){return String(video?.currentSrc||video?.getAttribute('src')||video?.src||'').trim();}
-  function isLocalVideo(video){return source(video).startsWith('blob:');}
+  function isVideo(file){return !!file?.type?.startsWith('video/');}
+  function revokeEntry(entry){if(entry?.url){try{URL.revokeObjectURL(entry.url)}catch(_){}entry.url='';}}
+  function clearSelection(){selection.forEach(revokeEntry);selection=[];selectionGeneration++;}
 
-  function releasePoster(video){
-    const url=video?.dataset?.hnFastVideoPoster;
-    if(url){try{URL.revokeObjectURL(url)}catch(_){}delete video.dataset.hnFastVideoPoster;}
+  function posterFromFile(file,generation){
+    return new Promise(resolve=>{
+      const sourceUrl=URL.createObjectURL(file),video=document.createElement('video');
+      let settled=false,timer=null,frameRequested=false;
+      const finish=blob=>{
+        if(settled)return;settled=true;clearTimeout(timer);
+        try{video.pause()}catch(_){}
+        video.onloadedmetadata=null;video.onloadeddata=null;video.onseeked=null;video.onerror=null;
+        video.removeAttribute('src');try{video.load()}catch(_){}
+        URL.revokeObjectURL(sourceUrl);
+        if(!blob?.size||generation!==selectionGeneration){resolve(null);return;}
+        const url=URL.createObjectURL(blob);resolve({blob,url});
+      };
+      const draw=()=>{
+        if(settled||video.readyState<2)return;
+        const w=Number(video.videoWidth)||0,h=Number(video.videoHeight)||0;if(!w||!h)return;
+        const scale=Math.min(1,MAX_EDGE/Math.max(w,h));
+        const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(w*scale));canvas.height=Math.max(1,Math.round(h*scale));
+        const ctx=canvas.getContext('2d',{alpha:false});if(!ctx){finish(null);return;}
+        try{ctx.drawImage(video,0,0,canvas.width,canvas.height);}catch(_){finish(null);return;}
+        canvas.toBlob(finish,'image/jpeg',QUALITY);
+      };
+      const requestFrame=()=>{
+        if(settled||frameRequested)return;frameRequested=true;
+        if(typeof video.requestVideoFrameCallback==='function'){
+          try{video.requestVideoFrameCallback(()=>draw());return;}catch(_){}
+        }
+        requestAnimationFrame(draw);
+      };
+      const seekFrame=()=>{
+        if(settled)return;
+        const duration=Number(video.duration)||0;
+        if(Number.isFinite(duration)&&duration>.08){
+          try{
+            const target=Math.min(.12,Math.max(.01,duration/3));
+            if(Math.abs((video.currentTime||0)-target)>.005){video.currentTime=target;return;}
+          }catch(_){}
+        }
+        requestFrame();
+      };
+      timer=setTimeout(()=>{if(video.readyState>=2)draw();else finish(null);},POSTER_TIMEOUT);
+      video.muted=true;video.defaultMuted=true;video.playsInline=true;video.preload='auto';
+      video.onloadedmetadata=()=>{
+        // Muted one-frame playback makes iOS decode a real frame instead of keeping the surface black.
+        try{const p=video.play();if(p?.then)p.then(()=>{try{video.pause()}catch(_){}seekFrame();}).catch(()=>seekFrame());else seekFrame();}catch(_){seekFrame();}
+      };
+      video.onloadeddata=()=>{frameRequested=false;seekFrame();};
+      video.onseeked=()=>{frameRequested=false;requestFrame();};
+      video.onerror=()=>finish(null);
+      video.src=sourceUrl;try{video.load()}catch(_){finish(null);}
+    });
   }
 
-  function drawPoster(video){
-    const w=Number(video.videoWidth)||0,h=Number(video.videoHeight)||0;
-    if(!w||!h||video.readyState<2)return;
-    const scale=Math.min(1,MAX_EDGE/Math.max(w,h));
-    const canvas=document.createElement('canvas');
-    canvas.width=Math.max(1,Math.round(w*scale));
-    canvas.height=Math.max(1,Math.round(h*scale));
-    const ctx=canvas.getContext('2d',{alpha:false});if(!ctx)return;
-    try{ctx.drawImage(video,0,0,canvas.width,canvas.height);}catch(_){return;}
-    canvas.toBlob(blob=>{
-      if(!blob?.size||!video.isConnected||!isLocalVideo(video))return;
-      releasePoster(video);
-      const url=URL.createObjectURL(blob);
-      video.dataset.hnFastVideoPoster=url;
-      video.poster=url;
-      video.preload='metadata';
-    },'image/jpeg',QUALITY);
+  function prepareSelection(files){
+    clearSelection();
+    const generation=selectionGeneration;
+    selection=files.map(file=>{
+      if(!isVideo(file))return null;
+      const entry={file,url:'',promise:null};
+      entry.promise=posterFromFile(file,generation).then(result=>{
+        if(!result||generation!==selectionGeneration)return null;
+        entry.url=result.url;applySelectionPosters();return entry.url;
+      });
+      return entry;
+    });
   }
 
-  function primeLocalVideo(video){
-    if(!video||bound.has(video)||!isLocalVideo(video))return;
-    bound.add(video);
-    video.muted=true;video.playsInline=true;video.preload='auto';
-    let sought=false;
-    const capture=()=>{if(video.readyState>=2)drawPoster(video);};
-    const seek=()=>{
-      const duration=Number(video.duration)||0;
-      if(!sought&&duration>.15){
-        sought=true;
-        try{video.currentTime=Math.min(.12,duration/3);return;}catch(_){}
-      }
-      capture();
-    };
-    video.addEventListener('loadedmetadata',seek,{once:true});
-    video.addEventListener('loadeddata',()=>{if(!sought)seek();else capture();},{once:true});
-    video.addEventListener('seeked',capture,{once:true});
-    if(video.readyState>=1)seek();
-    try{video.load()}catch(_){}
+  function decorateItem(item,url){
+    if(!item?.isConnected||!url)return;
+    const video=item.querySelector('video');if(!video)return;
+    video.poster=url;video.preload='none';
+    let image=item.querySelector('.hn-fast-video-poster');
+    if(!image){image=document.createElement('img');image.className='hn-fast-video-poster';image.alt='Vista previa del video';item.appendChild(image);}
+    if(image.src!==url)image.src=url;
   }
 
-  function scan(root=document){
-    const scope=root?.querySelectorAll?root:document;
-    scope.querySelectorAll('.hn-chat-pending-item video,.hn-chat-row[data-chat-key="outgoing"] video').forEach(primeLocalVideo);
-    if(root instanceof HTMLVideoElement)primeLocalVideo(root);
+  function applyToContainer(container){
+    if(!container)return;
+    const items=[...container.querySelectorAll('.hn-chat-media-item,.hn-chat-pending-item')];
+    if(!items.length)return;
+    items.forEach((item,index)=>{
+      const entry=selection[index];if(!entry)return;
+      if(entry.url)decorateItem(item,entry.url);
+      else entry.promise?.then(url=>{if(url)decorateItem(item,url);});
+    });
+  }
+
+  function applySelectionPosters(){
+    const screen=document.getElementById('hn-chat-screen');if(!screen)return;
+    applyToContainer(screen.querySelector('.hn-chat-media-pending'));
+    applyToContainer(screen.querySelector('.hn-chat-row[data-chat-key="outgoing"]'));
+  }
+
+  function syncSendingState(){
+    const screen=document.getElementById('hn-chat-screen');if(!screen)return;
+    const sending=!!screen.querySelector('.hn-chat-row[data-chat-key="outgoing"]');
+    screen.classList.toggle('hn-video-media-sending',sending);
+    if(sending)applySelectionPosters();
   }
 
   function redispatchFast(input){
@@ -73,29 +127,34 @@
   function bypassVideoOptimization(event){
     const input=event.target;
     if(!(input instanceof HTMLInputElement)||!input.matches(INPUT_SELECTOR)||event.__hnOptimizedChange)return;
-    const files=[...(input.files||[])];
-    if(!files.length||!files.every(file=>file.type.startsWith('video/')))return;
-    // The old optimizer re-records Android video in real time. For pure video
-    // selections we skip that path completely and continue with the original file.
-    event.preventDefault();
-    event.stopImmediatePropagation();
+    const files=[...(input.files||[])];if(!files.length)return;
+    if(!files.some(isVideo)){clearSelection();return;}
+
+    // Any selection containing video bypasses the legacy canvas/MediaRecorder optimizer.
+    // Photos-only selections still use the normal lightweight image optimizer.
+    prepareSelection(files);
+    event.preventDefault();event.stopImmediatePropagation();
     queueMicrotask(()=>redispatchFast(input));
   }
 
+  function installStyles(){
+    if(document.getElementById('hn-video-fast-path-style'))return;
+    const style=document.createElement('style');style.id='hn-video-fast-path-style';
+    style.textContent=`
+      #hn-chat-screen.hn-video-media-sending .hn-chat-media-pending{display:none!important}
+      #hn-chat-screen .hn-chat-pending-item,#hn-chat-screen .hn-chat-row[data-chat-key="outgoing"] .hn-chat-media-item{position:relative!important;overflow:hidden!important}
+      #hn-chat-screen .hn-fast-video-poster{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;max-width:none!important;max-height:none!important;object-fit:cover!important;background:#090909!important;z-index:3!important;pointer-events:none!important}
+    `;
+    document.head.appendChild(style);
+  }
+
   function install(){
+    installStyles();
     document.addEventListener('change',bypassVideoOptimization,{capture:true});
-    scan();
-    const observer=new MutationObserver(mutations=>{
-      for(const mutation of mutations){
-        for(const node of mutation.addedNodes){if(node instanceof Element)scan(node.parentElement||node);}
-        for(const node of mutation.removedNodes){
-          if(!(node instanceof Element))continue;
-          if(node instanceof HTMLVideoElement)releasePoster(node);
-          node.querySelectorAll?.('video[data-hn-fast-video-poster]').forEach(releasePoster);
-        }
-      }
-    });
+    observer=new MutationObserver(()=>{applySelectionPosters();syncSendingState();});
     observer.observe(document.documentElement,{childList:true,subtree:true});
+    window.addEventListener('hn:session-logout',clearSelection);
+    applySelectionPosters();syncSendingState();
   }
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
