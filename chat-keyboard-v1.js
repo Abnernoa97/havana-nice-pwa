@@ -146,6 +146,11 @@
         padding-bottom:68px!important;
         scroll-padding-bottom:68px!important;
       }
+      #hn-chat-screen.is-active .hn-chat-time,
+      #hn-chat-screen.is-active .hn-chat-row.mine .hn-chat-time{
+        color:#d4af37!important;
+        font-weight:600!important;
+      }
 
       /* Always pinned to the real bottom edge, WhatsApp style. */
       #hn-chat-screen.is-active .hn-chat-compose{
