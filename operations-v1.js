@@ -16,6 +16,11 @@
     'ANDY REY':'GERENTE DE LIVERPOOL'
   };
 
+  function applyHomeLabels(){
+    const subtitle=document.querySelector('.module[data-module="CALENDARIO DE EVENTOS"] .module-subtitle');
+    if(subtitle)subtitle.textContent='TODOS LOS DETALLES';
+  }
+
   function applyFamilyRoles(){
     const cards=[...document.querySelectorAll('.family-member')];
     if(!cards.length)return false;
@@ -29,6 +34,7 @@
   }
 
   function installFamilyRoles(){
+    applyHomeLabels();
     if(applyFamilyRoles())return;
     let tries=0;
     const timer=setInterval(()=>{
