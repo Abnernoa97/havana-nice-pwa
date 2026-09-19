@@ -17,7 +17,7 @@ const FRESH_PATHS=new Set([
   '/chat-media-fix-v1.js','/chat-v2.js','/chat-typing-v2.js',
   '/chat-realtime-guard-v1.js','/chat-keyboard-v1.js',
   '/chat-media-lightbox-v2.js','/chat-video-controls-v1.js',
-  '/chat-video-fast-path-v1.js','/chat-video-poster-cache-v1.js',
+  '/chat-video-fast-path-v1.js','/chat-video-poster-cache-v1.js','/chat-video-persisted-poster-v1.js',
   '/family-v1.js',
   '/musician-device-access-v1.js','/musician-push.js','/musician-background-v1.js',
   '/calendar-v1.js','/calendar-expand.js','/calendar-navigation.js',
