@@ -1,4 +1,4 @@
-/* HAVANA NICE — CHAT MEDIA DISPLAY + MEDIA OPTIMIZATION V7
+/* HAVANA NICE — CHAT MEDIA DISPLAY + MEDIA OPTIMIZATION V8
    Owns chat photo/video sizing and client-side media optimization.
    Fullscreen viewing remains owned by chat-media-lightbox-v2.js.
 */
@@ -195,13 +195,16 @@
     const files=[...(input.files||[])];if(!files.length)return;
     const candidates=files.filter(file=>file.type.startsWith('image/')||file.type.startsWith('video/'));
     if(!candidates.length)return;
+    // iOS videos go directly to the existing duration validation and upload.
+    // Avoid canvas re-recording and FileList replacement for video-only selections.
+    if(isIOS()&&files.every(file=>file.type.startsWith('video/')))return;
     event.preventDefault();event.stopImmediatePropagation();
     const notice=createOptimizingNotice(input,candidates.length);
     try{
       const optimized=[];
       for(const file of files){
         if(file.type.startsWith('image/'))optimized.push(await optimizeImage(file));
-        else if(file.type.startsWith('video/'))optimized.push(await optimizeVideo(file,await readVideoMeta(file)));
+        else if(file.type.startsWith('video/'))optimized.push(isIOS()?file:await optimizeVideo(file,await readVideoMeta(file)));
         else optimized.push(file);
       }
       if(typeof DataTransfer==='undefined')throw new Error('DataTransfer no disponible');
