@@ -10,5 +10,23 @@ function init(){const s=document.createElement('style');s.textContent='.module,.
 (function(){var s=document.createElement('script');s.src='./chat-media-fix-v1.js?v=90a1afd6882864bd0f423ab0459550af8a23794c';s.async=false;document.head.appendChild(s)})();
 (function(){var s=document.createElement('script');s.src='./chat-keyboard-v1.js?v=c8d8dc241c0ab17d471af96badbdb40cd89915af';s.async=false;document.head.appendChild(s)})();
 
+/* Prominent upload progress UI. Transport stays in Chat Media V13; this is visual only. */
+(function(){'use strict';
+  const STYLE_ID='hn-chat-upload-progress-ui';
+  function installStyle(){if(document.getElementById(STYLE_ID))return;const s=document.createElement('style');s.id=STYLE_ID;s.textContent=`
+    #hn-chat-screen .hn-chat-row[data-chat-key="outgoing"] .hn-chat-bubble{position:relative!important;overflow:hidden!important}
+    #hn-chat-screen .hn-chat-upload-visual{position:absolute!important;inset:0!important;z-index:30!important;pointer-events:none!important;display:flex!important;align-items:center!important;justify-content:center!important;background:linear-gradient(180deg,rgba(0,0,0,.10),rgba(0,0,0,.22))!important}
+    #hn-chat-screen .hn-chat-upload-badge{min-width:92px!important;height:92px!important;padding:0 12px!important;border-radius:50%!important;border:2px solid rgba(255,241,168,.92)!important;background:rgba(2,3,2,.74)!important;box-shadow:0 4px 24px rgba(0,0,0,.45),inset 0 0 18px rgba(229,189,98,.08)!important;display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;backdrop-filter:blur(8px)!important;-webkit-backdrop-filter:blur(8px)!important}
+    #hn-chat-screen .hn-chat-upload-percent{color:#fff1a8!important;font:600 30px/1 Arial,sans-serif!important;letter-spacing:-.03em!important;text-shadow:0 1px 8px rgba(0,0,0,.6)!important}
+    #hn-chat-screen .hn-chat-upload-label{margin-top:7px!important;color:rgba(244,241,232,.78)!important;font:600 8px/1 Arial,sans-serif!important;letter-spacing:.20em!important;text-transform:uppercase!important}
+    #hn-chat-screen .hn-chat-upload-track{position:absolute!important;left:10px!important;right:10px!important;bottom:8px!important;height:6px!important;border-radius:999px!important;background:rgba(255,255,255,.18)!important;overflow:hidden!important;box-shadow:0 1px 4px rgba(0,0,0,.35)!important}
+    #hn-chat-screen .hn-chat-upload-fill{display:block!important;height:100%!important;width:0;border-radius:inherit!important;background:linear-gradient(90deg,#b9822f,#fff1a8,#d9b45f)!important;transition:width .16s linear!important;box-shadow:0 0 10px rgba(255,241,168,.42)!important}
+    #hn-chat-screen .hn-chat-row[data-chat-key="outgoing"] .hn-chat-time{font-size:10px!important;font-weight:700!important;letter-spacing:.10em!important;color:#fff1a8!important}
+  `;document.head.appendChild(s)}
+  function render(percent){installStyle();const bubble=document.querySelector('#hn-chat-screen .hn-chat-row[data-chat-key="outgoing"] .hn-chat-bubble');if(!bubble)return;let visual=bubble.querySelector('.hn-chat-upload-visual');if(!visual){visual=document.createElement('div');visual.className='hn-chat-upload-visual';visual.innerHTML='<div class="hn-chat-upload-badge"><div class="hn-chat-upload-percent">1%</div><div class="hn-chat-upload-label">ENVIANDO</div></div><div class="hn-chat-upload-track"><span class="hn-chat-upload-fill"></span></div>';bubble.appendChild(visual)}const value=Math.max(1,Math.min(100,Math.round(Number(percent)||0)));const number=visual.querySelector('.hn-chat-upload-percent'),fill=visual.querySelector('.hn-chat-upload-fill');if(number)number.textContent=value+'%';if(fill)fill.style.width=value+'%'}
+  window.addEventListener('hn:chat-media-upload-progress',e=>render(e?.detail?.percent));
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installStyle,{once:true});else installStyle();
+})();
+
 /* Chat lifecycle reconciliation lives here instead of a separate patch file. */
 (function(){'use strict';let timer=null;const reconcile=()=>{try{if(typeof window.hnChatReconcile==='function')window.hnChatReconcile()}catch(_){}};const schedule=delay=>{clearTimeout(timer);timer=setTimeout(reconcile,delay)};function boot(){if(typeof window.hnChatReconcile!=='function'){setTimeout(boot,500);return}schedule(1200);document.addEventListener('visibilitychange',()=>{if(!document.hidden)schedule(150)});window.addEventListener('focus',()=>schedule(150));window.addEventListener('pageshow',()=>schedule(150))}boot()})();
