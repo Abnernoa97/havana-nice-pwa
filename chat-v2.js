@@ -148,7 +148,28 @@
   function startRecording(){if(pendingMedia.length){alert('Primero envía o elimina las fotos/videos seleccionados.');return;}if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder){alert('Este dispositivo o navegador no permite grabar notas de voz.');return;}const mimeType=pickAudioMime();navigator.mediaDevices.getUserMedia({audio:true}).then(stream=>{audioChunks=[];mediaRecorder=mimeType?new MediaRecorder(stream,{mimeType}):new MediaRecorder(stream);recordingStartedAt=Date.now();micEl?.classList.add('is-recording');micEl?.setAttribute('aria-label','Detener grabación');micEl?.setAttribute('title','Detener grabación');updateRecordingUI();recordingTimer=setInterval(updateRecordingUI,250);mediaRecorder.ondataavailable=e=>{if(e.data?.size)audioChunks.push(e.data)};mediaRecorder.onerror=()=>{stream.getTracks().forEach(t=>t.stop());mediaRecorder=null;resetRecordingUI(false);alert('No se pudo grabar el audio.');};mediaRecorder.onstop=()=>{stopRecordingTimer();stream.getTracks().forEach(t=>t.stop());const duration=Math.max(1,Math.round((Date.now()-recordingStartedAt)/1000));const blob=new Blob(audioChunks,{type:mediaRecorder?.mimeType||mimeType||'audio/webm'});mediaRecorder=null;if(!blob.size)return;pendingVoice={blob,duration};resetRecordingUI(true);updateSendState();inputEl?.focus();};mediaRecorder.start();}).catch(error=>{console.error('HAVANA NICE microphone permission failed:',error);alert('Necesitamos permiso para usar el micrófono.');});}
   function stopRecording(){if(mediaRecorder&&mediaRecorder.state!=='inactive')mediaRecorder.stop();}
   function toggleRecording(){if(micEl?.disabled)return;if(mediaRecorder&&mediaRecorder.state==='recording')stopRecording();else startRecording();}
-  function getVideoDuration(file){return new Promise((resolve,reject)=>{const url=URL.createObjectURL(file),video=document.createElement('video');video.preload='metadata';video.onloadedmetadata=()=>{const d=Number(video.duration)||0;URL.revokeObjectURL(url);resolve(d)};video.onerror=()=>{URL.revokeObjectURL(url);reject(new Error('No se pudo leer el video.'))};video.src=url;});}
+  function getVideoDuration(file){
+    const ios=/iPad|iPhone|iPod/i.test(navigator.userAgent||'')||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+    if(ios)return new Promise((resolve,reject)=>{
+      const url=URL.createObjectURL(file),video=document.createElement('video');
+      let settled=false;
+      const finish=(error,duration)=>{
+        if(settled)return;settled=true;clearTimeout(timer);
+        video.onloadedmetadata=null;video.onerror=null;
+        video.removeAttribute('src');video.load();URL.revokeObjectURL(url);
+        if(error)reject(error);else resolve(duration);
+      };
+      const timer=setTimeout(()=>finish(new Error('No se pudo leer el video en 15 segundos.')),15000);
+      video.preload='metadata';video.muted=true;video.playsInline=true;
+      video.onloadedmetadata=()=>{
+        const duration=Number(video.duration);
+        finish(Number.isFinite(duration)&&duration>0?null:new Error('Duración de video no válida.'),duration);
+      };
+      video.onerror=()=>finish(new Error('No se pudo leer el video.'));
+      video.src=url;video.load();
+    });
+    return new Promise((resolve,reject)=>{const url=URL.createObjectURL(file),video=document.createElement('video');video.preload='metadata';video.onloadedmetadata=()=>{const d=Number(video.duration)||0;URL.revokeObjectURL(url);resolve(d)};video.onerror=()=>{URL.revokeObjectURL(url);reject(new Error('No se pudo leer el video.'))};video.src=url;});
+  }
   async function handleMediaFiles(fileList){const files=[...fileList];if(!files.length)return;if(pendingVoice){pendingVoice=null;resetRecordingUI(false);}const maxMedia=Math.min(10,Math.max(1,Number(chatSettings.max_media_files)||MAX_MEDIA));if(pendingMedia.length+files.length>maxMedia){alert(`Puedes subir máximo ${maxMedia} fotos/videos por envío.`);mediaEl.value='';return;}for(const file of files){if(!file.type.startsWith('image/')&&!file.type.startsWith('video/')){alert('Solo puedes subir fotos o videos.');continue;}if(file.type.startsWith('video/')){try{const duration=await getVideoDuration(file);const maxSeconds=Math.min(60,Math.max(1,Number(chatSettings.max_video_minutes)||5))*60;if(!duration||duration>maxSeconds){alert(`El video "${file.name}" supera el máximo de ${Math.round(maxSeconds/60)} minutos.`);continue;}}catch(_){alert(`No se pudo revisar el video "${file.name}".`);continue;}}pendingMedia.push(file);}mediaEl.value='';renderPendingMedia();updateSendState();}
   function clearPendingPreviewUrls(){pendingPreviewUrls.forEach(url=>{try{URL.revokeObjectURL(url)}catch(_){}});pendingPreviewUrls=[];}
   function renderPendingMedia(){const box=chatScreen?.querySelector('.hn-chat-media-pending');if(!box)return;clearPendingPreviewUrls();if(!pendingMedia.length){box.classList.remove('is-visible');box.innerHTML='';return;}box.classList.add('is-visible');box.innerHTML=pendingMedia.map((file,i)=>{const url=URL.createObjectURL(file);pendingPreviewUrls.push(url);const tag=file.type.startsWith('video/')?'video':'img';return `<div class="hn-chat-pending-item"><${tag} src="${url}" ${tag==='video'?'muted':''}></${tag}><button class="hn-chat-pending-remove" type="button" data-index="${i}" aria-label="Eliminar archivo">×</button></div>`;}).join('');box.querySelectorAll('.hn-chat-pending-remove').forEach(btn=>btn.addEventListener('click',()=>{pendingMedia.splice(Number(btn.dataset.index),1);renderPendingMedia();updateSendState();}));}
