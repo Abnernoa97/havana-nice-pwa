@@ -1,4 +1,4 @@
-/* HAVANA NICE — iOS INSTALL + LAYOUT V3 */
+/* HAVANA NICE — iOS INSTALL + LAYOUT V4 */
 (function(){
   'use strict';
   const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
@@ -35,14 +35,14 @@
       #homeScreen .home-inner{
         width:min(100%,720px)!important;
         margin:0 auto!important;
-        padding-top:70px!important;
+        padding-top:58px!important;
       }
       #homeScreen .welcome{
-        margin:0 0 26px!important;
+        margin:0 0 18px!important;
         text-align:center!important;
       }
       #homeScreen .welcome-small{
-        margin:0 0 11px!important;
+        margin:0 0 9px!important;
         font-size:9px!important;
         line-height:1.25!important;
         letter-spacing:.38em!important;
@@ -54,18 +54,27 @@
         letter-spacing:-.035em!important;
       }
       #homeScreen .welcome-role{
-        margin:13px 0 0!important;
+        margin:10px 0 0!important;
         font-size:9px!important;
         line-height:1.45!important;
         letter-spacing:.20em!important;
       }
+      #homeScreen .modules{gap:8px!important;}
+      #homeScreen .module{
+        min-height:68px!important;
+        padding:11px 16px!important;
+      }
+      #homeScreen .module-subtitle{margin-top:4px!important;}
 
       @media(max-height:720px){
-        #homeScreen .home-inner{padding-top:56px!important;}
-        #homeScreen .welcome{margin-bottom:19px!important;}
-        #homeScreen .welcome-small{margin-bottom:8px!important;}
+        #homeScreen .home-inner{padding-top:48px!important;}
+        #homeScreen .welcome{margin-bottom:13px!important;}
+        #homeScreen .welcome-small{margin-bottom:6px!important;}
         #homeScreen .welcome-name{font-size:clamp(42px,12vw,64px)!important;}
-        #homeScreen .welcome-role{margin-top:9px!important;}
+        #homeScreen .welcome-role{margin-top:7px!important;}
+        #homeScreen .modules{gap:6px!important;}
+        #homeScreen .module{min-height:60px!important;padding:9px 14px!important;}
+        #homeScreen .module-subtitle{margin-top:3px!important;}
       }
     `;
     document.head.appendChild(style);
