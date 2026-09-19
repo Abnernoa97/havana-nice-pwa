@@ -104,5 +104,32 @@ function init(){const s=document.createElement('style');s.textContent='.module,.
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();
 
+/* Minimal reference-style composer. Visual override only; chat logic stays untouched. */
+(function(){'use strict';
+  const STYLE_ID='hn-chat-minimal-composer-v1';
+  function install(){if(document.getElementById(STYLE_ID))return;const s=document.createElement('style');s.id=STYLE_ID;s.textContent=`
+    #hn-chat-screen .hn-chat-compose{display:grid!important;grid-template-columns:minmax(0,1fr) 94px!important;gap:8px!important;align-items:center!important;padding:8px 0 max(8px,env(safe-area-inset-bottom))!important;border-top:0!important;background:transparent!important;box-shadow:none!important;min-height:0!important}
+    #hn-chat-screen .hn-chat-input-wrap{grid-column:1!important;display:grid!important;grid-template-columns:54px minmax(0,1fr) 46px!important;gap:8px!important;align-items:center!important;position:static!important;min-width:0!important}
+    #hn-chat-screen .hn-chat-input{grid-column:2!important;grid-row:1!important;width:100%!important;height:54px!important;min-height:54px!important;max-height:54px!important;margin:0!important;padding:0 17px!important;border:1px solid #d8d2c8!important;border-radius:999px!important;background:#fff!important;color:#29251f!important;font-size:16px!important;line-height:1.2!important;resize:none!important;overflow:hidden!important;box-shadow:none!important;box-sizing:border-box!important}
+    #hn-chat-screen .hn-chat-input::placeholder{color:#9a938a!important;opacity:1!important}
+    #hn-chat-screen .hn-chat-attach,#hn-chat-screen .hn-chat-mic{position:static!important;inset:auto!important;transform:none!important;margin:0!important;border:0!important;background:#171817!important;color:#fff!important;box-shadow:none!important;display:flex!important;align-items:center!important;justify-content:center!important}
+    #hn-chat-screen .hn-chat-attach{grid-column:1!important;grid-row:1!important;width:54px!important;height:54px!important;border-radius:50%!important;font-size:28px!important;font-weight:300!important}
+    #hn-chat-screen .hn-chat-mic{grid-column:3!important;grid-row:1!important;width:46px!important;height:46px!important;border-radius:50%!important;font-size:20px!important}
+    #hn-chat-screen .hn-chat-mic.is-recording{background:#8d2929!important;color:#fff!important}
+    #hn-chat-screen .hn-chat-send{grid-column:2!important;grid-row:1!important;width:94px!important;height:54px!important;min-height:54px!important;margin:0!important;padding:0 14px!important;border:0!important;border-radius:999px!important;background:#171817!important;color:#fff!important;font-size:13px!important;font-weight:700!important;letter-spacing:0!important;text-transform:none!important;box-shadow:none!important}
+    #hn-chat-screen .hn-chat-send:disabled{background:#d8d2c9!important;color:#a49d94!important;opacity:1!important}
+    #hn-chat-screen .hn-chat-media-pending,#hn-chat-screen .hn-chat-recording,#hn-chat-screen .hn-chat-reply{grid-column:1 / -1!important}
+    @media(max-width:390px){
+      #hn-chat-screen .hn-chat-compose{grid-template-columns:minmax(0,1fr) 84px!important;gap:6px!important}
+      #hn-chat-screen .hn-chat-input-wrap{grid-template-columns:48px minmax(0,1fr) 42px!important;gap:6px!important}
+      #hn-chat-screen .hn-chat-attach{width:48px!important;height:48px!important}
+      #hn-chat-screen .hn-chat-mic{width:42px!important;height:42px!important}
+      #hn-chat-screen .hn-chat-input{height:50px!important;min-height:50px!important;max-height:50px!important;padding:0 14px!important;font-size:15px!important}
+      #hn-chat-screen .hn-chat-send{width:84px!important;height:50px!important;min-height:50px!important;font-size:12px!important}
+    }
+  `;document.head.appendChild(s)}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
+})();
+
 /* Chat lifecycle reconciliation lives here instead of a separate patch file. */
 (function(){'use strict';let timer=null;const reconcile=()=>{try{if(typeof window.hnChatReconcile==='function')window.hnChatReconcile()}catch(_){}};const schedule=delay=>{clearTimeout(timer);timer=setTimeout(reconcile,delay)};function boot(){if(typeof window.hnChatReconcile!=='function'){setTimeout(boot,500);return}schedule(1200);document.addEventListener('visibilitychange',()=>{if(!document.hidden)schedule(150)});window.addEventListener('focus',()=>schedule(150));window.addEventListener('pageshow',()=>schedule(150))}boot()})();
