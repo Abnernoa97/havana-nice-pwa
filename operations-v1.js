@@ -16,19 +16,27 @@
     'ANDY REY':'GERENTE DE LIVERPOOL'
   };
 
-  function applyFamilyRoles(root=document){
-    root.querySelectorAll?.('.family-member').forEach(card=>{
+  function applyFamilyRoles(){
+    const cards=[...document.querySelectorAll('.family-member')];
+    if(!cards.length)return false;
+    cards.forEach(card=>{
       const name=card.querySelector('.family-name')?.textContent?.trim().toUpperCase();
       const role=card.querySelector('.family-role');
-      if(role&&FAMILY_ROLES[name])role.textContent=FAMILY_ROLES[name];
+      const next=FAMILY_ROLES[name];
+      if(role&&next&&role.textContent!==next)role.textContent=next;
     });
+    return true;
   }
 
-  function initFamilyRoles(){
-    applyFamilyRoles();
-    new MutationObserver(()=>applyFamilyRoles()).observe(document.body,{childList:true,subtree:true});
+  function installFamilyRoles(){
+    if(applyFamilyRoles())return;
+    let tries=0;
+    const timer=setInterval(()=>{
+      tries++;
+      if(applyFamilyRoles()||tries>=40)clearInterval(timer);
+    },250);
   }
 
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initFamilyRoles,{once:true});
-  else initFamilyRoles();
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installFamilyRoles,{once:true});
+  else installFamilyRoles();
 })();
