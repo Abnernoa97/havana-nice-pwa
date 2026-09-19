@@ -1,4 +1,4 @@
-/* HAVANA NICE — CALENDAR EXPAND V3
+/* HAVANA NICE — CALENDAR EXPAND V4
    Reliable accordion interaction for musician calendar cards.
    Google Maps stays visible even when the accordion is collapsed.
    Uses a real touch button for iPhone instead of a pseudo-element only.
@@ -19,22 +19,25 @@
       .calendar-event-card:not(.is-expanded) .calendar-event-details-m{display:none!important}
       .calendar-event-card.is-expanded{border-color:rgba(229,189,98,.72)}
       .calendar-event-card .calendar-map-button{
-        display:block!important;
+        display:flex!important;
+        align-items:center!important;
+        justify-content:center!important;
+        gap:8px!important;
         margin-top:12px!important;
-        padding:10px 12px!important;
-        border:1px solid rgba(229,189,98,.52)!important;
+        padding:11px 13px!important;
+        border:1px solid rgba(229,189,98,.62)!important;
         color:var(--gold-light)!important;
-        background:rgba(0,0,0,.18)!important;
-        text-align:left!important;
-        text-transform:none!important;
-        letter-spacing:0!important;
-        font-size:10px!important;
-        line-height:1.35!important;
-        overflow-wrap:anywhere!important;
-        word-break:break-word!important;
+        background:rgba(0,0,0,.22)!important;
+        text-align:center!important;
+        text-transform:uppercase!important;
+        letter-spacing:.14em!important;
+        font-size:9px!important;
+        font-weight:600!important;
+        line-height:1.2!important;
         text-decoration:none!important;
         cursor:pointer!important;
       }
+      .calendar-event-card .calendar-map-button::after{content:'↗';font-size:12px!important;letter-spacing:0!important}
       .${BUTTON_CLASS}{
         position:absolute!important;top:8px!important;right:8px!important;
         width:42px!important;height:42px!important;margin:0!important;padding:0!important;
@@ -74,8 +77,8 @@
     if(!link)return;
     const href=String(link.getAttribute('href')||'').trim();
     if(!href)return;
-    link.textContent=href;
-    link.setAttribute('aria-label','Abrir ubicación en Google Maps');
+    link.textContent='Llegar al evento';
+    link.setAttribute('aria-label','Llegar al evento en Google Maps');
   }
 
   function applyState(card,id){
