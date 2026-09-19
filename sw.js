@@ -1,8 +1,8 @@
-/* HAVANA NICE — UNIFIED SERVICE WORKER
+/* HAVANA NICE — UNIFIED SERVICE WORKER V3
    One worker for musicians + admin + push.
-   Preserves iOS Family handling while preventing cache/worker conflicts.
+   Chat Media V10 assets are network-first; legacy chat video patch assets are retired.
 */
-const CACHE='hn-unified-v2';
+const CACHE='hn-unified-v3';
 const MUSICIAN_SHELL='./index.html';
 const ADMIN_SHELL='./admin.html';
 const MUSICIAN_SHELL_REQUEST=new Request(MUSICIAN_SHELL);
@@ -14,10 +14,8 @@ const FAMILY_IOS_VERSION='ios-family-20260918-clean';
 
 const FRESH_PATHS=new Set([
   '/notifications-v5.js','/operations-fix.js','/ios-install-v1.js',
-  '/chat-media-fix-v1.js','/chat-v2.js','/chat-typing-v2.js',
-  '/chat-realtime-guard-v1.js','/chat-keyboard-v1.js',
-  '/chat-media-lightbox-v2.js','/chat-video-controls-v1.js',
-  '/chat-video-fast-path-v1.js','/chat-video-poster-cache-v1.js','/chat-video-persisted-poster-v1.js',
+  '/chat-v2.js','/chat-media-v10.js','/chat-media-fix-v1.js','/chat-video-placeholder.svg',
+  '/chat-typing-v2.js','/chat-realtime-guard-v1.js','/chat-keyboard-v1.js',
   '/family-v1.js',
   '/musician-device-access-v1.js','/musician-push.js','/musician-background-v1.js',
   '/calendar-v1.js','/calendar-expand.js','/calendar-navigation.js',
@@ -115,7 +113,7 @@ self.addEventListener('fetch',event=>{
   if(event.request.method!=='GET')return;
   const url=new URL(event.request.url);
 
-  // Critical iOS rule: Supabase/Storage cross-origin requests never pass through the SW.
+  // iOS: Supabase/Storage cross-origin requests stay outside the Service Worker.
   if(IS_IOS&&url.origin!==self.location.origin)return;
 
   if(url.hostname==='cdn.jsdelivr.net'&&url.pathname==='/npm/@supabase/supabase-js@2/+esm'){
