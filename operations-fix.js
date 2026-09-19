@@ -7,6 +7,7 @@ function init(){const s=document.createElement('style');s.textContent='.module,.
 (function(){var s=document.createElement('script');s.src='./chat-typing-v2.js?v=70a94193937be7ab27a714e00fde8efe34503edb';s.async=false;document.head.appendChild(s)})();
 (function(){var s=document.createElement('script');s.src='./chat-realtime-guard-v1.js?v=7edbf360d985a8ce064d8bd2f04d68b5aa026d62';s.async=false;document.head.appendChild(s)})();
 (function(){var s=document.createElement('script');s.src='./ios-install-v1.js?v=72b630c25c9dbca9220acdebdab48bc002191f9d';s.async=false;document.head.appendChild(s)})();
-(function(){var s=document.createElement('script');s.src='./chat-media-v10.js?v=12dfac61fa1e95ce2a7d1dbbb657baec5ad2dccc';s.async=false;document.head.appendChild(s)})();
+(function(){var s=document.createElement('script');s.src='./chat-media-v10.js?v=b097387a0ff73f2d34857dbf1236b7fd64383280';s.async=false;document.head.appendChild(s)})();
+(function(){var s=document.createElement('script');s.src='./chat-video-processing-v1.js?v=c1d8ebca4620964606ca31df37e7c9ecd2b569ba';s.async=false;document.head.appendChild(s)})();
 (function(){var s=document.createElement('script');s.src='./chat-media-fix-v1.js?v=f3c4ba8df744b8d2d7a64d95d1de79b1dba695be';s.async=false;document.head.appendChild(s)})();
 (function(){var s=document.createElement('script');s.src='./chat-keyboard-v1.js?v=c8d8dc241c0ab17d471af96badbdb40cd89915af';s.async=false;document.head.appendChild(s)})();
