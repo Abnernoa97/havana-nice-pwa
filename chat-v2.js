@@ -23,6 +23,8 @@
   let mediaRecorder = null, audioChunks = [], recordingStartedAt = 0, recordingTimer = null;
   let pendingVoice = null, pendingMedia = [], pendingPreviewUrls = [];
   let chatReconnectTimer = null, chatReconnectDelay = 1000;
+  let chatChannelOwner=null, chatChannelStatus=null, chatChannelEpoch=0;
+  let chatBootTimer=null, chatResumeTimer=null;
   let sending=false, outgoing=null, outgoingUrls=[];
   let activeProfileId=null, historyRestoredFor=null, historyDB=null;
   let loadFlight=null, syncRevision=0, syncedAt=0;
@@ -345,7 +347,7 @@
   async function loadMessages(){
     const id=ensureChatIdentity(),sb=client();if(!id||!sb)return;if(loadFlight)return loadFlight;const revision=syncRevision;
     const task=(async()=>{try{
-      const {data,error}=await sb.from(CHAT_TABLE).select(MESSAGE_FIELDS).order('created_at',{ascending:false}).limit(PAGE_SIZE);if(activeProfileId!==id)return;if(error){console.warn('HAVANA NICE chat load failed:',error);return;}
+      const {data,error}=await sb.from(CHAT_TABLE).select(MESSAGE_FIELDS).order('created_at',{ascending:false}).limit(PAGE_SIZE);if(activeProfileId!==id||String(currentProfile()?.id||'')!==id)return;if(error){console.warn('HAVANA NICE chat load failed:',error);return;}
       const rows=new Map((data||[]).map(row=>[String(row.id),row]));for(const [key,change] of liveChanges){if(change.revision<=revision)continue;if(change.deleted)rows.delete(key);else rows.set(key,change.row);}
       messages=[...rows.values()].sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));oldestLoadedAt=messages[0]?.created_at||null;hasMore=(data||[]).length===PAGE_SIZE;syncRevision++;syncedAt=Date.now();for(const [key,change] of liveChanges)if(change.revision<=revision)liveChanges.delete(key);persistHistory();render(false);updateUnread();
     }catch(error){console.warn('HAVANA NICE chat reconcile failed:',error);}})();
@@ -362,8 +364,64 @@
     }catch(error){console.warn('HAVANA NICE older messages load failed:',error);}finally{loadingOlder=false;}
   }
 
-  window.hnChatReconcile=()=>{if(Date.now()-syncedAt<1500)return;return loadMessages();};
-  function subscribe(){const sb=client(),owner=ensureChatIdentity();if(!sb||!owner)return;clearTimeout(chatReconnectTimer);if(chatChannel){try{sb.removeChannel(chatChannel);}catch(_){}chatChannel=null;}chatChannel=sb.channel('hn-chat-realtime').on('postgres_changes',{event:'INSERT',schema:'public',table:CHAT_TABLE},payload=>{if(owner!==String(currentProfile()?.id||''))return;const row=payload.new;noteLiveChange(row);if(!messages.some(m=>String(m.id)===String(row.id))){messages.push(row);messages.sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));persistHistory();render(false);}if(chatScreen?.classList.contains('is-active'))markRead();else updateUnread();}).on('postgres_changes',{event:'DELETE',schema:'public',table:CHAT_TABLE},payload=>{if(owner!==String(currentProfile()?.id||''))return;const id=payload.old?.id;if(!id)return;noteLiveChange({id},true);const had=messages.some(m=>String(m.id)===String(id));messages=messages.filter(m=>String(m.id)!==String(id));if(replyTarget?.id===id)closeReply();persistHistory();if(had)render();else updateUnread();}).on('postgres_changes',{event:'UPDATE',schema:'public',table:'chat_settings'},()=>{loadChatSettings();}).subscribe(status=>{if(status==='SUBSCRIBED'){chatReconnectDelay=1000;clearTimeout(chatReconnectTimer);void loadMessages();}else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'||status==='CLOSED'){clearTimeout(chatReconnectTimer);chatReconnectTimer=setTimeout(()=>subscribe(),chatReconnectDelay);chatReconnectDelay=Math.min(chatReconnectDelay*2,10000);}});}
+  function disconnectChat(){
+    clearTimeout(chatReconnectTimer);
+    chatChannelEpoch++;
+    const old=chatChannel;
+    chatChannel=null;chatChannelOwner=null;chatChannelStatus=null;
+    if(old){try{Promise.resolve(client()?.removeChannel(old)).catch(()=>{});}catch(_){}}
+  }
+  function subscribe(force=false){
+    const sb=client(),owner=ensureChatIdentity();if(!sb||!owner||navigator.onLine===false)return;
+    if(!force&&chatChannel&&chatChannelOwner===owner&&['JOINING','SUBSCRIBED'].includes(chatChannelStatus))return;
+    disconnectChat();
+    const epoch=chatChannelEpoch;
+    const valid=()=>epoch===chatChannelEpoch&&owner===String(currentProfile()?.id||'');
+    chatChannelOwner=owner;chatChannelStatus='JOINING';
+    chatChannel=sb.channel('hn-chat-realtime-'+epoch)
+      .on('postgres_changes',{event:'INSERT',schema:'public',table:CHAT_TABLE},payload=>{
+        if(!valid())return;
+        const row=payload.new;noteLiveChange(row);
+        if(!messages.some(m=>String(m.id)===String(row.id))){messages.push(row);messages.sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));persistHistory();render(false);}
+        if(chatScreen?.classList.contains('is-active'))markRead();else updateUnread();
+      })
+      .on('postgres_changes',{event:'DELETE',schema:'public',table:CHAT_TABLE},payload=>{
+        if(!valid())return;const id=payload.old?.id;if(!id)return;
+        noteLiveChange({id},true);const had=messages.some(m=>String(m.id)===String(id));
+        messages=messages.filter(m=>String(m.id)!==String(id));if(replyTarget?.id===id)closeReply();
+        persistHistory();if(had)render();else updateUnread();
+      })
+      .on('postgres_changes',{event:'UPDATE',schema:'public',table:'chat_settings'},()=>{if(valid())loadChatSettings();})
+      .subscribe(status=>{
+        if(!valid())return;chatChannelStatus=status;
+        if(status==='SUBSCRIBED'){chatReconnectDelay=1000;clearTimeout(chatReconnectTimer);void loadMessages();}
+        else if(['CHANNEL_ERROR','TIMED_OUT','CLOSED'].includes(status)){
+          clearTimeout(chatReconnectTimer);
+          if(navigator.onLine!==false)chatReconnectTimer=setTimeout(()=>{if(valid())subscribe(true);},chatReconnectDelay);
+          chatReconnectDelay=Math.min(chatReconnectDelay*2,10000);
+        }
+      });
+  }
+  function startChat(force=false){
+    clearTimeout(chatBootTimer);
+    if(!currentProfile()?.id){disconnectChat();return;}
+    if(!client()){chatBootTimer=setTimeout(()=>startChat(force),250);return;}
+    void restoreHistory();subscribe(force);
+    if(force||Date.now()-syncedAt>=1500)void loadMessages();
+    void loadChatSettings();
+  }
+  function resumeChat(){
+    clearTimeout(chatResumeTimer);
+    if(document.hidden||navigator.onLine===false)return;
+    chatResumeTimer=setTimeout(()=>startChat(true),150);
+  }
+  function stopChat(){
+    clearTimeout(chatBootTimer);clearTimeout(chatResumeTimer);disconnectChat();
+    activeProfileId=null;historyRestoredFor=null;messages=[];loadFlight=null;syncedAt=0;
+    syncRevision++;liveChanges.clear();closeReply();clearOutgoing();
+    if(listEl){releaseLocalImages(listEl);listEl.replaceChildren();}
+  }
+  window.hnChatReconcile=()=>startChat();
   function closeReply(){replyTarget=null;chatScreen?.querySelector('.hn-chat-reply')?.classList.remove('is-visible');chatScreen?.querySelectorAll('.hn-chat-bubble.hn-chat-selected').forEach(el=>el.classList.remove('hn-chat-selected'));}
   function selectMessage(id){const message=messages.find(m=>String(m.id)===String(id));if(!message)return;replyTarget=message;chatScreen?.querySelectorAll('.hn-chat-bubble').forEach(el=>el.classList.toggle('hn-chat-selected',el.dataset.messageId===String(id)));const reply=chatScreen?.querySelector('.hn-chat-reply');if(reply){reply.classList.add('is-visible');const who=reply.querySelector('.hn-chat-reply-label'),text=reply.querySelector('.hn-chat-reply-text');if(who)who.textContent=`RESPONDER A ${message.sender_name||'MIEMBRO'}`;if(text)text.textContent=replyPreview(message);}inputEl?.focus();}
   function closeChat(fromButton=false){if(!chatScreen)return;if(mediaRecorder&&mediaRecorder.state==='recording'){try{mediaRecorder.stop();}catch(_){} }closeReply();chatScreen.classList.remove('is-active');if(previousScreen)previousScreen.classList.add('is-active');else document.getElementById('homeScreen')?.classList.add('is-active');const video=document.getElementById('backgroundVideo');if(video)video.muted=videoWasMuted;if(historyArmed&&fromButton){historyArmed=false;try{history.back();}catch(_){}}else if(!fromButton)historyArmed=false;}
@@ -371,6 +429,6 @@
   function wireModule(){const module=ensureHomeModule();if(!module||module.dataset.hnChatBound==='1')return;module.dataset.hnChatBound='1';module.addEventListener('click',()=>openChat());}
   window.addEventListener('popstate',()=>{if(historyArmed){historyArmed=false;closeChat(false);}});
   const observer=new MutationObserver(()=>wireModule());observer.observe(document.documentElement,{childList:true,subtree:true});
-  function init(){if(initialized)return;initialized=true;ensureStyles();wireModule();window.addEventListener('hn:session-ready',()=>{void restoreHistory();subscribe();loadMessages();loadChatSettings();});}
+  function init(){if(initialized)return;initialized=true;ensureStyles();wireModule();window.addEventListener('hn:session-ready',()=>startChat());window.addEventListener('hn:session-logout',stopChat);window.addEventListener('online',resumeChat);window.addEventListener('offline',disconnectChat);window.addEventListener('pageshow',resumeChat);window.addEventListener('focus',resumeChat);document.addEventListener('visibilitychange',resumeChat);startChat();}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })();

@@ -170,9 +170,10 @@
   function posterFromFile(file,g){
     return new Promise(resolve=>{
       const src=URL.createObjectURL(file),v=document.createElement('video');
-      let done=false,timer=null,seeked=false,frame=false;
+      let done=false,timer=null,seeked=false,frame=false,frameId=null;
       const finish=blob=>{
         if(done)return;done=true;clearTimeout(timer);
+        if(frameId!==null&&typeof v.cancelVideoFrameCallback==='function'){try{v.cancelVideoFrameCallback(frameId)}catch(_){}}
         try{v.pause()}catch(_){}
         v.onloadedmetadata=v.onloadeddata=v.onseeked=v.onerror=null;
         v.removeAttribute('src');try{v.load()}catch(_){}
@@ -187,11 +188,11 @@
         const c=document.createElement('canvas');c.width=Math.max(1,Math.round(w*scale));c.height=Math.max(1,Math.round(h*scale));
         const ctx=c.getContext('2d',{alpha:false});if(!ctx){finish(null);return}
         try{ctx.drawImage(v,0,0,c.width,c.height)}catch(_){finish(null);return}
-        c.toBlob(finish,'image/jpeg',POSTER_QUALITY);
+        try{c.toBlob(finish,'image/jpeg',POSTER_QUALITY)}catch(_){finish(null)}
       };
       const requestFrame=()=>{
         if(done||frame)return;frame=true;
-        if(typeof v.requestVideoFrameCallback==='function'){try{v.requestVideoFrameCallback(draw);return}catch(_){}
+        if(typeof v.requestVideoFrameCallback==='function'){try{frameId=v.requestVideoFrameCallback(draw);return}catch(_){}
         }
         setTimeout(()=>requestAnimationFrame(draw),30);
       };
@@ -201,7 +202,8 @@
         }
         requestFrame();
       };
-      timer=setTimeout(()=>{if(v.readyState>=2)requestFrame();else finish(null)},POSTER_TIMEOUT);
+      // A decoder/frame/canvas callback must never keep the send pending.
+      timer=setTimeout(()=>finish(null),POSTER_TIMEOUT);
       v.muted=true;v.defaultMuted=true;v.playsInline=true;v.preload='auto';
       v.onloadedmetadata=()=>{try{const p=v.play();if(p?.then)p.then(()=>setTimeout(()=>{try{v.pause()}catch(_){}seek()},50)).catch(seek);else seek()}catch(_){seek()}};
       v.onloadeddata=()=>{frame=false;seek()};v.onseeked=()=>{frame=false;requestFrame()};v.onerror=()=>finish(null);v.src=src;
@@ -212,7 +214,8 @@
   function makeEntry(file,g){
     const entry={file,blob:null,url:'',posterPromise:null};
     entry.posterPromise=posterFromFile(file,g).then(result=>{
-      if(!result||g!==generation)return null;
+      if(!result)return null;
+      if(g!==generation){URL.revokeObjectURL(result.url);return null;}
       entry.blob=result.blob;entry.url=result.url;paintPending();return entry;
     });
     return entry;
@@ -228,7 +231,10 @@
     const entry=await ensurePoster(file);if(!entry?.blob?.size)return '';
     const client=sb(),path=objectPath(videoUrl);if(!client||!path)return '';
     try{
-      const result=await client.storage.from(BUCKET).upload(path+'.poster.jpg',entry.blob,{contentType:'image/jpeg',cacheControl:'31536000',upsert:false});
+      let timer;
+      const upload=client.storage.from(BUCKET).upload(path+'.poster.jpg',entry.blob,{contentType:'image/jpeg',cacheControl:'31536000',upsert:false});
+      const result=await Promise.race([upload,new Promise(resolve=>{timer=setTimeout(()=>resolve(null),POSTER_TIMEOUT)})]).finally(()=>clearTimeout(timer));
+      if(!result)return ''; // A late sidecar is safe: cleanup protects derived poster paths too.
       if(result?.error&&!/exist|duplicate|already/i.test(String(result.error.message||'')))throw result.error;
       return posterUrl(videoUrl);
     }catch(err){console.warn('HAVANA NICE poster upload skipped:',err);return ''}
