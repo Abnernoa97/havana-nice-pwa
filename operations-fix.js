@@ -7,5 +7,5 @@ function init(){const s=document.createElement('style');s.textContent='.module,.
 (function(){var s=document.createElement('script');s.src='./chat-typing-v2.js?v=70a94193937be7ab27a714e00fde8efe34503edb';s.async=false;document.head.appendChild(s)})();
 (function(){var s=document.createElement('script');s.src='./chat-realtime-guard-v1.js?v=7edbf360d985a8ce064d8bd2f04d68b5aa026d62';s.async=false;document.head.appendChild(s)})();
 (function(){var s=document.createElement('script');s.src='./ios-install-v1.js?v=72b630c25c9dbca9220acdebdab48bc002191f9d';s.async=false;document.head.appendChild(s)})();
-(function(){var s=document.createElement('script');s.src='./chat-media-fix-v1.js?v=6f77d4adf471b4c43cf4fb0dca90a8efa1b690df';s.async=false;document.head.appendChild(s)})();
+(function(){var s=document.createElement('script');s.src='./chat-media-fix-v1.js?v=ff0b4cc445223ed9ddbcc49df6b0e781e939119a';s.async=false;document.head.appendChild(s)})();
 (function(){var s=document.createElement('script');s.src='./chat-keyboard-v1.js?v=9264af2797639e7b263bd754b82a76caece56c58';s.async=false;document.head.appendChild(s)})();
