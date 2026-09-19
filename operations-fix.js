@@ -28,5 +28,25 @@ function init(){const s=document.createElement('style');s.textContent='.module,.
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installStyle,{once:true});else installStyle();
 })();
 
+/* Chat performance surface: static light marble, no heading, background video paused while Chat is active. */
+(function(){'use strict';
+  const STYLE_ID='hn-chat-static-surface-v1';
+  let chatObserver=null,rootObserver=null,inChat=false,videoWasPlaying=false;
+  function installStyle(){if(document.getElementById(STYLE_ID))return;const s=document.createElement('style');s.id=STYLE_ID;s.textContent=`
+    #hn-chat-screen{background-color:#e8ded0!important;background-image:radial-gradient(circle at 14% 12%,rgba(255,255,255,.72) 0,rgba(255,255,255,0) 31%),linear-gradient(118deg,transparent 0 28%,rgba(132,104,76,.07) 29%,transparent 30% 61%,rgba(255,255,255,.36) 62%,transparent 63%),linear-gradient(160deg,#f2eadf 0%,#e3d7c7 48%,#eee5d8 100%)!important;padding-top:max(10px,env(safe-area-inset-top))!important}
+    #hn-chat-screen .hn-chat-head{display:none!important}
+    #hn-chat-screen .hn-chat-wrap{padding-top:0!important}
+    #hn-chat-screen .hn-chat-list{padding-top:0!important}
+    #hn-chat-screen .hn-chat-day{color:rgba(68,50,32,.48)!important;font-weight:600!important}
+    #hn-chat-screen .hn-chat-empty{color:rgba(68,50,32,.52)!important}
+    #hn-chat-screen .hn-chat-compose{border-top-color:rgba(104,75,39,.24)!important}
+    #hn-chat-screen .hn-chat-input{box-shadow:0 3px 16px rgba(65,46,25,.08)!important}
+  `;document.head.appendChild(s)}
+  function sync(){const chat=document.getElementById('hn-chat-screen'),video=document.getElementById('backgroundVideo');const active=!!chat?.classList.contains('is-active');if(active&&!inChat){inChat=true;if(video){videoWasPlaying=!video.paused;try{video.pause()}catch(_){}video.setAttribute('data-hn-chat-paused','1')}}else if(!active&&inChat){inChat=false;if(video){video.removeAttribute('data-hn-chat-paused');if(videoWasPlaying){try{const p=video.play();if(p?.catch)p.catch(()=>{})}catch(_){}}}videoWasPlaying=false}}
+  function bind(){installStyle();const chat=document.getElementById('hn-chat-screen');if(!chat)return false;if(chatObserver)chatObserver.disconnect();chatObserver=new MutationObserver(sync);chatObserver.observe(chat,{attributes:true,attributeFilter:['class']});sync();return true}
+  function boot(){installStyle();if(bind())return;rootObserver=new MutationObserver(()=>{if(bind()){rootObserver.disconnect();rootObserver=null}});rootObserver.observe(document.documentElement,{childList:true,subtree:true})}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
+})();
+
 /* Chat lifecycle reconciliation lives here instead of a separate patch file. */
 (function(){'use strict';let timer=null;const reconcile=()=>{try{if(typeof window.hnChatReconcile==='function')window.hnChatReconcile()}catch(_){}};const schedule=delay=>{clearTimeout(timer);timer=setTimeout(reconcile,delay)};function boot(){if(typeof window.hnChatReconcile!=='function'){setTimeout(boot,500);return}schedule(1200);document.addEventListener('visibilitychange',()=>{if(!document.hidden)schedule(150)});window.addEventListener('focus',()=>schedule(150));window.addEventListener('pageshow',()=>schedule(150))}boot()})();
