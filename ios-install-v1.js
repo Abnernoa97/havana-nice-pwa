@@ -1,4 +1,4 @@
-/* HAVANA NICE — iOS INSTALL + LAYOUT V5 */
+/* HAVANA NICE — iOS INSTALL + LAYOUT V6 */
 (function(){
   'use strict';
   const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
@@ -133,12 +133,14 @@
   }
 
   function installProfilePicker(){
-    if(repairProfilePicker())return;
-    let tries=0;
-    const timer=setInterval(()=>{
-      tries++;
-      if(repairProfilePicker()||tries>=40)clearInterval(timer);
-    },250);
+    repairProfilePicker();
+    document.addEventListener('click',event=>{
+      const trigger=event.target?.closest?.('.hn-home-profile-button');
+      if(!trigger)return;
+      /* The button's own click handler builds #hnProfileEditor before this event reaches document. */
+      repairProfilePicker();
+      setTimeout(repairProfilePicker,0);
+    });
   }
 
   const isStandalone=window.matchMedia?.('(display-mode: standalone)').matches||window.navigator.standalone===true;
