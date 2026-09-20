@@ -53,6 +53,31 @@
     try{window.dispatchEvent(new CustomEvent(type,{detail:profile||null}));}catch(_){}
   }
 
+  function isStandalone(){
+    try{
+      return window.matchMedia?.('(display-mode: standalone)').matches===true||window.navigator.standalone===true;
+    }catch(_){
+      return false;
+    }
+  }
+
+  function replyClientMode(event,nonce){
+    if(!nonce)return;
+    const payload={
+      type:'HN_CLIENT_MODE_RESPONSE',
+      nonce,
+      standalone:isStandalone(),
+      visibility:document.visibilityState||''
+    };
+    try{
+      if(event?.source&&typeof event.source.postMessage==='function'){
+        event.source.postMessage(payload);
+        return;
+      }
+    }catch(_){}
+    try{navigator.serviceWorker.controller?.postMessage(payload);}catch(_){}
+  }
+
   function normalizeLaunch(value){
     const section=String(value||'').trim().toLowerCase();
     return section==='notifications'||section==='chat'?section:'';
@@ -126,7 +151,14 @@
     if('serviceWorker'in navigator){
       navigator.serviceWorker.addEventListener('message',event=>{
         const data=event&&event.data;
-        if(!data||data.type!=='HN_PUSH_OPEN')return;
+        if(!data)return;
+
+        if(data.type==='HN_QUERY_CLIENT_MODE'){
+          replyClientMode(event,data.nonce);
+          return;
+        }
+
+        if(data.type!=='HN_PUSH_OPEN')return;
         const section=normalizeLaunch(data.section)||launchFromUrl(data.url);
         if(section)queueLaunch(section);
       });
