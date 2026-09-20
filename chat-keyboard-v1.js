@@ -1,11 +1,21 @@
-/* HAVANA NICE — CHAT KEYBOARD / COMPOSER V9 */
+/* HAVANA NICE — CHAT KEYBOARD / COMPOSER V10
+   Stable mobile viewport + latest-message follow.
+   Scoped to Chat only. No global DOM observer.
+*/
 (() => {
   'use strict';
+  if (window.__hnChatKeyboardV10) return;
+  window.__hnChatKeyboardV10 = true;
 
   const STYLE_ID = 'hn-chat-keyboard-fix-style';
+  const FOLLOW_THRESHOLD = 120;
   let raf = 0;
-  let bound = false;
-  let composerResizeObserver = null;
+  let boundGlobal = false;
+  let boundChat = null;
+  let composeResizeObserver = null;
+  let listObserver = null;
+  let userIntentUntil = 0;
+  let followingLatest = true;
 
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent || '') ||
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -16,9 +26,45 @@
 
   function isKeyboardOpen(vv) {
     if (!vv) return false;
-    const screenHeight = Math.max(window.innerHeight || 0, document.documentElement?.clientHeight || 0);
+    const layoutHeight = Math.max(window.innerHeight || 0, document.documentElement?.clientHeight || 0);
     const visibleHeight = Math.max(0, vv.height || 0);
-    return screenHeight > 0 && (screenHeight - visibleHeight) > 120;
+    return layoutHeight > 0 && (layoutHeight - visibleHeight) > 120;
+  }
+
+  function distanceFromBottom() {
+    const list = getList();
+    if (!list) return Infinity;
+    return Math.max(0, list.scrollHeight - list.scrollTop - list.clientHeight);
+  }
+
+  function nearBottom(threshold = FOLLOW_THRESHOLD) {
+    return distanceFromBottom() <= threshold;
+  }
+
+  function scrollLatest(force = false) {
+    const chat = getChat();
+    const list = getList();
+    if (!chat || !list || !chat.classList.contains('is-active')) return;
+    if (!force && !followingLatest) return;
+    followingLatest = true;
+    const move = () => {
+      if (!followingLatest || !list.isConnected) return;
+      try { list.scrollTop = list.scrollHeight; } catch (_) {}
+    };
+    requestAnimationFrame(() => {
+      move();
+      requestAnimationFrame(move);
+    });
+    setTimeout(move, 70);
+    setTimeout(move, 180);
+  }
+
+  function markUserIntent() {
+    userIntentUntil = Date.now() + 900;
+  }
+
+  function onListScroll() {
+    if (Date.now() <= userIntentUntil) followingLatest = nearBottom();
   }
 
   function syncKeyboardState(vv) {
@@ -37,27 +83,14 @@
     requestAnimationFrame(() => {
       const height = Math.max(56, Math.ceil(compose.getBoundingClientRect().height || 0));
       chat.style.setProperty('--hn-compose-height', `${height}px`);
+      if (followingLatest) scrollLatest();
     });
-  }
-
-  function bindComposerResize() {
-    const compose = getCompose();
-    if (!compose) return;
-    if (typeof ResizeObserver === 'undefined') {
-      syncComposerMetrics();
-      return;
-    }
-    composerResizeObserver?.disconnect();
-    composerResizeObserver = new ResizeObserver(syncComposerMetrics);
-    composerResizeObserver.observe(compose);
-    syncComposerMetrics();
   }
 
   function syncIOSComposer(vv) {
     const chat = getChat();
     const compose = getCompose();
     if (!chat || !compose || !isIOS) return;
-
     const open = syncKeyboardState(vv);
     syncComposerMetrics();
     if (!open) {
@@ -65,66 +98,47 @@
       chat.style.removeProperty('--hn-chat-bottom-space');
       return;
     }
-
     const viewportBottom = (vv?.offsetTop || 0) + (vv?.height || window.innerHeight || 0);
     const layoutBottom = window.innerHeight || document.documentElement.clientHeight || 0;
     const keyboardHeight = Math.max(0, layoutBottom - viewportBottom);
     chat.style.setProperty('--hn-keyboard-height', `${Math.round(keyboardHeight)}px`);
-
     requestAnimationFrame(() => {
       const height = Math.max(56, Math.ceil(compose.getBoundingClientRect().height || 0));
       chat.style.setProperty('--hn-compose-height', `${height}px`);
       chat.style.setProperty('--hn-chat-bottom-space', `${Math.round(keyboardHeight + height + 10)}px`);
-    });
-  }
-
-  function scheduleKeepVisible() {
-    cancelAnimationFrame(raf);
-    raf = requestAnimationFrame(() => {
-      const chat = getChat();
-      const compose = getCompose();
-      const vv = window.visualViewport;
-      if (!chat || !compose || !chat.classList.contains('is-active')) return;
-
-      syncComposerMetrics();
-      const open = syncKeyboardState(vv);
-      if (isIOS) {
-        syncIOSComposer(vv);
-        return;
-      }
-
-      if (vv && open) {
-        const rect = compose.getBoundingClientRect();
-        const bottom = vv.offsetTop + vv.height;
-        const overlap = rect.bottom - bottom;
-        if (overlap > 0) {
-          const list = getList();
-          if (list) list.scrollTop += overlap + 8;
-        }
-      }
+      if (followingLatest) scrollLatest();
     });
   }
 
   function syncViewport() {
-    const chat = getChat();
-    if (!chat || !chat.classList.contains('is-active')) return;
-    const vv = window.visualViewport;
-    if (!vv) return;
+    cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(() => {
+      const chat = getChat();
+      if (!chat || !chat.classList.contains('is-active')) return;
+      bindChat();
+      const vv = window.visualViewport;
+      syncComposerMetrics();
+      const open = syncKeyboardState(vv);
 
-    syncComposerMetrics();
-    const open = syncKeyboardState(vv);
-    if (isIOS) {
-      syncIOSComposer(vv);
-      return;
-    }
+      if (isIOS) {
+        syncIOSComposer(vv);
+      } else if (vv && open) {
+        const h = Math.max(1, Math.round(vv.height));
+        chat.style.setProperty('--hn-visual-height', `${h}px`);
+        chat.style.height = `${h}px`;
+        chat.style.maxHeight = `${h}px`;
+      } else {
+        chat.style.removeProperty('--hn-visual-height');
+        chat.style.removeProperty('height');
+        chat.style.removeProperty('max-height');
+      }
 
-    const h = Math.round(vv.height);
-    if (h > 0) {
-      chat.style.setProperty('--hn-visual-height', `${h}px`);
-      chat.style.height = `${h}px`;
-      chat.style.maxHeight = `${h}px`;
-    }
-    if (open) scheduleKeepVisible();
+      if (followingLatest) {
+        scrollLatest();
+        setTimeout(() => scrollLatest(), 120);
+        setTimeout(() => scrollLatest(), 280);
+      }
+    });
   }
 
   function installStyles() {
@@ -154,11 +168,9 @@
       #hn-chat-screen.is-active .hn-chat-send:disabled{display:none!important}
       #hn-chat-screen.is-active .hn-chat-compose:has(.hn-chat-send:not(:disabled)) .hn-chat-mic{display:none!important}
 
-      /* Empty composer = microphone. Text/media/voice ready = send. */
       #hn-chat-screen.is-active .hn-chat-compose:has(.hn-chat-input:placeholder-shown):not(:has(.hn-chat-media-pending.is-visible)):not(:has(.hn-chat-recording.is-pending)) .hn-chat-send{display:none!important}
       #hn-chat-screen.is-active .hn-chat-compose:has(.hn-chat-input:placeholder-shown):not(:has(.hn-chat-media-pending.is-visible)):not(:has(.hn-chat-recording.is-pending)) .hn-chat-mic{display:flex!important}
 
-      /* Sender metadata: gold, always distinct from message content. */
       #hn-chat-screen.is-active .hn-chat-time{color:#d9b45f!important;font-weight:700!important}
       #hn-chat-screen.is-active .hn-chat-row.mine .hn-chat-time{color:#d9b45f!important;font-weight:700!important}
 
@@ -193,64 +205,91 @@
       input.placeholder = 'Mensaje';
       input.setAttribute('aria-label', 'Mensaje');
     }
-
-    /* The core owns active states. We only correct the initial empty state. */
-    if (send && input && !String(input.value || '').trim() && !hasPendingMedia && !hasPendingVoice) {
-      send.disabled = true;
-    }
-
-    const attach = chat.querySelector('.hn-chat-attach');
-    if (attach) attach.setAttribute('aria-label', 'Adjuntar');
+    if (send && input && !String(input.value || '').trim() && !hasPendingMedia && !hasPendingVoice) send.disabled = true;
+    chat.querySelector('.hn-chat-attach')?.setAttribute('aria-label', 'Adjuntar');
     syncComposerMetrics();
   }
 
-  function bind() {
-    if (bound) return;
-    bound = true;
-    installStyles();
+  function bindChat() {
+    const chat = getChat();
+    const list = getList();
+    const compose = getCompose();
+    if (!chat || !list || !compose) return false;
+    if (boundChat === chat) return true;
+
+    boundChat = chat;
+    followingLatest = true;
     normalizeComposer();
-    bindComposerResize();
+
+    ['touchstart','pointerdown','wheel'].forEach(type => list.addEventListener(type, markUserIntent, { passive:true }));
+    list.addEventListener('scroll', onListScroll, { passive:true });
+    list.addEventListener('load', e => { if (e.target?.tagName === 'IMG' && followingLatest) scrollLatest(); }, true);
+
+    listObserver?.disconnect();
+    listObserver = new MutationObserver(() => {
+      if (followingLatest) scrollLatest();
+    });
+    listObserver.observe(list, { childList:true });
+
+    composeResizeObserver?.disconnect();
+    if (typeof ResizeObserver !== 'undefined') {
+      composeResizeObserver = new ResizeObserver(() => {
+        syncComposerMetrics();
+        if (followingLatest) scrollLatest();
+      });
+      composeResizeObserver.observe(compose);
+    }
+
+    scrollLatest(true);
+    return true;
+  }
+
+  function bindGlobal() {
+    if (boundGlobal) return;
+    boundGlobal = true;
+    installStyles();
 
     const vv = window.visualViewport;
     if (vv) {
-      vv.addEventListener('resize', syncViewport, { passive: true });
-      vv.addEventListener('scroll', syncViewport, { passive: true });
+      vv.addEventListener('resize', syncViewport, { passive:true });
+      vv.addEventListener('scroll', syncViewport, { passive:true });
     }
-    window.addEventListener('resize', syncComposerMetrics, { passive: true });
+    window.addEventListener('resize', syncViewport, { passive:true });
+
+    document.addEventListener('click', e => {
+      if (e.target?.closest?.('.hn-chat-module')) {
+        followingLatest = true;
+        setTimeout(() => { bindChat(); syncViewport(); scrollLatest(true); }, 0);
+        setTimeout(() => { syncViewport(); scrollLatest(true); }, 120);
+      }
+    }, { passive:true });
 
     document.addEventListener('focusin', e => {
       if (e.target?.matches?.('.hn-chat-input')) {
-        normalizeComposer();
-        setTimeout(syncViewport, 80);
-        setTimeout(syncViewport, 260);
+        bindChat();
+        followingLatest = true;
+        setTimeout(syncViewport, 50);
+        setTimeout(syncViewport, 180);
+        setTimeout(() => scrollLatest(true), 300);
       }
-    }, { passive: true });
+    }, { passive:true });
 
     document.addEventListener('submit', e => {
       if (e.target?.matches?.('.hn-chat-compose')) {
-        setTimeout(syncViewport, 80);
-        setTimeout(syncViewport, 260);
+        followingLatest = true;
+        setTimeout(() => scrollLatest(true), 30);
+        setTimeout(syncViewport, 100);
+        setTimeout(() => scrollLatest(true), 220);
       }
-    }, { passive: true });
+    }, { passive:true });
 
-    const observer = new MutationObserver(() => {
-      const chat = getChat();
-      if (chat) {
-        normalizeComposer();
-        bindComposerResize();
-      }
-      if (chat?.classList.contains('is-active')) scheduleKeepVisible();
-    });
-    observer.observe(document.body, {
-      subtree: true,
-      childList: true,
-      attributes: true,
-      attributeFilter: ['class']
-    });
+    window.addEventListener('pageshow', () => { if (getChat()?.classList.contains('is-active')) { bindChat(); syncViewport(); scrollLatest(true); } }, { passive:true });
+    document.addEventListener('visibilitychange', () => { if (!document.hidden && getChat()?.classList.contains('is-active')) { bindChat(); syncViewport(); if (followingLatest) scrollLatest(); } }, { passive:true });
 
+    bindChat();
     syncViewport();
   }
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind, { once: true });
-  else bind();
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bindGlobal, { once:true });
+  else bindGlobal();
 })();
