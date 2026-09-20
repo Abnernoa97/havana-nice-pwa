@@ -26,6 +26,8 @@
         left:max(20px,env(safe-area-inset-left))!important;
         right:max(20px,env(safe-area-inset-right))!important;
         align-items:flex-start!important;
+        z-index:40!important;
+        pointer-events:auto!important;
       }
       #homeScreen .home-brand{
         font-size:18px!important;
@@ -33,9 +35,18 @@
         letter-spacing:.15em!important;
       }
       #homeScreen .home-inner{
+        position:relative!important;
+        z-index:1!important;
         width:min(100%,720px)!important;
         margin:0 auto!important;
         padding-top:58px!important;
+      }
+      #homeScreen .hn-home-profile-wrap,
+      #homeScreen .hn-home-profile-button{
+        position:relative!important;
+        z-index:41!important;
+        pointer-events:auto!important;
+        touch-action:manipulation!important;
       }
       #homeScreen .welcome{
         margin:0 0 18px!important;
