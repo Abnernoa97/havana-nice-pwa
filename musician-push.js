@@ -1,6 +1,7 @@
-/* HAVANA NICE — MUSICIAN PUSH V2
-   Android behavior preserved. iPhone/iPad installed PWA gets a first-run
-   notification permission prompt after musician session is ready.
+/* HAVANA NICE — MUSICIAN PUSH V3
+   Android behavior preserved. iPhone/iPad always gets a visible notification
+   activation flow after musician session is ready, with explicit diagnostics
+   instead of silently hiding when a platform capability is missing.
 */
 (function(){
   'use strict';
@@ -12,10 +13,13 @@
   const isStandalone=()=>window.matchMedia?.('(display-mode: standalone)').matches||window.navigator.standalone===true;
 
   let busy=false;
-  let last='';
 
-  function profile(){
-    try{return sessionStorage.getItem('hn_profile')||''}catch(_){return ''}
+  function username(){
+    try{
+      const raw=sessionStorage.getItem('hn_profile')||'';
+      if(!raw)return'';
+      try{return String(JSON.parse(raw)?.username||'').trim()}catch(_){return String(raw).trim()}
+    }catch(_){return''}
   }
 
   function vapidBytes(value){
@@ -27,38 +31,39 @@
   }
 
   async function registerPush(){
-    const username=profile();
-    if(!username||busy||!('serviceWorker'in navigator)||!('Notification'in window)||Notification.permission!=='granted')return;
+    const user=username();
+    if(!user||busy||!('serviceWorker'in navigator)||!('Notification'in window)||Notification.permission!=='granted')return false;
     busy=true;
     try{
       const reg=await navigator.serviceWorker.ready;
-      const manager=reg.pushManager;
-      if(!manager)return;
-      let sub=await manager.getSubscription();
-      if(!sub){
-        sub=await manager.subscribe({userVisibleOnly:true,applicationServerKey:vapidBytes(VAPID_PUBLIC_KEY)});
-      }
+      if(!reg.pushManager)throw new Error('PushManager no disponible');
+      let sub=await reg.pushManager.getSubscription();
+      if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:vapidBytes(VAPID_PUBLIC_KEY)});
       const json=sub.toJSON();
       const client=window.hnSupabase;
-      if(client&&typeof client.rpc==='function'){
-        await client.rpc('register_musician_push_subscription',{
-          p_username:username,
-          p_endpoint:json.endpoint,
-          p_p256dh:json.keys&&json.keys.p256dh,
-          p_auth:json.keys&&json.keys.auth
-        });
-      }
-      last=username;
+      if(!client||typeof client.rpc!=='function')throw new Error('Supabase no disponible');
+      const {data,error}=await client.rpc('register_musician_push_subscription',{
+        p_username:user,
+        p_endpoint:json.endpoint,
+        p_p256dh:json.keys&&json.keys.p256dh,
+        p_auth:json.keys&&json.keys.auth
+      });
+      if(error)throw error;
+      if(data&&data.ok===false)throw new Error(data.error||'No se pudo registrar Push');
       closeIOSPrompt();
+      return true;
     }catch(error){
       console.warn('[HN-Push]',error);
-    }finally{
-      busy=false;
-    }
+      setPromptStatus('No se pudo completar el registro de notificaciones. Vuelve a intentarlo.');
+      return false;
+    }finally{busy=false}
   }
 
-  function closeIOSPrompt(){
-    document.getElementById(PROMPT_ID)?.remove();
+  function closeIOSPrompt(){document.getElementById(PROMPT_ID)?.remove()}
+
+  function setPromptStatus(message){
+    const el=document.querySelector(`#${PROMPT_ID} .hn-push-status`);
+    if(el)el.textContent=message||'';
   }
 
   function installIOSPromptStyle(){
@@ -67,21 +72,24 @@
     style.id=STYLE_ID;
     style.textContent=`
       #${PROMPT_ID}{position:fixed;inset:0;z-index:250000;display:flex;align-items:center;justify-content:center;padding:22px;}
-      #${PROMPT_ID} .hn-push-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.82);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);}
+      #${PROMPT_ID} .hn-push-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.84);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);}
       #${PROMPT_ID} .hn-push-card{position:relative;width:min(100%,410px);padding:27px 22px 22px;border:1px solid rgba(229,189,98,.78);background:#050605;color:#f4f1e8;box-shadow:0 18px 60px rgba(0,0,0,.58);text-align:center;}
       #${PROMPT_ID} .hn-push-icon{width:56px;height:56px;margin:0 auto 15px;border:1px solid rgba(229,189,98,.72);border-radius:50%;display:grid;place-items:center;color:#fff1a8;font:400 22px Georgia,serif;letter-spacing:.04em;background:rgba(229,189,98,.06);}
       #${PROMPT_ID} .hn-push-eyebrow{font-size:9px;letter-spacing:.26em;text-transform:uppercase;color:#e5bd62;}
       #${PROMPT_ID} h2{margin:9px 0 10px;color:#fff1a8;font:400 27px Georgia,serif;letter-spacing:.02em;}
       #${PROMPT_ID} p{margin:0 auto;color:rgba(244,241,232,.7);font-size:12px;line-height:1.55;max-width:310px;}
-      #${PROMPT_ID} .hn-push-activate{width:100%;height:50px;margin-top:20px;border:1px solid #e5bd62;background:rgba(229,189,98,.08);color:#fff1a8;font-size:10px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;}
-      #${PROMPT_ID} .hn-push-activate:active{transform:scale(.985);}
-      #${PROMPT_ID} .hn-push-activate:disabled{opacity:.55;}
+      #${PROMPT_ID} .hn-push-status{min-height:34px;margin-top:12px;color:#e9c779;font-size:10px;line-height:1.45;letter-spacing:.04em;}
+      #${PROMPT_ID} .hn-push-activate{width:100%;height:50px;margin-top:10px;border:1px solid #e5bd62;background:rgba(229,189,98,.08);color:#fff1a8;font-size:10px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;}
+      #${PROMPT_ID} .hn-push-activate:active{transform:scale(.985)}
+      #${PROMPT_ID} .hn-push-activate:disabled{opacity:.55}
     `;
     document.head.appendChild(style);
   }
 
   function shouldShowIOSPrompt(){
-    return isIOS&&isStandalone()&&profile()&&('Notification'in window)&&Notification.permission==='default';
+    if(!isIOS||!username())return false;
+    if('Notification'in window&&Notification.permission==='granted')return false;
+    return true;
   }
 
   function showIOSPrompt(){
@@ -96,24 +104,48 @@
         <div class="hn-push-eyebrow">HAVANA NICE</div>
         <h2 id="hnPushTitle">ACTIVAR NOTIFICACIONES</h2>
         <p>Recibe mensajes del Chat de Información y avisos importantes del equipo.</p>
+        <div class="hn-push-status"></div>
         <button class="hn-push-activate" type="button">ACTIVAR</button>
       </section>`;
     document.body.appendChild(wrap);
     const button=wrap.querySelector('.hn-push-activate');
     button.addEventListener('click',async()=>{
       if(button.disabled)return;
+
+      if(!isStandalone()){
+        setPromptStatus('Abre HAVANA NICE desde el icono instalado en la pantalla de inicio del iPhone.');
+        return;
+      }
+      if(!('serviceWorker'in navigator)){
+        setPromptStatus('Este iPhone no tiene Service Worker disponible para esta app.');
+        return;
+      }
+      if(!('Notification'in window)||!('PushManager'in window)){
+        setPromptStatus('Este iPhone no está exponiendo Web Push. Se requiere iOS/iPadOS 16.4 o posterior y la app instalada en Inicio.');
+        return;
+      }
+      if(Notification.permission==='denied'){
+        setPromptStatus('Las notificaciones están bloqueadas. Actívalas desde Ajustes > Notificaciones > HAVANA NICE.');
+        return;
+      }
+
       button.disabled=true;
       button.textContent='ACTIVANDO…';
+      setPromptStatus('');
       try{
-        const permission=await Notification.requestPermission();
-        if(permission==='granted'){
-          await registerPush();
-          closeIOSPrompt();
+        let permission=Notification.permission;
+        if(permission==='default')permission=await Notification.requestPermission();
+        if(permission!=='granted'){
+          setPromptStatus('iPhone no concedió el permiso de notificaciones.');
+          button.disabled=false;
+          button.textContent='ACTIVAR';
           return;
         }
-        closeIOSPrompt();
+        const ok=await registerPush();
+        if(!ok){button.disabled=false;button.textContent='ACTIVAR'}
       }catch(error){
         console.warn('[HN-Push] iOS permission',error);
+        setPromptStatus('No fue posible abrir el permiso de iPhone.');
         button.disabled=false;
         button.textContent='ACTIVAR';
       }
@@ -121,33 +153,33 @@
   }
 
   function afterSessionReady(){
-    if(Notification.permission==='granted')registerPush();
-    else if(shouldShowIOSPrompt())setTimeout(showIOSPrompt,350);
+    if(!isIOS){
+      if('Notification'in window&&Notification.permission==='granted')registerPush();
+      return;
+    }
+    if('Notification'in window&&Notification.permission==='granted')registerPush();
+    else setTimeout(showIOSPrompt,250);
   }
 
   function init(){
-    if(!('serviceWorker'in navigator))return;
-    navigator.serviceWorker.register('./sw.js',{scope:'./',updateViaCache:'none'}).catch(error=>console.warn('[HN-Push] sw',error)).finally(()=>{
-      document.addEventListener('click',event=>{
-        const button=event.target.closest&&event.target.closest('#loginButton,#login');
-        if(!button)return;
-        if(isIOS){
-          setTimeout(afterSessionReady,400);
-          return;
-        }
-        if('Notification'in window&&Notification.permission==='default'){
-          Notification.requestPermission().then(registerPush).catch(()=>{});
-        }else registerPush();
-      },true);
+    if('serviceWorker'in navigator){
+      navigator.serviceWorker.register('./sw.js',{scope:'./',updateViaCache:'none'}).catch(error=>console.warn('[HN-Push] sw',error));
+    }
 
-      window.addEventListener('hn:session-ready',afterSessionReady);
-      window.addEventListener('hn:session-logout',()=>{last='';closeIOSPrompt()});
-      document.addEventListener('visibilitychange',()=>{if(!document.hidden){if(Notification.permission==='granted')registerPush();else showIOSPrompt()}});
-      window.addEventListener('online',()=>{if(Notification.permission==='granted')registerPush()});
+    document.addEventListener('click',event=>{
+      const login=event.target.closest&&event.target.closest('#loginButton,#login');
+      if(!login)return;
+      if(isIOS){setTimeout(afterSessionReady,450);return}
+      if('Notification'in window&&Notification.permission==='default')Notification.requestPermission().then(registerPush).catch(()=>{});
+      else registerPush();
+    },true);
 
-      if(Notification.permission==='granted')registerPush();
-      else showIOSPrompt();
-    });
+    window.addEventListener('hn:session-ready',afterSessionReady);
+    window.addEventListener('hn:session-logout',closeIOSPrompt);
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden)afterSessionReady()});
+    window.addEventListener('online',()=>{if('Notification'in window&&Notification.permission==='granted')registerPush()});
+
+    setTimeout(afterSessionReady,500);
   }
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});
