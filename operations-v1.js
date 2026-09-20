@@ -70,16 +70,7 @@
     if(document.getElementById('hnDirectVoiceFlow'))return;
     const script=document.createElement('script');
     script.id='hnDirectVoiceFlow';
-    script.src='./chat-audio-whatsapp-v1.js?v=40c16462dfac0d9a94861b01983882c958636b07';
-    script.async=true;
-    document.body.appendChild(script);
-  }
-
-  function loadClassicMicIcon(){
-    if(document.getElementById('hnClassicMicIcon'))return;
-    const script=document.createElement('script');
-    script.id='hnClassicMicIcon';
-    script.src='./chat-mic-icon-v2.js?v=f41654a311d731057bdab7e3bdd04788e65644cf';
+    script.src='./chat-audio-whatsapp-v1.js?v=1578927fc6ecd09a5de0ece71dfcc2fe6e14df27';
     script.async=true;
     document.body.appendChild(script);
   }
@@ -88,7 +79,6 @@
     installFamilyRoles();
     installFamilyProfileBackFix();
     loadDirectVoiceFlow();
-    loadClassicMicIcon();
   }
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});
