@@ -63,6 +63,13 @@ function canonicalPushUrl(value){
   }catch(_){return APP_ORIGIN+'/'}
 }
 
+function pushSection(value){
+  try{
+    const section=new URL(canonicalPushUrl(value)).searchParams.get('open');
+    return section==='notifications'||section==='chat'?section:'';
+  }catch(_){return ''}
+}
+
 async function refreshShell(path,requestKey,admin){
   try{
     const response=await fetch(path,{cache:'no-store'});
@@ -155,24 +162,34 @@ self.addEventListener('fetch',event=>{
 self.addEventListener('push',event=>{
   event.waitUntil((async()=>{
     let data={};try{data=event.data?event.data.json():{}}catch(_){data={}}
-    const title=data.title||'HAVANA NICE',body=data.message||'Nueva actualización',url=canonicalPushUrl(data.url);
+    const title=data.title||'HAVANA NICE';
+    const body=data.message||'Nueva actualización';
+    const url=canonicalPushUrl(data.url);
+    const section=pushSection(url);
     let count=1;
     try{count=(await new Promise(resolve=>{const request=indexedDB.open('hn_push',1);request.onupgradeneeded=()=>request.result.createObjectStore('state');request.onsuccess=()=>{const q=request.result.transaction('state','readwrite').objectStore('state').get('count');q.onsuccess=()=>resolve(Number(q.result||0));q.onerror=()=>resolve(0)};request.onerror=()=>resolve(0)}))+1}catch(_){}
     try{const request=indexedDB.open('hn_push',1);request.onsuccess=()=>{const db=request.result;db.transaction('state','readwrite').objectStore('state').put(count,'count')}}catch(_){}
     try{if(self.navigator&&self.navigator.setAppBadge)await self.navigator.setAppBadge(Math.min(99,count))}catch(_){}
-    await self.registration.showNotification(title,{body,tag:'hn-push-'+Date.now(),renotify:true,silent:false,vibrate:[200,100,200,100,300],data:{url}});
+    await self.registration.showNotification(title,{body,tag:'hn-push-'+Date.now(),renotify:true,silent:false,vibrate:[200,100,200,100,300],data:{url,section}});
   })());
 });
 
 self.addEventListener('notificationclick',event=>{
   event.notification.close();
   const target=canonicalPushUrl(event.notification.data&&event.notification.data.url);
+  const section=(event.notification.data&&event.notification.data.section)||pushSection(target);
   event.waitUntil((async()=>{
     const list=await clients.matchAll({type:'window',includeUncontrolled:true});
     for(const client of list){
-      try{if('navigate'in client)await client.navigate(target)}catch(_){}
+      try{
+        const url=new URL(client.url);
+        if(url.origin!==APP_ORIGIN||url.pathname.endsWith('/admin.html'))continue;
+      }catch(_){continue;}
+      try{client.postMessage({type:'HN_PUSH_OPEN',section,url:target});}catch(_){}
       if('focus'in client)return client.focus();
     }
-    return clients.openWindow(target);
+    const opened=await clients.openWindow(target);
+    if(opened&&section){try{opened.postMessage({type:'HN_PUSH_OPEN',section,url:target});}catch(_){}}
+    return opened;
   })());
 });
