@@ -9,9 +9,6 @@
   "background_color": "#020403",
   "theme_color": "#020403",
   "description": "HAVANA NICE MEMBERS",
-  "launch_handler": {
-    "client_mode": "navigate-existing"
-  },
   "icons": [
     {
       "src": "./havana-nice-icon-192.png",
