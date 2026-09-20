@@ -1,4 +1,4 @@
-/* HAVANA NICE — iOS INSTALL + LAYOUT V4 */
+/* HAVANA NICE — iOS INSTALL + LAYOUT V5 */
 (function(){
   'use strict';
   const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
@@ -19,6 +19,30 @@
       #moduleScreen.is-active{z-index:20!important;}
       #homeScreen.is-active{z-index:20!important;}
       #chatScreen.is-active,#hn-chat-screen.is-active{z-index:20!important;}
+
+      /* iPhone profile picker: the visible pencil is a real label for the native file input. */
+      #hnProfileEditor label.hn-editor-pencil{
+        pointer-events:auto!important;
+        display:grid!important;
+        place-items:center!important;
+        cursor:pointer!important;
+        -webkit-user-select:none!important;
+        user-select:none!important;
+      }
+      #hnProfileEditor .hn-editor-file{
+        display:block!important;
+        position:fixed!important;
+        left:-10000px!important;
+        top:auto!important;
+        width:1px!important;
+        height:1px!important;
+        opacity:0!important;
+        pointer-events:none!important;
+        overflow:hidden!important;
+        margin:0!important;
+        padding:0!important;
+        border:0!important;
+      }
 
       /* iPhone home: keep HAVANA NICE / BIENVENIDO / NAME / ROLE visually separated. */
       #homeScreen .home-top{
@@ -80,8 +104,46 @@
     document.head.appendChild(style);
   }
 
+  function repairProfilePicker(){
+    const editor=document.getElementById('hnProfileEditor');
+    if(!editor)return false;
+    const pairs=[
+      ['cover','.hn-editor-cover-pencil','.hn-editor-file[data-file="cover"]','hnFamilyCoverFileIOS','Cambiar foto de portada'],
+      ['avatar','.hn-editor-avatar-pencil','.hn-editor-file[data-file="avatar"]','hnFamilyAvatarFileIOS','Cambiar foto de perfil']
+    ];
+    let ready=true;
+    pairs.forEach(([,pencilSelector,inputSelector,inputId,labelText])=>{
+      const input=editor.querySelector(inputSelector);
+      const pencil=editor.querySelector(pencilSelector);
+      if(!input||!pencil){ready=false;return}
+      input.id=inputId;
+      input.accept='image/*';
+      if(pencil.tagName==='LABEL'){
+        pencil.htmlFor=inputId;
+        return;
+      }
+      const label=document.createElement('label');
+      label.className=pencil.className;
+      label.htmlFor=inputId;
+      label.setAttribute('aria-label',labelText);
+      label.textContent='✎';
+      pencil.replaceWith(label);
+    });
+    return ready;
+  }
+
+  function installProfilePicker(){
+    if(repairProfilePicker())return;
+    let tries=0;
+    const timer=setInterval(()=>{
+      tries++;
+      if(repairProfilePicker()||tries>=40)clearInterval(timer);
+    },250);
+  }
+
   const isStandalone=window.matchMedia?.('(display-mode: standalone)').matches||window.navigator.standalone===true;
   installIOSLayout();
+  installProfilePicker();
   if(isStandalone)return;
 
   function addAppleIcon(){
