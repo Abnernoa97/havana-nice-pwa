@@ -32,4 +32,3 @@ async function start(){if(started||!logged())return;try{client=await getClient()
 function init(){style();find();document.addEventListener('click',function(e){var m=e.target.closest&&e.target.closest('.module');if(!m)return;var t=m.querySelector('.module-title');if(t&&t.textContent.trim().toUpperCase()==='NOTIFICACIONES'){e.preventDefault();e.stopImmediatePropagation();open()}},true);start();window.addEventListener('hn:session-ready',function(){start()});window.addEventListener('hn:session-logout',function(){stop()});document.addEventListener('visibilitychange',function(){if(!document.hidden&&started)sync(false)});window.addEventListener('online',function(){if(started)sync(false)})}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();
-import('./musician-push.js?v=8161dc96f20726250add287b26d2614b9cf42bdc').catch(function(){});
