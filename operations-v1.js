@@ -70,7 +70,7 @@
     if(document.getElementById('hnDirectVoiceFlow'))return;
     const script=document.createElement('script');
     script.id='hnDirectVoiceFlow';
-    script.src='./chat-audio-whatsapp-v1.js?v=f81e3281b633653ce0bd6f45aa1809eca29119a0';
+    script.src='./chat-audio-whatsapp-v1.js?v=1578927fc6ecd09a5de0ece71dfcc2fe6e14df27';
     script.async=true;
     document.body.appendChild(script);
   }
