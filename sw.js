@@ -13,7 +13,6 @@ const SUPABASE_ESM='https://esm.sh/@supabase/supabase-js@2';
 const IS_IOS=/iPad|iPhone|iPod/.test(self.navigator?.userAgent||'')||((self.navigator?.platform||'')==='MacIntel'&&(self.navigator?.maxTouchPoints||0)>1);
 const FAMILY_IOS_VERSION='ios-family-20260920-profile-picker';
 const APP_ORIGIN='https://havana-nice-pwa.pages.dev';
-const CLIENT_MODE_WAITERS=new Map();
 
 const FRESH_PATHS=new Set([
   '/notifications-v5.js','/operations-v1.js','/operations-fix.js','/ios-install-v1.js',
@@ -56,67 +55,22 @@ async function normalizeAdminShell(response){
 function isAdminUrl(url){return url.pathname.endsWith('/admin.html')}
 async function normalizeShell(response,admin){return admin?normalizeAdminShell(response):normalizeMusicianShell(response)}
 
-function canonicalPushUrl(value){
+function routeFromValue(value){
   try{
     const url=new URL(String(value||'/'),APP_ORIGIN);
-    if(url.origin!==APP_ORIGIN)return APP_ORIGIN+'/';
-    return url.href;
-  }catch(_){return APP_ORIGIN+'/'}
+    const hash=String(url.hash||'').replace(/^#/,'').toLowerCase();
+    if(hash==='chat'||hash==='notifications')return hash;
+    const legacy=String(url.searchParams.get('open')||'').toLowerCase();
+    if(legacy==='chat'||legacy==='notifications')return legacy;
+  }catch(_){}
+  return '';
 }
 
-function pushSection(value){
-  try{
-    const section=new URL(canonicalPushUrl(value)).searchParams.get('open');
-    return section==='notifications'||section==='chat'?section:'';
-  }catch(_){return ''}
+function routeUrl(route){
+  return route==='chat'||route==='notifications'
+    ? APP_ORIGIN+'/#'+route
+    : APP_ORIGIN+'/';
 }
-
-function musicianClient(client){
-  try{
-    const url=new URL(client.url);
-    return url.origin===APP_ORIGIN&&!url.pathname.endsWith('/admin.html');
-  }catch(_){return false}
-}
-
-async function chooseInstalledMusicianClient(list){
-  const candidates=list.filter(musicianClient);
-  if(!candidates.length)return null;
-
-  const nonce='hn-client-'+Date.now()+'-'+Math.random().toString(36).slice(2);
-  const responses=new Map();
-  CLIENT_MODE_WAITERS.set(nonce,responses);
-
-  for(const client of candidates){
-    try{client.postMessage({type:'HN_QUERY_CLIENT_MODE',nonce});}catch(_){}
-  }
-
-  await new Promise(resolve=>setTimeout(resolve,140));
-  CLIENT_MODE_WAITERS.delete(nonce);
-
-  const standalone=candidates.find(client=>responses.get(client.id)?.standalone===true);
-  if(standalone)return standalone;
-
-  // Never let a normal Chrome tab take ownership of notification routing.
-  // If clients answered and all are browser tabs, launch the PWA target instead.
-  if([...responses.values()].some(Boolean))return null;
-
-  // Old clients that have not loaded the current router are intentionally ignored.
-  // Opening the target is safer than focusing an unknown browser tab.
-  return null;
-}
-
-self.addEventListener('message',event=>{
-  const data=event&&event.data;
-  if(!data||data.type!=='HN_CLIENT_MODE_RESPONSE'||!data.nonce)return;
-  const responses=CLIENT_MODE_WAITERS.get(data.nonce);
-  const source=event.source;
-  if(!responses||!source||!source.id)return;
-  responses.set(source.id,{
-    standalone:data.standalone===true,
-    visibility:String(data.visibility||''),
-    url:String(source.url||'')
-  });
-});
 
 async function refreshShell(path,requestKey,admin){
   try{
@@ -178,7 +132,6 @@ self.addEventListener('fetch',event=>{
   if(event.request.method!=='GET')return;
   const url=new URL(event.request.url);
 
-  // iOS: Supabase/Storage cross-origin requests stay outside the Service Worker.
   if(IS_IOS&&url.origin!==self.location.origin)return;
 
   if(url.hostname==='cdn.jsdelivr.net'&&url.pathname==='/npm/@supabase/supabase-js@2/+esm'){
@@ -209,36 +162,67 @@ self.addEventListener('fetch',event=>{
 
 self.addEventListener('push',event=>{
   event.waitUntil((async()=>{
-    let data={};try{data=event.data?event.data.json():{}}catch(_){data={}}
+    let data={};
+    try{data=event.data?event.data.json():{}}catch(_){data={}}
     const title=data.title||'HAVANA NICE';
     const body=data.message||'Nueva actualización';
-    const url=canonicalPushUrl(data.url);
-    const section=pushSection(url);
+    const route=routeFromValue(data.url);
+    const url=routeUrl(route);
+
     let count=1;
-    try{count=(await new Promise(resolve=>{const request=indexedDB.open('hn_push',1);request.onupgradeneeded=()=>request.result.createObjectStore('state');request.onsuccess=()=>{const q=request.result.transaction('state','readwrite').objectStore('state').get('count');q.onsuccess=()=>resolve(Number(q.result||0));q.onerror=()=>resolve(0)};request.onerror=()=>resolve(0)}))+1}catch(_){}
-    try{const request=indexedDB.open('hn_push',1);request.onsuccess=()=>{const db=request.result;db.transaction('state','readwrite').objectStore('state').put(count,'count')}}catch(_){}
+    try{
+      count=(await new Promise(resolve=>{
+        const request=indexedDB.open('hn_push',1);
+        request.onupgradeneeded=()=>request.result.createObjectStore('state');
+        request.onsuccess=()=>{
+          const q=request.result.transaction('state','readwrite').objectStore('state').get('count');
+          q.onsuccess=()=>resolve(Number(q.result||0));
+          q.onerror=()=>resolve(0);
+        };
+        request.onerror=()=>resolve(0);
+      }))+1;
+    }catch(_){}
+
+    try{
+      const request=indexedDB.open('hn_push',1);
+      request.onsuccess=()=>{
+        const db=request.result;
+        db.transaction('state','readwrite').objectStore('state').put(count,'count');
+      };
+    }catch(_){}
+
     try{if(self.navigator&&self.navigator.setAppBadge)await self.navigator.setAppBadge(Math.min(99,count))}catch(_){}
-    await self.registration.showNotification(title,{body,tag:'hn-push-'+Date.now(),renotify:true,silent:false,vibrate:[200,100,200,100,300],data:{url,section}});
+
+    await self.registration.showNotification(title,{
+      body,
+      tag:'hn-push-'+Date.now(),
+      renotify:true,
+      silent:false,
+      vibrate:[200,100,200,100,300],
+      data:{url,route}
+    });
   })());
 });
 
 self.addEventListener('notificationclick',event=>{
   event.notification.close();
-  const target=canonicalPushUrl(event.notification.data&&event.notification.data.url);
-  const section=(event.notification.data&&event.notification.data.section)||pushSection(target);
+  const route=(event.notification.data&&event.notification.data.route)||routeFromValue(event.notification.data&&event.notification.data.url);
+  const target=routeUrl(route);
 
   event.waitUntil((async()=>{
     const list=await clients.matchAll({type:'window',includeUncontrolled:true});
-    const client=await chooseInstalledMusicianClient(list);
+    const musician=list.find(client=>{
+      try{
+        const url=new URL(client.url);
+        return url.origin===APP_ORIGIN&&!url.pathname.endsWith('/admin.html');
+      }catch(_){return false;}
+    });
 
-    if(client){
-      try{if('focus'in client)await client.focus();}catch(_){}
-      try{client.postMessage({type:'HN_PUSH_OPEN',section,url:target});}catch(_){}
-      return client;
+    if(musician){
+      try{musician.postMessage({type:'HN_ROUTE',route});}catch(_){}
+      try{if('focus'in musician)return await musician.focus();}catch(_){}
     }
 
-    // No verified standalone window is alive: launch the in-scope PWA target.
-    // The ?open=... intent is consumed by session-memory-v2 after session restore.
     return clients.openWindow(target);
   })());
 });
