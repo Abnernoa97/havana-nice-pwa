@@ -66,9 +66,19 @@
     },true);
   }
 
+  function loadDirectVoiceFlow(){
+    if(document.getElementById('hnDirectVoiceFlow'))return;
+    const script=document.createElement('script');
+    script.id='hnDirectVoiceFlow';
+    script.src='./chat-audio-whatsapp-v1.js?v=f81e3281b633653ce0bd6f45aa1809eca29119a0';
+    script.async=true;
+    document.body.appendChild(script);
+  }
+
   function init(){
     installFamilyRoles();
     installFamilyProfileBackFix();
+    loadDirectVoiceFlow();
   }
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});
