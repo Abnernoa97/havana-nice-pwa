@@ -112,6 +112,8 @@
   async function finishRecording(){
     if(!recorder||recorder.state==='inactive')return;
     sendOnStop=true;cancelOnStop=false;
+    const duration=Math.max(1,Math.round((Date.now()-startedAt)/1000));
+    showSending(duration);
     try{recorder.stop()}catch(error){console.error('[HN direct audio stop]',error);setIdle();stopTracks();recorder=null;busy=false}
   }
   function cancelRecording(){
