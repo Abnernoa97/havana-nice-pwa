@@ -75,10 +75,20 @@
     document.body.appendChild(script);
   }
 
+  function loadClassicMicIcon(){
+    if(document.getElementById('hnClassicMicIcon'))return;
+    const script=document.createElement('script');
+    script.id='hnClassicMicIcon';
+    script.src='./chat-mic-icon-v2.js?v=f41654a311d731057bdab7e3bdd04788e65644cf';
+    script.async=true;
+    document.body.appendChild(script);
+  }
+
   function init(){
     installFamilyRoles();
     installFamilyProfileBackFix();
     loadDirectVoiceFlow();
+    loadClassicMicIcon();
   }
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});
