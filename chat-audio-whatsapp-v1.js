@@ -16,7 +16,7 @@
   let sendOnStop=false;
   let busy=false;
 
-  const micSvg=`<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8.2 3.2h7.6c1 0 1.8.8 1.8 1.8v7.2c0 3.1-2.5 5.6-5.6 5.6s-5.6-2.5-5.6-5.6V5c0-1 .8-1.8 1.8-1.8Z"></path><path d="M7.1 6h9.8M7.1 8.6h9.8M7.1 11.2h9.8M7.4 13.8h9.2"></path><path d="M9.4 3.2v13.6M14.6 3.2v13.6"></path><path d="M12 17.8V21"></path><path d="M8.6 21h6.8"></path></svg>`;
+  const micSvg=`<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="8" y="2.5" width="8" height="12" rx="4"></rect><path d="M5.5 10.5v.8a6.5 6.5 0 0 0 13 0v-.8"></path><path d="M12 17.8v3.2"></path><path d="M8.5 21h7"></path><path d="M10 5.5h4M10 8h4M10 10.5h4"></path></svg>`;
   const trashSvg=`<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h16"></path><path d="M9 7V4.5h6V7"></path><path d="M6.5 7l1 13h9l1-13"></path><path d="M10 10.5v6M14 10.5v6"></path></svg>`;
 
   function session(){try{return JSON.parse(sessionStorage.getItem('hn_profile')||'null')}catch(_){return null}}
