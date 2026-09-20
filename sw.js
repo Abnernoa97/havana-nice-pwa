@@ -1,9 +1,9 @@
-/* HAVANA NICE — UNIFIED SERVICE WORKER V11
+/* HAVANA NICE — UNIFIED SERVICE WORKER V12
    One worker for musicians + admin + push.
    Every same-origin JavaScript runtime is network-first/no-cache while online.
    Old app caches are purged on activation so devices cannot stay pinned to stale code.
 */
-const CACHE='hn-unified-v11';
+const CACHE='hn-unified-v12';
 const MUSICIAN_SHELL='./index.html';
 const ADMIN_SHELL='./admin.html';
 const MUSICIAN_SHELL_REQUEST=new Request(MUSICIAN_SHELL);
@@ -11,7 +11,7 @@ const ADMIN_SHELL_REQUEST=new Request(ADMIN_SHELL);
 const SUPABASE_CDN='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const SUPABASE_ESM='https://esm.sh/@supabase/supabase-js@2';
 const IS_IOS=/iPad|iPhone|iPod/.test(self.navigator?.userAgent||'')||((self.navigator?.platform||'')==='MacIntel'&&(self.navigator?.maxTouchPoints||0)>1);
-const FAMILY_IOS_VERSION='ios-family-20260918-clean';
+const FAMILY_IOS_VERSION='ios-family-20260920-profile-picker';
 
 const FRESH_PATHS=new Set([
   '/notifications-v5.js','/operations-v1.js','/operations-fix.js','/ios-install-v1.js',
