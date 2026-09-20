@@ -12,6 +12,7 @@ const SUPABASE_CDN='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const SUPABASE_ESM='https://esm.sh/@supabase/supabase-js@2';
 const IS_IOS=/iPad|iPhone|iPod/.test(self.navigator?.userAgent||'')||((self.navigator?.platform||'')==='MacIntel'&&(self.navigator?.maxTouchPoints||0)>1);
 const FAMILY_IOS_VERSION='ios-family-20260920-profile-picker';
+const APP_ORIGIN='https://havana-nice-pwa.pages.dev';
 
 const FRESH_PATHS=new Set([
   '/notifications-v5.js','/operations-v1.js','/operations-fix.js','/ios-install-v1.js',
@@ -53,6 +54,14 @@ async function normalizeAdminShell(response){
 
 function isAdminUrl(url){return url.pathname.endsWith('/admin.html')}
 async function normalizeShell(response,admin){return admin?normalizeAdminShell(response):normalizeMusicianShell(response)}
+
+function canonicalPushUrl(value){
+  try{
+    const url=new URL(String(value||'/'),APP_ORIGIN);
+    if(url.origin!==APP_ORIGIN)return APP_ORIGIN+'/';
+    return url.href;
+  }catch(_){return APP_ORIGIN+'/'}
+}
 
 async function refreshShell(path,requestKey,admin){
   try{
@@ -146,7 +155,7 @@ self.addEventListener('fetch',event=>{
 self.addEventListener('push',event=>{
   event.waitUntil((async()=>{
     let data={};try{data=event.data?event.data.json():{}}catch(_){data={}}
-    const title=data.title||'HAVANA NICE',body=data.message||'Nueva actualización',url=data.url||'/';
+    const title=data.title||'HAVANA NICE',body=data.message||'Nueva actualización',url=canonicalPushUrl(data.url);
     let count=1;
     try{count=(await new Promise(resolve=>{const request=indexedDB.open('hn_push',1);request.onupgradeneeded=()=>request.result.createObjectStore('state');request.onsuccess=()=>{const q=request.result.transaction('state','readwrite').objectStore('state').get('count');q.onsuccess=()=>resolve(Number(q.result||0));q.onerror=()=>resolve(0)};request.onerror=()=>resolve(0)}))+1}catch(_){}
     try{const request=indexedDB.open('hn_push',1);request.onsuccess=()=>{const db=request.result;db.transaction('state','readwrite').objectStore('state').put(count,'count')}}catch(_){}
@@ -157,6 +166,13 @@ self.addEventListener('push',event=>{
 
 self.addEventListener('notificationclick',event=>{
   event.notification.close();
-  const url=(event.notification.data&&event.notification.data.url)||'/';
-  event.waitUntil(clients.matchAll({type:'window',includeUncontrolled:true}).then(list=>{for(const client of list){if('focus'in client)return client.focus()}return clients.openWindow(url)}));
+  const target=canonicalPushUrl(event.notification.data&&event.notification.data.url);
+  event.waitUntil((async()=>{
+    const list=await clients.matchAll({type:'window',includeUncontrolled:true});
+    for(const client of list){
+      try{if('navigate'in client)await client.navigate(target)}catch(_){}
+      if('focus'in client)return client.focus();
+    }
+    return clients.openWindow(target);
+  })());
 });
