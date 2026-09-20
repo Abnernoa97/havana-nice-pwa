@@ -2,6 +2,7 @@
    Remembers only the last successfully validated musician on this device.
    Device authorization is validated server-side before restoring the session.
    Direct app routes: #chat and #notifications.
+   Direct push routes keep HOME underneath so Android Back returns to the app.
 */
 (function(){
   'use strict';
@@ -11,6 +12,7 @@
   let restoring=false;
   let pendingRoute='';
   let routeTimer=null;
+  let notificationsHistoryArmed=false;
 
   function readSaved(){
     try{
@@ -56,9 +58,33 @@
     return normalizeRoute(location.hash);
   }
 
-  function clearRouteFromUrl(){
+  function homeUrl(){
+    return location.pathname+location.search;
+  }
+
+  function prepareDirectRouteBase(){
     if(!routeFromLocation())return;
-    try{history.replaceState(history.state,'',location.pathname+location.search);}catch(_){}
+    try{
+      history.replaceState(Object.assign({},history.state||{},{hnPushHome:true}),'',homeUrl());
+    }catch(_){}
+  }
+
+  function armNotificationsHistory(){
+    try{
+      history.pushState(Object.assign({},history.state||{},{hnPushNotifications:true}),'',homeUrl());
+      notificationsHistoryArmed=true;
+    }catch(_){notificationsHistoryArmed=false;}
+  }
+
+  function showHomeFromNotifications(){
+    const moduleScreen=document.getElementById('moduleScreen');
+    const home=document.getElementById('homeScreen');
+    const login=document.getElementById('loginScreen');
+    const repertoire=document.getElementById('repertoireScreen');
+    if(moduleScreen)moduleScreen.classList.remove('is-active');
+    if(repertoire)repertoire.classList.remove('is-active');
+    if(login)login.classList.remove('is-active');
+    if(home)home.classList.add('is-active');
   }
 
   function findRouteButton(route){
@@ -80,16 +106,26 @@
     const button=findRouteButton(pendingRoute);
     if(!button)return false;
 
+    const route=pendingRoute;
     pendingRoute='';
     clearTimeout(routeTimer);
     routeTimer=null;
-    clearRouteFromUrl();
+
+    // When the app was launched directly by #chat or #notifications,
+    // convert that first entry into HOME before opening the destination.
+    // Chat already creates its own history state; Notifications does not.
+    prepareDirectRouteBase();
+    if(route==='notifications')armNotificationsHistory();
 
     try{
       button.click();
       return true;
     }catch(error){
       console.warn('HAVANA NICE route failed:',error);
+      if(route==='notifications'&&notificationsHistoryArmed){
+        notificationsHistoryArmed=false;
+        try{history.back();}catch(_){}
+      }
       return false;
     }
   }
@@ -119,6 +155,21 @@
       const route=routeFromLocation();
       if(route)queueRoute(route);
     });
+
+    window.addEventListener('popstate',()=>{
+      if(!notificationsHistoryArmed)return;
+      notificationsHistoryArmed=false;
+      showHomeFromNotifications();
+    });
+
+    document.addEventListener('click',event=>{
+      const back=event.target&&event.target.closest&&event.target.closest('.hn-n-back');
+      if(!back||!notificationsHistoryArmed)return;
+      setTimeout(()=>{
+        if(!notificationsHistoryArmed)return;
+        try{history.back();}catch(_){notificationsHistoryArmed=false;}
+      },0);
+    },true);
 
     if('serviceWorker'in navigator){
       navigator.serviceWorker.addEventListener('message',event=>{
@@ -230,6 +281,7 @@
     button.addEventListener('click',()=>{
       clear();
       pendingRoute='';
+      notificationsHistoryArmed=false;
       clearTimeout(routeTimer);
       routeTimer=null;
       notifySession('hn:session-logout');
