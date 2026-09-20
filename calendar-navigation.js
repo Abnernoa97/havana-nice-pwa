@@ -85,17 +85,17 @@
       .find(x => x.dataset.module === 'CALENDARIO DE EVENTOS');
     if (!module) return false;
     bound = true;
-    if (isIOS) {
-      // iOS-only interception: the legacy generic module handler otherwise opens
-      // moduleScreen first, leaving its Repertoire content visible during the transition.
-      module.addEventListener('click', event => {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        openCalendar();
-      }, true);
-    } else {
-      module.addEventListener('click', () => openCalendar());
-    }
+
+    // Calendar owns its navigation on every platform. Intercept before the
+    // legacy generic module handler can activate moduleScreen, which may still
+    // contain Repertoire markup from the previous visit and visually cross-fade
+    // over Calendar during the screen transition.
+    module.addEventListener('click', event => {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      openCalendar();
+    }, true);
+
     return true;
   }
 
