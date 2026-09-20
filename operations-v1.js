@@ -43,6 +43,34 @@
     },250);
   }
 
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installFamilyRoles,{once:true});
-  else installFamilyRoles();
+  function installFamilyProfileBackFix(){
+    if(document.documentElement.dataset.hnFamilyProfileBackFix==='1')return;
+    document.documentElement.dataset.hnFamilyProfileBackFix='1';
+    document.addEventListener('click',event=>{
+      const button=event.target?.closest?.('.family-profile-back');
+      if(!button)return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+
+      // The Family module already owns a two-level history stack:
+      // Home -> Family list -> Member profile. Let its popstate handler
+      // consume only the profile entry instead of the button clearing the
+      // profile flag first and accidentally consuming the Family level too.
+      if(history.state?.hnFamilyProfile){
+        try{history.back();return}catch(_){ }
+      }
+
+      // Safe fallback for profiles opened without a pushed history entry.
+      document.getElementById('hnFamilyProfileScreen')?.classList.remove('is-active');
+      document.getElementById('hnFamilyScreen')?.classList.add('is-active');
+    },true);
+  }
+
+  function init(){
+    installFamilyRoles();
+    installFamilyProfileBackFix();
+  }
+
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});
+  else init();
 })();
