@@ -13,6 +13,7 @@ const SUPABASE_ESM='https://esm.sh/@supabase/supabase-js@2';
 const IS_IOS=/iPad|iPhone|iPod/.test(self.navigator?.userAgent||'')||((self.navigator?.platform||'')==='MacIntel'&&(self.navigator?.maxTouchPoints||0)>1);
 const FAMILY_IOS_VERSION='ios-family-20260920-profile-picker';
 const APP_ORIGIN='https://havana-nice-pwa.pages.dev';
+const CLIENT_MODE_WAITERS=new Map();
 
 const FRESH_PATHS=new Set([
   '/notifications-v5.js','/operations-v1.js','/operations-fix.js','/ios-install-v1.js',
@@ -69,6 +70,53 @@ function pushSection(value){
     return section==='notifications'||section==='chat'?section:'';
   }catch(_){return ''}
 }
+
+function musicianClient(client){
+  try{
+    const url=new URL(client.url);
+    return url.origin===APP_ORIGIN&&!url.pathname.endsWith('/admin.html');
+  }catch(_){return false}
+}
+
+async function chooseInstalledMusicianClient(list){
+  const candidates=list.filter(musicianClient);
+  if(!candidates.length)return null;
+
+  const nonce='hn-client-'+Date.now()+'-'+Math.random().toString(36).slice(2);
+  const responses=new Map();
+  CLIENT_MODE_WAITERS.set(nonce,responses);
+
+  for(const client of candidates){
+    try{client.postMessage({type:'HN_QUERY_CLIENT_MODE',nonce});}catch(_){}
+  }
+
+  await new Promise(resolve=>setTimeout(resolve,140));
+  CLIENT_MODE_WAITERS.delete(nonce);
+
+  const standalone=candidates.find(client=>responses.get(client.id)?.standalone===true);
+  if(standalone)return standalone;
+
+  // Never let a normal Chrome tab take ownership of notification routing.
+  // If clients answered and all are browser tabs, launch the PWA target instead.
+  if([...responses.values()].some(Boolean))return null;
+
+  // Old clients that have not loaded the current router are intentionally ignored.
+  // Opening the target is safer than focusing an unknown browser tab.
+  return null;
+}
+
+self.addEventListener('message',event=>{
+  const data=event&&event.data;
+  if(!data||data.type!=='HN_CLIENT_MODE_RESPONSE'||!data.nonce)return;
+  const responses=CLIENT_MODE_WAITERS.get(data.nonce);
+  const source=event.source;
+  if(!responses||!source||!source.id)return;
+  responses.set(source.id,{
+    standalone:data.standalone===true,
+    visibility:String(data.visibility||''),
+    url:String(source.url||'')
+  });
+});
 
 async function refreshShell(path,requestKey,admin){
   try{
@@ -178,18 +226,19 @@ self.addEventListener('notificationclick',event=>{
   event.notification.close();
   const target=canonicalPushUrl(event.notification.data&&event.notification.data.url);
   const section=(event.notification.data&&event.notification.data.section)||pushSection(target);
+
   event.waitUntil((async()=>{
     const list=await clients.matchAll({type:'window',includeUncontrolled:true});
-    for(const client of list){
-      try{
-        const url=new URL(client.url);
-        if(url.origin!==APP_ORIGIN||url.pathname.endsWith('/admin.html'))continue;
-      }catch(_){continue;}
+    const client=await chooseInstalledMusicianClient(list);
+
+    if(client){
+      try{if('focus'in client)await client.focus();}catch(_){}
       try{client.postMessage({type:'HN_PUSH_OPEN',section,url:target});}catch(_){}
-      if('focus'in client)return client.focus();
+      return client;
     }
-    const opened=await clients.openWindow(target);
-    if(opened&&section){try{opened.postMessage({type:'HN_PUSH_OPEN',section,url:target});}catch(_){}}
-    return opened;
+
+    // No verified standalone window is alive: launch the in-scope PWA target.
+    // The ?open=... intent is consumed by session-memory-v2 after session restore.
+    return clients.openWindow(target);
   })());
 });
