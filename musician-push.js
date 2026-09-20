@@ -1,7 +1,7 @@
-/* HAVANA NICE — MUSICIAN PUSH V3
-   Android behavior preserved. iPhone/iPad always gets a visible notification
-   activation flow after musician session is ready, with explicit diagnostics
-   instead of silently hiding when a platform capability is missing.
+/* HAVANA NICE — MUSICIAN PUSH V4
+   Android behavior preserved. On iPhone/iPad, notification activation is
+   shown only when Web Push capability is actually available. Older iOS
+   versions keep full app access without a blocking unsupported prompt.
 */
 (function(){
   'use strict';
@@ -11,6 +11,7 @@
   const STYLE_ID='hnIOSPushPromptStyle';
   const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
   const isStandalone=()=>window.matchMedia?.('(display-mode: standalone)').matches||window.navigator.standalone===true;
+  const hasWebPush=()=>('serviceWorker'in navigator)&&('Notification'in window)&&('PushManager'in window);
 
   let busy=false;
 
@@ -32,7 +33,7 @@
 
   async function registerPush(){
     const user=username();
-    if(!user||busy||!('serviceWorker'in navigator)||!('Notification'in window)||Notification.permission!=='granted')return false;
+    if(!user||busy||!hasWebPush()||Notification.permission!=='granted')return false;
     busy=true;
     try{
       const reg=await navigator.serviceWorker.ready;
@@ -87,8 +88,8 @@
   }
 
   function shouldShowIOSPrompt(){
-    if(!isIOS||!username())return false;
-    if('Notification'in window&&Notification.permission==='granted')return false;
+    if(!isIOS||!username()||!hasWebPush())return false;
+    if(Notification.permission==='granted')return false;
     return true;
   }
 
@@ -114,14 +115,6 @@
 
       if(!isStandalone()){
         setPromptStatus('Abre HAVANA NICE desde el icono instalado en la pantalla de inicio del iPhone.');
-        return;
-      }
-      if(!('serviceWorker'in navigator)){
-        setPromptStatus('Este iPhone no tiene Service Worker disponible para esta app.');
-        return;
-      }
-      if(!('Notification'in window)||!('PushManager'in window)){
-        setPromptStatus('Este iPhone no está exponiendo Web Push. Se requiere iOS/iPadOS 16.4 o posterior y la app instalada en Inicio.');
         return;
       }
       if(Notification.permission==='denied'){
@@ -154,10 +147,16 @@
 
   function afterSessionReady(){
     if(!isIOS){
-      if('Notification'in window&&Notification.permission==='granted')registerPush();
+      if(hasWebPush()&&Notification.permission==='granted')registerPush();
       return;
     }
-    if('Notification'in window&&Notification.permission==='granted')registerPush();
+
+    if(!hasWebPush()){
+      closeIOSPrompt();
+      return;
+    }
+
+    if(Notification.permission==='granted')registerPush();
     else setTimeout(showIOSPrompt,250);
   }
 
@@ -170,14 +169,14 @@
       const login=event.target.closest&&event.target.closest('#loginButton,#login');
       if(!login)return;
       if(isIOS){setTimeout(afterSessionReady,450);return}
-      if('Notification'in window&&Notification.permission==='default')Notification.requestPermission().then(registerPush).catch(()=>{});
+      if(hasWebPush()&&Notification.permission==='default')Notification.requestPermission().then(registerPush).catch(()=>{});
       else registerPush();
     },true);
 
     window.addEventListener('hn:session-ready',afterSessionReady);
     window.addEventListener('hn:session-logout',closeIOSPrompt);
     document.addEventListener('visibilitychange',()=>{if(!document.hidden)afterSessionReady()});
-    window.addEventListener('online',()=>{if('Notification'in window&&Notification.permission==='granted')registerPush()});
+    window.addEventListener('online',()=>{if(hasWebPush()&&Notification.permission==='granted')registerPush()});
 
     setTimeout(afterSessionReady,500);
   }
