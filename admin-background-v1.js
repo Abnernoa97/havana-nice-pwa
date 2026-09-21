@@ -8,6 +8,7 @@
   const TABLE = 'app_background_config';
   const BUCKET = 'musician-backgrounds';
   const PREFIX = 'global/';
+  const CACHE_SECONDS = '31536000';
   const CARD_ID = 'hnAdminBackgroundPanel';
   const STYLE_ID = 'hnAdminBackgroundStyle';
 
@@ -195,6 +196,76 @@
       if(error) throw error;
     }
 
+    async function ensureLongCache(data,publicUrl){
+      try{
+        const currentPath = String(data?.storage_path || '');
+        if(!currentPath.startsWith(PREFIX) || data?.media_type !== 'video') return currentPath;
+
+        const currentName = currentPath.slice(PREFIX.length);
+        const {data:items,error:listError} = await sb.storage
+          .from(BUCKET)
+          .list('global',{limit:100});
+
+        if(listError) return currentPath;
+
+        const item = (items || []).find(function(entry){
+          return entry.name === currentName;
+        });
+
+        const cacheControl = String(item?.metadata?.cacheControl || '');
+        if(cacheControl.includes(CACHE_SECONDS)) return currentPath;
+
+        const response = await fetch(publicUrl,{cache:'no-store'});
+        if(!response.ok) return currentPath;
+
+        const blob = await response.blob();
+        if(!blob?.size) return currentPath;
+
+        const ext = currentName.toLowerCase().endsWith('.webm') ? 'webm' : 'mp4';
+        const nextPath = PREFIX + 'background-' + Date.now() + '.' + ext;
+        const contentType = blob.type || (ext === 'webm' ? 'video/webm' : 'video/mp4');
+
+        const {error:uploadError} = await sb.storage
+          .from(BUCKET)
+          .upload(
+            nextPath,
+            blob,
+            {
+              contentType,
+              upsert:false,
+              cacheControl:CACHE_SECONDS
+            }
+          );
+
+        if(uploadError) return currentPath;
+
+        const {error:configError} = await sb
+          .from(TABLE)
+          .upsert(
+            {
+              id:1,
+              storage_path:nextPath,
+              media_type:'video',
+              active:true,
+              updated_at:new Date().toISOString()
+            },
+            {
+              onConflict:'id'
+            }
+          );
+
+        if(configError){
+          try{await sb.storage.from(BUCKET).remove([nextPath]);}catch(_){}
+          return currentPath;
+        }
+
+        return nextPath;
+      }catch(error){
+        console.warn('[HN background cache]',error);
+        return String(data?.storage_path || '');
+      }
+    }
+
     async function loadCurrent(){
       const {data,error} = await sb
         .from(TABLE)
@@ -215,9 +286,10 @@
         return;
       }
 
-      const {data:urlData} = sb.storage
+      let activePath = data.storage_path;
+      let {data:urlData} = sb.storage
         .from(BUCKET)
-        .getPublicUrl(data.storage_path);
+        .getPublicUrl(activePath);
 
       if(!urlData?.publicUrl){
         setStatus('Usando video predeterminado');
@@ -225,6 +297,14 @@
       }
 
       if(data.media_type === 'video'){
+        const upgradedPath = await ensureLongCache(data,urlData.publicUrl);
+        if(upgradedPath && upgradedPath !== activePath){
+          activePath = upgradedPath;
+          ({data:urlData} = sb.storage
+            .from(BUCKET)
+            .getPublicUrl(activePath));
+        }
+
         preview.src = urlData.publicUrl;
         preview.hidden = false;
         preview.load();
@@ -269,7 +349,7 @@
             {
               contentType:file.type,
               upsert:false,
-              cacheControl:'31536000'
+              cacheControl:CACHE_SECONDS
             }
           );
 
