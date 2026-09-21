@@ -26,7 +26,7 @@
     body.appendChild(panel);panel.querySelector('#hnDaClearAlerts')?.addEventListener('click',clearAlerts);return panel;
   }
   async function client(){if(sb)return sb;const mod=await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');sb=mod.createClient(URL,KEY);return sb;}
-  async function clearAlerts(){\n    const btn=document.getElementById('hnDaClearAlerts');if(!btn||!sb)return;\n    if(!confirm('¿Borrar todas las alertas de acceso?'))return;\n    btn.disabled=true;\n    const {data,error}=await sb.rpc('admin_delete_all_musician_access_alerts');\n    if(error||data!==true){const m=document.getElementById('hnDaMsg');if(m)m.textContent='No se pudieron borrar las alertas';btn.disabled=false;return;}\n    await load();\n  }\n  async function load(){
+  async function load(){
     const panel=ensurePanel();if(!panel)return;const api=await client();const {data:session}=await api.auth.getSession();if(!session?.session)return;
     const [profiles,devices,alerts]=await Promise.all([api.rpc('admin_list_musicians'),api.rpc('admin_list_musician_devices'),api.rpc('admin_list_musician_access_alerts')]);
     if(profiles.error||devices.error){panel.querySelector('#hnDaMsg').textContent='No se pudieron cargar los accesos';return;}
@@ -72,7 +72,7 @@
   async function clearAlerts(){
     const btn=document.getElementById('hnDaClearAlerts');if(!btn||btn.disabled)return;
     if(!window.confirm('¿Borrar todas las alertas de acceso?'))return;
-    btn.disabled=true;const {data,error}=await sb.rpc('admin_delete_musician_access_alerts');
+    btn.disabled=true;const {data,error}=await sb.rpc('admin_delete_all_musician_access_alerts');
     if(error||data!==true){const m=document.getElementById('hnDaMsg');if(m)m.textContent='No se pudieron borrar las alertas';btn.disabled=false;return;}
     await load();
   }
