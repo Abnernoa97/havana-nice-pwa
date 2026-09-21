@@ -16,14 +16,14 @@
       .hn-da-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin-bottom:12px}.hn-da-title{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#e5bd62}.hn-da-summary{font-size:8px;letter-spacing:.12em;text-transform:uppercase;color:#9b9b96;text-align:right}
       .hn-da-grid{display:grid;gap:8px}.hn-da-row{border:1px solid rgba(130,190,145,.18);background:rgba(0,0,0,.18);padding:11px}.hn-da-main{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.hn-da-name{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#f4f1e8}.hn-da-meta{font-size:8px;line-height:1.6;color:#9b9b96;margin-top:5px}.hn-da-status{font-size:8px;letter-spacing:.12em;text-transform:uppercase;white-space:nowrap}.hn-da-status.authorized{color:#bfe0c6}.hn-da-status.pending{color:#e5bd62}.hn-da-status.blocked,.hn-da-status.revoked{color:#d9a89b}
       .hn-da-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}.hn-da-actions button{min-width:86px;height:32px;padding:7px 9px;font-size:8px}.hn-da-history{margin-top:10px;border-top:1px solid rgba(130,190,145,.12);padding-top:8px}.hn-da-history summary{cursor:pointer;color:#9b9b96;font-size:8px;letter-spacing:.12em;text-transform:uppercase;list-style:none}.hn-da-history summary::-webkit-details-marker{display:none}.hn-da-history summary:before{content:'+';display:inline-block;margin-right:7px;color:#e5bd62}.hn-da-history[open] summary:before{content:'−'}.hn-da-history-list{display:grid;gap:6px;margin-top:8px}.hn-da-history-item{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px;border:1px solid rgba(130,190,145,.10);background:rgba(0,0,0,.12)}.hn-da-history-item .hn-da-actions{margin-top:0}.hn-da-history-item button{min-width:78px}
-      .hn-da-alerts{margin-top:15px}.hn-da-alert{border-left:2px solid #e5bd62;padding:10px 11px;background:rgba(229,189,98,.035);margin-top:7px}.hn-da-alert.unread{background:rgba(229,189,98,.07)}.hn-da-alert-title{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:#fff1a8}.hn-da-alert-msg{font-size:8px;line-height:1.55;color:#d6d1c6;margin-top:4px}.hn-da-alert-date{font-size:7px;color:#777;margin-top:5px}.hn-da-empty{padding:10px 0;color:#777;font-size:8px;letter-spacing:.12em;text-transform:uppercase}
+      .hn-da-alerts{margin-top:15px}.hn-da-alerts-head{display:flex;align-items:center;justify-content:space-between;gap:10px}.hn-da-clear{min-width:auto!important;height:30px!important;padding:6px 9px!important;font-size:7px!important}.hn-da-alert{border-left:2px solid #e5bd62;padding:10px 11px;background:rgba(229,189,98,.035);margin-top:7px}.hn-da-alert.unread{background:rgba(229,189,98,.07)}.hn-da-alert-title{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:#fff1a8}.hn-da-alert-msg{font-size:8px;line-height:1.55;color:#d6d1c6;margin-top:4px}.hn-da-alert-date{font-size:7px;color:#777;margin-top:5px}.hn-da-empty{padding:10px 0;color:#777;font-size:8px;letter-spacing:.12em;text-transform:uppercase}
     `;document.head.appendChild(s);
   }
   function ensurePanel(){
     const c=card();if(!c)return null;let panel=document.getElementById(ROOT);if(panel)return panel;
     const body=c.querySelector('.hn-admin-body')||c;panel=document.createElement('div');panel.id=ROOT;
-    panel.innerHTML='<div class="hn-da-head"><div class="hn-da-title">Dispositivos / Accesos</div><div class="hn-da-summary" id="hnDaSummary">—</div></div><div class="hn-da-grid" id="hnDaDevices"></div><div class="hn-da-alerts"><div class="hn-da-title">Alertas de acceso</div><div id="hnDaAlerts"></div></div><div id="hnDaMsg" class="msg"></div>';
-    body.appendChild(panel);return panel;
+    panel.innerHTML='<div class="hn-da-head"><div class="hn-da-title">Dispositivos / Accesos</div><div class="hn-da-summary" id="hnDaSummary">—</div></div><div class="hn-da-grid" id="hnDaDevices"></div><div class="hn-da-alerts"><div class="hn-da-alerts-head"><div class="hn-da-title">Alertas de acceso</div><button class="danger hn-da-clear" id="hnDaClearAlerts" type="button">BORRAR ALERTAS</button></div><div id="hnDaAlerts"></div></div><div id="hnDaMsg" class="msg"></div>';
+    body.appendChild(panel);panel.querySelector('#hnDaClearAlerts')?.addEventListener('click',clearAlerts);return panel;
   }
   async function client(){if(sb)return sb;const mod=await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');sb=mod.createClient(URL,KEY);return sb;}
   async function load(){
@@ -69,6 +69,13 @@
   }
   function emptyProfileRow(p){return '<div class="hn-da-row"><div class="hn-da-main"><div><div class="hn-da-name">'+esc(p.username)+'</div><div class="hn-da-meta">Sin dispositivo registrado</div></div><div class="hn-da-status">SIN DISPOSITIVO</div></div></div>';}
   function historyRow(r){return '<div class="hn-da-history-item"><div><div class="hn-da-meta">'+esc(r.device_label||'Dispositivo')+'<br>'+statusLabel(String(r.status||'').toLowerCase())+' · '+esc(deviceDate(r))+'</div></div><div class="hn-da-actions"><button class="danger" data-da-action="delete-device" data-id="'+esc(r.id)+'">ELIMINAR</button></div></div>';}
+  async function clearAlerts(){
+    const btn=document.getElementById('hnDaClearAlerts');if(!btn||btn.disabled)return;
+    if(!window.confirm('¿Borrar todas las alertas de acceso?'))return;
+    btn.disabled=true;const {data,error}=await sb.rpc('admin_delete_musician_access_alerts');
+    if(error||data!==true){const m=document.getElementById('hnDaMsg');if(m)m.textContent='No se pudieron borrar las alertas';btn.disabled=false;return;}
+    await load();
+  }
   function renderAlerts(rows){
     const el=document.getElementById('hnDaAlerts');if(!el)return;const list=(rows||[]).slice(0,12);
     el.innerHTML=list.length?list.map(a=>'<div class="hn-da-alert '+(a.read_at?'':'unread')+'"><div class="hn-da-alert-title">'+esc(a.title||'NUEVO ACCESO')+' · '+esc(a.username)+'</div><div class="hn-da-alert-msg">'+esc(a.message)+'</div><div class="hn-da-alert-date">'+(a.created_at?new Date(a.created_at).toLocaleString('es-MX'):'')+'</div><div class="hn-da-actions"><button data-alert-read="'+esc(a.id)+'">MARCAR LEÍDA</button><button class="danger" data-alert-delete="'+esc(a.id)+'">ELIMINAR</button></div></div>').join(''):'<div class="hn-da-empty">Sin alertas nuevas</div>';
