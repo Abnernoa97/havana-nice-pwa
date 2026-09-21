@@ -269,7 +269,7 @@
             {
               contentType:file.type,
               upsert:false,
-              cacheControl:'3600'
+              cacheControl:'31536000'
             }
           );
 
