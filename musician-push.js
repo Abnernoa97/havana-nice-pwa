@@ -1,7 +1,6 @@
-/* HAVANA NICE — MUSICIAN PUSH V4
-   Android behavior preserved. On iPhone/iPad, notification activation is
-   shown only when Web Push capability is actually available. Older iOS
-   versions keep full app access without a blocking unsupported prompt.
+/* HAVANA NICE — MUSICIAN PUSH V5
+   Explicit activation prompt for supported Android and iPhone/iPad devices.
+   Existing push registration and platform safeguards are preserved.
 */
 (function(){
   'use strict';
@@ -88,8 +87,8 @@
   }
 
   function shouldShowIOSPrompt(){
-    if(!isIOS||!username()||!hasWebPush())return false;
-    if(Notification.permission==='granted')return false;
+    if(!username()||!hasWebPush())return false;
+    if(Notification.permission==='granted'||Notification.permission==='denied')return false;
     return true;
   }
 
@@ -113,7 +112,7 @@
     button.addEventListener('click',async()=>{
       if(button.disabled)return;
 
-      if(!isStandalone()){
+      if(isIOS&&!isStandalone()){
         setPromptStatus('Abre HAVANA NICE desde el icono instalado en la pantalla de inicio del iPhone.');
         return;
       }
@@ -146,18 +145,13 @@
   }
 
   function afterSessionReady(){
-    if(!isIOS){
-      if(hasWebPush()&&Notification.permission==='granted')registerPush();
-      return;
-    }
-
     if(!hasWebPush()){
       closeIOSPrompt();
       return;
     }
-
     if(Notification.permission==='granted')registerPush();
-    else setTimeout(showIOSPrompt,250);
+    else if(Notification.permission==='default')setTimeout(showIOSPrompt,250);
+    else closeIOSPrompt();
   }
 
   function init(){
@@ -168,9 +162,7 @@
     document.addEventListener('click',event=>{
       const login=event.target.closest&&event.target.closest('#loginButton,#login');
       if(!login)return;
-      if(isIOS){setTimeout(afterSessionReady,450);return}
-      if(hasWebPush()&&Notification.permission==='default')Notification.requestPermission().then(registerPush).catch(()=>{});
-      else registerPush();
+      setTimeout(afterSessionReady,450);
     },true);
 
     window.addEventListener('hn:session-ready',afterSessionReady);
