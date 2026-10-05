@@ -1,11 +1,12 @@
-/* HAVANA NICE — ADMIN EVENT REPERTOIRE V1
+/* HAVANA NICE — ADMIN EVENT REPERTOIRE V2
    Event-specific setlist inside the existing Admin Repertoire card.
-   Admin only. Does not modify the musician repertoire UI or the master repertoire logic.
+   Admin only. Multi-select + event-only custom songs.
+   Does not modify musician UI or master repertoire behavior.
 */
 (function(){
   'use strict';
-  if(window.__hnAdminEventRepertoireV1)return;
-  window.__hnAdminEventRepertoireV1=true;
+  if(window.__hnAdminEventRepertoireV2)return;
+  window.__hnAdminEventRepertoireV2=true;
 
   const PANEL_ID='hnEventRepertoireAdmin';
   const STYLE_ID='hnAdminEventRepertoireStyle';
@@ -14,6 +15,7 @@
   let songs=[];
   let items=[];
   let selectedEventId='';
+  let selectedSongIds=new Set();
   let started=false;
 
   const esc=value=>String(value??'').replace(/[&<>'"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
@@ -40,7 +42,7 @@
   }
 
   function installStyle(){
-    if(document.getElementById(STYLE_ID))return;
+    document.getElementById(STYLE_ID)?.remove();
     const style=document.createElement('style');
     style.id=STYLE_ID;
     style.textContent=`
@@ -50,13 +52,35 @@
       #${PANEL_ID} .hn-er-kicker{font-size:9px;font-weight:800;letter-spacing:.22em;text-transform:uppercase;color:#6b5425}
       #${PANEL_ID} .hn-er-heading{margin:6px 0 0;font:600 28px/1.05 Georgia,"Times New Roman",serif;color:#16351f}
       #${PANEL_ID} .hn-er-copy{margin-top:7px;font-size:9px;line-height:1.45;letter-spacing:.11em;text-transform:uppercase;color:#746f64}
-      #${PANEL_ID} .hn-er-controls{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr) auto;gap:8px;padding:16px 20px;border-bottom:1px solid #d7ccb5}
-      #${PANEL_ID} label{display:block;margin:0 0 5px;font-size:8px;font-weight:800;letter-spacing:.13em;text-transform:uppercase;color:#6d675c}
-      #${PANEL_ID} select{width:100%;height:46px;border:1px solid #b8aa8c;background:#fff;color:#171916;padding:0 11px;font-size:12px;outline:none}
-      #${PANEL_ID} select:focus{border-color:#7b5b1d;box-shadow:0 0 0 2px rgba(123,91,29,.10)}
-      #${PANEL_ID} .hn-er-add-button{align-self:end;height:46px;min-width:100px;border:1px solid #16351f;background:#16351f;color:#fff7dc;padding:0 15px;font-size:9px;font-weight:800;letter-spacing:.13em;text-transform:uppercase}
-      #${PANEL_ID} .hn-er-add-button:disabled{opacity:.45;cursor:wait}
-      #${PANEL_ID} .hn-er-event-meta{padding:0 20px 15px;color:#5d5a52;font-size:10px;letter-spacing:.08em;text-transform:uppercase}
+      #${PANEL_ID} .hn-er-event-block{padding:16px 20px 14px;border-bottom:1px solid #d7ccb5}
+      #${PANEL_ID} label,#${PANEL_ID} .hn-er-label{display:block;margin:0 0 6px;font-size:8px;font-weight:800;letter-spacing:.13em;text-transform:uppercase;color:#6d675c}
+      #${PANEL_ID} select,#${PANEL_ID} input[type="text"]{width:100%;height:46px;border:1px solid #b8aa8c;background:#fff;color:#171916;padding:0 11px;font-size:12px;outline:none}
+      #${PANEL_ID} select:focus,#${PANEL_ID} input[type="text"]:focus{border-color:#7b5b1d;box-shadow:0 0 0 2px rgba(123,91,29,.10)}
+      #${PANEL_ID} .hn-er-event-meta{margin-top:9px;color:#5d5a52;font-size:10px;letter-spacing:.08em;text-transform:uppercase}
+      #${PANEL_ID} .hn-er-picker{padding:16px 20px;border-bottom:1px solid #d7ccb5;background:#fbf8f2}
+      #${PANEL_ID} .hn-er-picker-head{display:flex;align-items:end;justify-content:space-between;gap:12px;margin-bottom:9px}
+      #${PANEL_ID} .hn-er-picker-title{font:600 20px/1.1 Georgia,"Times New Roman",serif;color:#16351f}
+      #${PANEL_ID} .hn-er-selected-count{font-size:9px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#725b2b;text-align:right}
+      #${PANEL_ID} .hn-er-search{margin-bottom:8px}
+      #${PANEL_ID} .hn-er-picker-actions{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:8px}
+      #${PANEL_ID} .hn-er-mini{min-height:34px;border:1px solid #aa9a7a;background:#fff;color:#4e493f;padding:7px 10px;font-size:8px;font-weight:800;letter-spacing:.11em;text-transform:uppercase}
+      #${PANEL_ID} .hn-er-choices{max-height:330px;overflow:auto;border:1px solid #c5b89e;background:#fff;-webkit-overflow-scrolling:touch}
+      #${PANEL_ID} .hn-er-choice{display:grid;grid-template-columns:34px minmax(0,1fr);align-items:center;gap:9px;min-height:58px;padding:8px 10px;border-top:1px solid #e2dacb;cursor:pointer}
+      #${PANEL_ID} .hn-er-choice:first-child{border-top:0}
+      #${PANEL_ID} .hn-er-choice:active{background:#f2ede4}
+      #${PANEL_ID} .hn-er-choice input{appearance:none;-webkit-appearance:none;width:28px;height:28px;margin:0;border:2px solid #16351f;background:#fff;display:grid;place-items:center}
+      #${PANEL_ID} .hn-er-choice input:checked{background:#16351f}
+      #${PANEL_ID} .hn-er-choice input:checked::after{content:"✓";color:#fff7dc;font-size:18px;font-weight:900;line-height:1}
+      #${PANEL_ID} .hn-er-choice-title{font-size:15px;font-weight:800;line-height:1.18;color:#151713}
+      #${PANEL_ID} .hn-er-choice-artist{margin-top:3px;font-size:9px;letter-spacing:.07em;text-transform:uppercase;color:#777166}
+      #${PANEL_ID} .hn-er-add-button{width:100%;min-height:48px;margin-top:9px;border:1px solid #16351f;background:#16351f;color:#fff7dc;padding:0 15px;font-size:9px;font-weight:800;letter-spacing:.13em;text-transform:uppercase}
+      #${PANEL_ID} .hn-er-add-button:disabled{opacity:.42;cursor:not-allowed}
+      #${PANEL_ID} .hn-er-custom{padding:16px 20px;border-bottom:1px solid #d7ccb5;background:#f2ecdf}
+      #${PANEL_ID} .hn-er-custom-title{font:600 18px/1.1 Georgia,"Times New Roman",serif;color:#16351f;margin-bottom:4px}
+      #${PANEL_ID} .hn-er-custom-copy{font-size:8px;line-height:1.4;letter-spacing:.10em;text-transform:uppercase;color:#746f64;margin-bottom:10px}
+      #${PANEL_ID} .hn-er-custom-grid{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) auto;gap:8px}
+      #${PANEL_ID} .hn-er-custom-button{min-width:105px;border:1px solid #6b5425;background:#fff;color:#16351f;padding:0 13px;font-size:8px;font-weight:800;letter-spacing:.11em;text-transform:uppercase}
+      #${PANEL_ID} .hn-er-custom-button:disabled{opacity:.45;cursor:wait}
       #${PANEL_ID} .hn-er-summary{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;padding:18px 20px 12px;background:#ede5d7;border-top:1px solid #d7ccb5}
       #${PANEL_ID} .hn-er-count strong{display:block;font:600 38px/1 Georgia,"Times New Roman",serif;color:#16351f}
       #${PANEL_ID} .hn-er-count span{display:block;margin-top:5px;font-size:8px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:#6b665d}
@@ -65,7 +89,7 @@
       #${PANEL_ID} .hn-er-progress>span{display:block;height:100%;width:0;background:#16351f;transition:width .18s ease}
       #${PANEL_ID} .hn-er-message{min-height:18px;padding:0 20px 9px;color:#7b3229;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
       #${PANEL_ID} .hn-er-list{padding:0 12px 14px}
-      #${PANEL_ID} .hn-er-item{display:grid;grid-template-columns:48px minmax(0,1fr) auto;align-items:center;gap:12px;min-height:72px;padding:10px 8px;border-top:1px solid #d9cfbd;background:#fffdf8;transition:opacity .15s ease,background .15s ease}
+      #${PANEL_ID} .hn-er-item{display:grid;grid-template-columns:48px minmax(0,1fr) auto;align-items:center;gap:12px;min-height:72px;padding:10px 8px;border-top:1px solid #d9cfbd;background:#fffdf8;transition:background .15s ease}
       #${PANEL_ID} .hn-er-item:first-child{border-top:0}
       #${PANEL_ID} .hn-er-check{width:42px;height:42px;border:2px solid #16351f;background:#fff;color:#16351f;display:grid;place-items:center;padding:0;font-size:24px;font-weight:900;line-height:1;letter-spacing:0;text-transform:none}
       #${PANEL_ID} .hn-er-check[aria-pressed="true"]{background:#16351f;color:#fff7dc}
@@ -73,6 +97,7 @@
       #${PANEL_ID} .hn-er-info{min-width:0}
       #${PANEL_ID} .hn-er-title{font-size:18px;font-weight:800;line-height:1.15;letter-spacing:.015em;color:#151713;overflow-wrap:anywhere}
       #${PANEL_ID} .hn-er-artist{margin-top:4px;font-size:10px;line-height:1.2;letter-spacing:.08em;text-transform:uppercase;color:#777166}
+      #${PANEL_ID} .hn-er-special{display:inline-block;margin-top:5px;font-size:7px;font-weight:900;letter-spacing:.15em;text-transform:uppercase;color:#8a6322}
       #${PANEL_ID} .hn-er-item.is-done{background:#e8e3d9}
       #${PANEL_ID} .hn-er-item.is-done .hn-er-title{text-decoration-line:line-through;text-decoration-thickness:2px;text-decoration-color:#16351f;color:#77756e}
       #${PANEL_ID} .hn-er-item.is-done .hn-er-artist{text-decoration-line:line-through;color:#97938b}
@@ -82,9 +107,12 @@
       @media(max-width:700px){
         #${PANEL_ID} .hn-er-top{padding:18px 15px 14px}
         #${PANEL_ID} .hn-er-heading{font-size:25px}
-        #${PANEL_ID} .hn-er-controls{grid-template-columns:1fr;padding:14px 15px}
-        #${PANEL_ID} .hn-er-add-button{width:100%}
-        #${PANEL_ID} .hn-er-event-meta{padding:0 15px 14px}
+        #${PANEL_ID} .hn-er-event-block,#${PANEL_ID} .hn-er-picker,#${PANEL_ID} .hn-er-custom{padding-left:15px;padding-right:15px}
+        #${PANEL_ID} .hn-er-picker-head{align-items:start;flex-direction:column;gap:4px}
+        #${PANEL_ID} .hn-er-selected-count{text-align:left}
+        #${PANEL_ID} .hn-er-choices{max-height:360px}
+        #${PANEL_ID} .hn-er-custom-grid{grid-template-columns:1fr}
+        #${PANEL_ID} .hn-er-custom-button{min-height:46px}
         #${PANEL_ID} .hn-er-summary{padding:16px 15px 11px}
         #${PANEL_ID} .hn-er-progress{margin:0 15px 16px}
         #${PANEL_ID} .hn-er-message{padding:0 15px 8px}
@@ -97,9 +125,7 @@
     document.head.appendChild(style);
   }
 
-  function panel(){
-    return document.getElementById(PANEL_ID);
-  }
+  function panel(){return document.getElementById(PANEL_ID)}
 
   function setMessage(message){
     const el=document.getElementById('hnErMessage');
@@ -118,20 +144,35 @@
       <div class="hn-er-top">
         <div class="hn-er-kicker">Repertorio del evento</div>
         <h2 class="hn-er-heading">Lista del día</h2>
-        <div class="hn-er-copy">Selecciona el evento, agrega las canciones y marca cada una al terminar.</div>
+        <div class="hn-er-copy">Selecciona todas las canciones que quieras y marca cada una al terminar.</div>
       </div>
-      <div class="hn-er-controls">
-        <div>
-          <label for="hnErEventSelect">Evento</label>
-          <select id="hnErEventSelect" aria-label="Seleccionar evento"><option value="">Cargando eventos…</option></select>
-        </div>
-        <div>
-          <label for="hnErSongSelect">Añadir canción</label>
-          <select id="hnErSongSelect" aria-label="Seleccionar canción"><option value="">Cargando repertorio…</option></select>
-        </div>
-        <button id="hnErAdd" class="hn-er-add-button" type="button">Añadir</button>
+      <div class="hn-er-event-block">
+        <label for="hnErEventSelect">Evento</label>
+        <select id="hnErEventSelect" aria-label="Seleccionar evento"><option value="">Cargando eventos…</option></select>
+        <div id="hnErEventMeta" class="hn-er-event-meta"></div>
       </div>
-      <div id="hnErEventMeta" class="hn-er-event-meta"></div>
+      <div class="hn-er-picker">
+        <div class="hn-er-picker-head">
+          <div class="hn-er-picker-title">Seleccionar canciones</div>
+          <div id="hnErSelectedCount" class="hn-er-selected-count">0 seleccionadas</div>
+        </div>
+        <input id="hnErSearch" class="hn-er-search" type="text" autocomplete="off" placeholder="Buscar canción o artista">
+        <div class="hn-er-picker-actions">
+          <button id="hnErSelectVisible" class="hn-er-mini" type="button">Marcar visibles</button>
+          <button id="hnErClearSelection" class="hn-er-mini" type="button">Limpiar selección</button>
+        </div>
+        <div id="hnErSongChoices" class="hn-er-choices"><div class="hn-er-empty">Cargando repertorio…</div></div>
+        <button id="hnErAddSelected" class="hn-er-add-button" type="button" disabled>Añadir seleccionadas</button>
+      </div>
+      <div class="hn-er-custom">
+        <div class="hn-er-custom-title">Canción nueva / especial</div>
+        <div class="hn-er-custom-copy">Solo para este evento. No modifica el repertorio general.</div>
+        <div class="hn-er-custom-grid">
+          <input id="hnErCustomTitle" type="text" autocomplete="off" placeholder="Nombre de la canción">
+          <input id="hnErCustomArtist" type="text" autocomplete="off" placeholder="Artista · opcional">
+          <button id="hnErAddCustom" class="hn-er-custom-button" type="button">Añadir especial</button>
+        </div>
+      </div>
       <div class="hn-er-summary">
         <div class="hn-er-count"><strong id="hnErCount">0 / 0</strong><span>Realizadas</span></div>
         <div id="hnErPending" class="hn-er-pending">0 pendientes</div>
@@ -152,10 +193,19 @@
 
     document.getElementById('hnErEventSelect')?.addEventListener('change',async event=>{
       selectedEventId=String(event.target.value||'');
+      selectedSongIds.clear();
       renderEventMeta();
+      renderSongChoices();
       await loadItems();
     });
-    document.getElementById('hnErAdd')?.addEventListener('click',addSelectedSong);
+    document.getElementById('hnErSearch')?.addEventListener('input',renderSongChoices);
+    document.getElementById('hnErSelectVisible')?.addEventListener('click',selectVisibleSongs);
+    document.getElementById('hnErClearSelection')?.addEventListener('click',()=>{
+      selectedSongIds.clear();
+      renderSongChoices();
+    });
+    document.getElementById('hnErAddSelected')?.addEventListener('click',addSelectedSongs);
+    document.getElementById('hnErAddCustom')?.addEventListener('click',addCustomSong);
     return true;
   }
 
@@ -184,22 +234,6 @@
     }).join('');
   }
 
-  function renderSongOptions(){
-    const select=document.getElementById('hnErSongSelect');
-    if(!select)return;
-    if(!songs.length){
-      select.innerHTML='<option value="">No hay canciones disponibles</option>';
-      select.disabled=true;
-      return;
-    }
-    select.disabled=false;
-    select.innerHTML='<option value="">Selecciona una canción…</option>'+songs.map(song=>{
-      const artist=String(song.song_artist||'').trim();
-      const hidden=song.song_active===false?' · OCULTA':'';
-      return `<option value="${esc(song.song_id)}">${esc(song.song_title||'Sin título')}${artist?' · '+esc(artist):''}${hidden}</option>`;
-    }).join('');
-  }
-
   function renderEventMeta(){
     const meta=document.getElementById('hnErEventMeta');
     if(!meta)return;
@@ -207,6 +241,64 @@
     if(!event){meta.textContent='';return}
     const parts=[formatDate(event.event_date),event.venue].filter(Boolean);
     meta.textContent=parts.join(' · ');
+  }
+
+  function filteredSongs(){
+    const query=String(document.getElementById('hnErSearch')?.value||'').trim().toLocaleLowerCase('es');
+    if(!query)return songs;
+    return songs.filter(song=>`${song.song_title||''} ${song.song_artist||''}`.toLocaleLowerCase('es').includes(query));
+  }
+
+  function renderSelectionState(){
+    const count=document.getElementById('hnErSelectedCount');
+    const button=document.getElementById('hnErAddSelected');
+    const n=selectedSongIds.size;
+    if(count)count.textContent=`${n} seleccionada${n===1?'':'s'}`;
+    if(button){
+      button.disabled=!selectedEventId||n===0;
+      button.textContent=n?`Añadir ${n} seleccionada${n===1?'':'s'}`:'Añadir seleccionadas';
+    }
+  }
+
+  function renderSongChoices(){
+    const box=document.getElementById('hnErSongChoices');
+    if(!box)return;
+    const rows=filteredSongs();
+    if(!songs.length){
+      box.innerHTML='<div class="hn-er-empty">No hay canciones en el repertorio general</div>';
+      renderSelectionState();
+      return;
+    }
+    if(!rows.length){
+      box.innerHTML='<div class="hn-er-empty">No hay coincidencias</div>';
+      renderSelectionState();
+      return;
+    }
+    box.innerHTML=rows.map(song=>{
+      const id=String(song.song_id);
+      const checked=selectedSongIds.has(id)?' checked':'';
+      const hidden=song.song_active===false?' · OCULTA':'';
+      return `
+        <label class="hn-er-choice">
+          <input class="hn-er-choice-check" type="checkbox" value="${esc(id)}"${checked}>
+          <span>
+            <span class="hn-er-choice-title">${esc(song.song_title||'Sin título')}</span>
+            ${song.song_artist?`<span class="hn-er-choice-artist">${esc(song.song_artist)}${hidden}</span>`:hidden?`<span class="hn-er-choice-artist">${esc(hidden.replace(/^ · /,''))}</span>`:''}
+          </span>
+        </label>
+      `;
+    }).join('');
+    box.querySelectorAll('.hn-er-choice-check').forEach(input=>input.addEventListener('change',()=>{
+      const id=String(input.value||'');
+      if(input.checked)selectedSongIds.add(id);else selectedSongIds.delete(id);
+      renderSelectionState();
+    }));
+    renderSelectionState();
+  }
+
+  function selectVisibleSongs(){
+    filteredSongs().forEach(song=>selectedSongIds.add(String(song.song_id)));
+    renderSongChoices();
   }
 
   function renderItems(){
@@ -237,6 +329,7 @@
         <div class="hn-er-info">
           <div class="hn-er-title">${esc(item.song_title||'')}</div>
           ${item.song_artist?`<div class="hn-er-artist">${esc(item.song_artist)}</div>`:''}
+          ${item.song_id?'':'<div class="hn-er-special">Canción especial</div>'}
         </div>
         <button class="hn-er-remove" type="button" data-action="remove" data-id="${esc(item.item_id)}">Quitar</button>
       </div>
@@ -260,8 +353,8 @@
     songs=Array.isArray(songResult.data)?songResult.data:[];
     chooseDefaultEvent();
     renderEventOptions();
-    renderSongOptions();
     renderEventMeta();
+    renderSongChoices();
     await loadItems();
   }
 
@@ -276,25 +369,54 @@
     renderItems();
   }
 
-  async function addSelectedSong(){
+  async function addSelectedSongs(){
     if(!client||!selectedEventId){setMessage('Selecciona un evento');return}
-    const select=document.getElementById('hnErSongSelect');
-    const button=document.getElementById('hnErAdd');
-    const songId=String(select?.value||'');
-    if(!songId){setMessage('Selecciona una canción');return}
+    const ids=[...selectedSongIds];
+    if(!ids.length){setMessage('Marca al menos una canción');return}
+    const button=document.getElementById('hnErAddSelected');
     if(button)button.disabled=true;
-    setMessage('Añadiendo…');
-    const {error}=await client.rpc('admin_add_event_repertoire_song',{p_event_id:selectedEventId,p_song_id:songId});
-    if(button)button.disabled=false;
-    if(error){console.warn('[HN Event Repertoire] add',error);setMessage('No se pudo añadir la canción');return}
-    if(select)select.value='';
+    setMessage(`Añadiendo ${ids.length} canción${ids.length===1?'':'es'}…`);
+    const {data,error}=await client.rpc('admin_add_event_repertoire_songs',{p_event_id:selectedEventId,p_song_ids:ids});
+    if(error){
+      console.warn('[HN Event Repertoire] add batch',error);
+      setMessage('No se pudieron añadir las canciones');
+      renderSelectionState();
+      return;
+    }
+    selectedSongIds.clear();
+    const search=document.getElementById('hnErSearch');if(search)search.value='';
+    renderSongChoices();
     await loadItems();
+    setMessage(`${Number(data)||ids.length} canción${ids.length===1?'':'es'} añadida${ids.length===1?'':'s'}`);
+  }
+
+  async function addCustomSong(){
+    if(!client||!selectedEventId){setMessage('Selecciona un evento');return}
+    const title=document.getElementById('hnErCustomTitle');
+    const artist=document.getElementById('hnErCustomArtist');
+    const button=document.getElementById('hnErAddCustom');
+    const name=String(title?.value||'').trim();
+    const performer=String(artist?.value||'').trim();
+    if(!name){setMessage('Escribe el nombre de la canción especial');title?.focus();return}
+    if(button)button.disabled=true;
+    setMessage('Añadiendo canción especial…');
+    const {error}=await client.rpc('admin_add_event_repertoire_custom_song',{
+      p_event_id:selectedEventId,
+      p_title:name,
+      p_artist:performer||null
+    });
+    if(button)button.disabled=false;
+    if(error){console.warn('[HN Event Repertoire] custom song',error);setMessage('No se pudo añadir la canción especial');return}
+    if(title)title.value='';
+    if(artist)artist.value='';
+    await loadItems();
+    setMessage('Canción especial añadida');
   }
 
   async function toggleItem(itemId){
     const item=items.find(row=>String(row.item_id)===String(itemId));
     if(!item||!client)return;
-    const button=document.querySelector(`#${PANEL_ID} .hn-er-check[data-id="${CSS.escape(String(itemId))}"]`);
+    const button=[...document.querySelectorAll(`#${PANEL_ID} .hn-er-check`)].find(el=>String(el.dataset.id)===String(itemId));
     if(button)button.disabled=true;
     const next=!item.completed;
     const {error}=await client.rpc('admin_set_event_repertoire_item_completed',{p_item_id:itemId,p_completed:next});
@@ -322,15 +444,9 @@
 
   async function start(){
     if(started)return;
-    if(!installPanel()){
-      setTimeout(start,120);
-      return;
-    }
+    if(!installPanel()){setTimeout(start,120);return}
     client=getClient();
-    if(!client){
-      setTimeout(start,120);
-      return;
-    }
+    if(!client){setTimeout(start,120);return}
     const {data:{session}}=await client.auth.getSession();
     if(!session)return;
     const {data:isAdmin}=await client.rpc('admin_is_admin');
@@ -344,10 +460,11 @@
     events=[];
     songs=[];
     items=[];
+    selectedSongIds.clear();
     selectedEventId='';
     renderEventOptions();
-    renderSongOptions();
     renderEventMeta();
+    renderSongChoices();
     renderItems();
   }
 
