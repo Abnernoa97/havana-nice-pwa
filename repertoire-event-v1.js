@@ -306,7 +306,8 @@
 
     if(!screenObserver){
       screenObserver=new MutationObserver(function(){
-        if(screen.querySelector('.hn-rep-screen'))renderCard();
+        if(!screen.querySelector('.hn-rep-screen'))return;
+        if(!document.getElementById(CARD_ID))renderCard();
       });
       screenObserver.observe(screen,{childList:true,subtree:true});
     }
