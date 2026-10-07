@@ -1,11 +1,12 @@
-/* HAVANA NICE — ADMIN EVENT REPERTOIRE V2
+/* HAVANA NICE — ADMIN EVENT REPERTOIRE V3
    Event-specific setlist inside the existing Admin Repertoire card.
-   Admin only. Multi-select + event-only custom songs.
+   Admin only. Multi-select + event-only custom songs + touch reorder.
    Does not modify musician UI or master repertoire behavior.
 */
 (function(){
   'use strict';
-  if(window.__hnAdminEventRepertoireV2)return;
+  if(window.__hnAdminEventRepertoireV3)return;
+  window.__hnAdminEventRepertoireV3=true;
   window.__hnAdminEventRepertoireV2=true;
 
   const PANEL_ID='hnEventRepertoireAdmin';
@@ -17,6 +18,7 @@
   let selectedEventId='';
   let selectedSongIds=new Set();
   let started=false;
+  let reorderSaving=false;
 
   const esc=value=>String(value??'').replace(/[&<>'"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
 
@@ -89,8 +91,13 @@
       #${PANEL_ID} .hn-er-progress>span{display:block;height:100%;width:0;background:#16351f;transition:width .18s ease}
       #${PANEL_ID} .hn-er-message{min-height:18px;padding:0 20px 9px;color:#7b3229;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
       #${PANEL_ID} .hn-er-list{padding:0 12px 14px}
-      #${PANEL_ID} .hn-er-item{display:grid;grid-template-columns:48px minmax(0,1fr) auto;align-items:center;gap:12px;min-height:72px;padding:10px 8px;border-top:1px solid #d9cfbd;background:#fffdf8;transition:background .15s ease}
+      #${PANEL_ID} .hn-er-item{display:grid;grid-template-columns:34px 48px minmax(0,1fr) auto;align-items:center;gap:10px;min-height:72px;padding:10px 8px;border-top:1px solid #d9cfbd;background:#fffdf8;transition:background .15s ease,opacity .15s ease,box-shadow .15s ease}
       #${PANEL_ID} .hn-er-item:first-child{border-top:0}
+      #${PANEL_ID} .hn-er-item.is-dragging{opacity:.72;background:#fff6df;box-shadow:0 8px 24px rgba(0,0,0,.18);position:relative;z-index:5}
+      #${PANEL_ID} .hn-er-drag{width:30px;height:42px;border:1px solid #b8aa8c;background:#f7f1e5;color:#16351f;display:grid;place-items:center;padding:0;font-size:19px;font-weight:800;line-height:1;touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab}
+      #${PANEL_ID} .hn-er-drag:active{cursor:grabbing;background:#eee3cf}
+      #${PANEL_ID} .hn-er-drag:disabled{opacity:.45;cursor:wait}
+      #${PANEL_ID} .hn-er-list.is-reordering{user-select:none;-webkit-user-select:none}
       #${PANEL_ID} .hn-er-check{width:42px;height:42px;border:2px solid #16351f;background:#fff;color:#16351f;display:grid;place-items:center;padding:0;font-size:24px;font-weight:900;line-height:1;letter-spacing:0;text-transform:none}
       #${PANEL_ID} .hn-er-check[aria-pressed="true"]{background:#16351f;color:#fff7dc}
       #${PANEL_ID} .hn-er-check:disabled{opacity:.55;cursor:wait}
@@ -117,9 +124,9 @@
         #${PANEL_ID} .hn-er-progress{margin:0 15px 16px}
         #${PANEL_ID} .hn-er-message{padding:0 15px 8px}
         #${PANEL_ID} .hn-er-list{padding:0 8px 10px}
-        #${PANEL_ID} .hn-er-item{grid-template-columns:46px minmax(0,1fr);gap:10px;padding:10px 7px}
+        #${PANEL_ID} .hn-er-item{grid-template-columns:32px 46px minmax(0,1fr);gap:9px;padding:10px 7px}
         #${PANEL_ID} .hn-er-title{font-size:17px}
-        #${PANEL_ID} .hn-er-remove{grid-column:2;justify-self:start;padding:3px 0 8px}
+        #${PANEL_ID} .hn-er-remove{grid-column:3;justify-self:start;padding:3px 0 8px}
       }
     `;
     document.head.appendChild(style);
@@ -325,6 +332,7 @@
 
     list.innerHTML=items.map(item=>`
       <div class="hn-er-item${item.completed?' is-done':''}" data-item-id="${esc(item.item_id)}">
+        <button class="hn-er-drag" type="button" aria-label="Mantén presionado para mover ${esc(item.song_title||'esta canción')}" data-action="drag" data-id="${esc(item.item_id)}">☰</button>
         <button class="hn-er-check" type="button" aria-label="${item.completed?'Marcar como pendiente':'Marcar como realizada'}" aria-pressed="${item.completed?'true':'false'}" data-action="toggle" data-id="${esc(item.item_id)}">${item.completed?'✓':''}</button>
         <div class="hn-er-info">
           <div class="hn-er-title">${esc(item.song_title||'')}</div>
@@ -337,6 +345,130 @@
 
     list.querySelectorAll('[data-action="toggle"]').forEach(button=>button.addEventListener('click',()=>toggleItem(button.dataset.id)));
     list.querySelectorAll('[data-action="remove"]').forEach(button=>button.addEventListener('click',()=>removeItem(button.dataset.id)));
+    bindReorder(list);
+  }
+
+  function bindReorder(list){
+    list.querySelectorAll('.hn-er-drag').forEach(handle=>{
+      handle.addEventListener('contextmenu',event=>event.preventDefault());
+      handle.addEventListener('pointerdown',event=>prepareDrag(event,handle,list));
+    });
+  }
+
+  function prepareDrag(event,handle,list){
+    if(reorderSaving||event.button>0)return;
+    const row=handle.closest('.hn-er-item');
+    if(!row)return;
+    event.preventDefault();
+
+    const pointerId=event.pointerId;
+    const startX=event.clientX;
+    const startY=event.clientY;
+    let active=false;
+    let finished=false;
+
+    const cleanup=()=>{
+      window.removeEventListener('pointermove',move);
+      window.removeEventListener('pointerup',end);
+      window.removeEventListener('pointercancel',end);
+    };
+
+    const timer=setTimeout(()=>{
+      if(finished)return;
+      active=true;
+      row.classList.add('is-dragging');
+      list.classList.add('is-reordering');
+      try{handle.setPointerCapture(pointerId)}catch(_){}
+      try{navigator.vibrate?.(18)}catch(_){}
+    },180);
+
+    const move=moveEvent=>{
+      if(moveEvent.pointerId!==pointerId||finished)return;
+      if(!active){
+        if(Math.hypot(moveEvent.clientX-startX,moveEvent.clientY-startY)>12){
+          finished=true;
+          clearTimeout(timer);
+          cleanup();
+        }
+        return;
+      }
+
+      moveEvent.preventDefault();
+      const otherRows=[...list.querySelectorAll('.hn-er-item:not(.is-dragging)')];
+      const next=otherRows.find(other=>{
+        const rect=other.getBoundingClientRect();
+        return moveEvent.clientY<rect.top+(rect.height/2);
+      });
+      if(next)list.insertBefore(row,next);
+      else list.appendChild(row);
+
+      const edge=88;
+      if(moveEvent.clientY<edge)window.scrollBy(0,-16);
+      else if(moveEvent.clientY>window.innerHeight-edge)window.scrollBy(0,16);
+    };
+
+    const end=async endEvent=>{
+      if(endEvent.pointerId!==pointerId||finished)return;
+      finished=true;
+      clearTimeout(timer);
+      cleanup();
+
+      if(!active)return;
+
+      row.classList.remove('is-dragging');
+      list.classList.remove('is-reordering');
+      try{handle.releasePointerCapture(pointerId)}catch(_){}
+
+      const orderedIds=[...list.querySelectorAll('.hn-er-item')].map(node=>String(node.dataset.itemId||'')).filter(Boolean);
+      const previousIds=items.map(item=>String(item.item_id));
+      if(orderedIds.join('|')===previousIds.join('|'))return;
+
+      const byId=new Map(items.map(item=>[String(item.item_id),item]));
+      items=orderedIds.map((id,index)=>{
+        const item=byId.get(id);
+        if(item)item.item_position=index+1;
+        return item;
+      }).filter(Boolean);
+
+      await persistOrder(orderedIds);
+    };
+
+    window.addEventListener('pointermove',move,{passive:false});
+    window.addEventListener('pointerup',end);
+    window.addEventListener('pointercancel',end);
+  }
+
+  async function persistOrder(orderedIds){
+    if(!client||!selectedEventId||reorderSaving)return;
+    const eventId=selectedEventId;
+    reorderSaving=true;
+
+    const eventSelect=document.getElementById('hnErEventSelect');
+    if(eventSelect)eventSelect.disabled=true;
+    document.querySelectorAll(`#${PANEL_ID} .hn-er-drag`).forEach(button=>button.disabled=true);
+    setMessage('Guardando orden…');
+
+    const {error}=await client.rpc('admin_reorder_event_repertoire',{
+      p_event_id:eventId,
+      p_item_ids:orderedIds
+    });
+
+    reorderSaving=false;
+    if(eventSelect)eventSelect.disabled=false;
+    document.querySelectorAll(`#${PANEL_ID} .hn-er-drag`).forEach(button=>button.disabled=false);
+
+    if(error){
+      console.warn('[HN Event Repertoire] reorder',error);
+      setMessage('No se pudo guardar el orden');
+      await loadItems();
+      return;
+    }
+
+    setMessage('Orden actualizado');
+    setTimeout(()=>{
+      const message=document.getElementById('hnErMessage');
+      if(message?.textContent==='Orden actualizado')message.textContent='';
+    },1400);
   }
 
   async function loadBase(){
