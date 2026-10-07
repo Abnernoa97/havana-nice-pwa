@@ -1,11 +1,12 @@
-/* HAVANA NICE — MUSICIAN EVENT REPERTOIRE V3
+/* HAVANA NICE — MUSICIAN EVENT REPERTOIRE V4
    Read-only event setlists as separate accordions inside musician Repertoire.
-   Adds one native Back level for an opened event accordion.
+   Adds one native Back level and reference links for event songs.
    Additive layer only: does not alter master repertoire rendering or editing.
 */
 (function(){
   'use strict';
-  if(window.__hnMusicianEventRepertoireV3)return;
+  if(window.__hnMusicianEventRepertoireV4)return;
+  window.__hnMusicianEventRepertoireV4=true;
   window.__hnMusicianEventRepertoireV3=true;
   window.__hnMusicianEventRepertoireV2=true;
 
@@ -50,6 +51,11 @@
     return div.innerHTML;
   }
 
+  function externalUrl(value){
+    var url=String(value||'').trim();
+    return /^https?:\/\//i.test(url)?url:'';
+  }
+
   function today(){
     var d=new Date();
     return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
@@ -85,11 +91,13 @@
       .hn-rep-screen .hn-mer-progress{height:4px;margin-bottom:12px;background:rgba(229,189,98,.14);overflow:hidden}
       .hn-rep-screen .hn-mer-progress>span{display:block;height:100%;background:#e5bd62;transition:width .18s ease}
       .hn-rep-screen .hn-mer-list{border-top:1px solid rgba(255,255,255,.07)}
-      .hn-rep-screen .hn-mer-row{display:grid;grid-template-columns:34px minmax(0,1fr);align-items:center;gap:11px;min-height:58px;padding:9px 2px;border-bottom:1px solid rgba(255,255,255,.07)}
+      .hn-rep-screen .hn-mer-row{display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:center;gap:11px;min-height:58px;padding:9px 2px;border-bottom:1px solid rgba(255,255,255,.07)}
       .hn-rep-screen .hn-mer-box{width:30px;height:30px;border:1.5px solid #e5bd62;display:grid;place-items:center;color:#020302;background:transparent;font-size:18px;font-weight:900;line-height:1}
       .hn-rep-screen .hn-mer-row.is-done .hn-mer-box{background:#e5bd62;color:#020302}
       .hn-rep-screen .hn-mer-song-title{color:#f4f1e8;font-size:11px;font-weight:600;line-height:1.22;letter-spacing:.07em;text-transform:uppercase}
       .hn-rep-screen .hn-mer-song-artist{margin-top:3px;color:rgba(244,241,232,.46);font-size:8px;line-height:1.2;letter-spacing:.08em;text-transform:uppercase}
+      .hn-rep-screen .hn-mer-reference{display:inline-flex;align-items:center;justify-content:center;min-width:92px;min-height:38px;padding:9px 10px;border:1px solid rgba(229,189,98,.74);color:#fff1a8;text-decoration:none;text-align:center;font-size:7px;font-weight:700;line-height:1.15;letter-spacing:.11em;text-transform:uppercase;background:rgba(0,0,0,.28);white-space:nowrap}
+      .hn-rep-screen .hn-mer-reference:active{background:rgba(229,189,98,.10)}
       .hn-rep-screen .hn-mer-row.is-done .hn-mer-song-title{text-decoration:line-through;text-decoration-thickness:1.5px;text-decoration-color:#e5bd62;color:rgba(244,241,232,.42)}
       .hn-rep-screen .hn-mer-row.is-done .hn-mer-song-artist{text-decoration:line-through;color:rgba(244,241,232,.28)}
       .hn-rep-screen .hn-mer-special{display:inline-block;margin-top:4px;color:#e5bd62;font-size:6px;font-weight:700;letter-spacing:.13em;text-transform:uppercase}
@@ -99,6 +107,8 @@
         .hn-rep-screen .hn-mer-toggle{padding:13px 12px}
         .hn-rep-screen .hn-mer-event{font-size:16px}
         .hn-rep-screen .hn-mer-body{padding:12px}
+        .hn-rep-screen .hn-mer-row{grid-template-columns:31px minmax(0,1fr) auto;gap:8px}
+        .hn-rep-screen .hn-mer-reference{min-width:78px;min-height:36px;padding:8px 7px;font-size:6px;letter-spacing:.08em}
       }
     `;
     document.head.appendChild(style);
@@ -124,6 +134,7 @@
           song_id:row.song_id,
           song_title:row.song_title||'',
           song_artist:row.song_artist||'',
+          song_reference_url:row.song_reference_url||'',
           item_position:Number(row.item_position)||0,
           completed:row.completed===true,
           completed_at:row.completed_at||null
@@ -159,12 +170,15 @@
     return '<div class="hn-mer-summary"><div><div class="hn-mer-count">'+done+' / '+total+'</div><span class="hn-mer-count-label">Realizadas</span></div><div class="hn-mer-pending">'+pending+' pendientes</div></div>'+
       '<div class="hn-mer-progress"><span style="width:'+(total?Math.round(done/total*100):0)+'%"></span></div>'+
       '<div class="hn-mer-list">'+group.items.map(function(item){
+        var href=externalUrl(item.song_reference_url);
         return '<div class="hn-mer-row'+(item.completed?' is-done':'')+'">'+
           '<div class="hn-mer-box">'+(item.completed?'✓':'')+'</div>'+
           '<div><div class="hn-mer-song-title">'+esc(item.song_title||'')+'</div>'+
           (item.song_artist?'<div class="hn-mer-song-artist">'+esc(item.song_artist)+'</div>':'')+
           (!item.song_id?'<div class="hn-mer-special">Canción especial</div>':'')+
-          '</div></div>';
+          '</div>'+
+          (href?'<a class="hn-mer-reference" href="'+esc(href)+'" target="_blank" rel="noopener noreferrer">REVISAR LINK ↗</a>':'')+
+          '</div>';
       }).join('')+'</div>';
   }
 
@@ -282,7 +296,7 @@
       client=await getClient();
       var id=profileId();
       if(!id){groups=[];openEventId='';ready=true;renderCards();return}
-      var result=await client.rpc('get_event_repertoire_for_profile',{p_profile_id:id});
+      var result=await client.rpc('get_event_repertoire_for_profile_v2',{p_profile_id:id});
       if(result.error){
         console.error('[HN Event Repertoire Musician]',result.error);
         return;
@@ -305,9 +319,10 @@
   function subscribe(){
     if(!client)return;
     if(channel)try{client.removeChannel(channel)}catch(_){}
-    channel=client.channel('hn-event-repertoire-musician-v2-'+String(profileId()||'none'))
+    channel=client.channel('hn-event-repertoire-musician-v4-'+String(profileId()||'none'))
       .on('postgres_changes',{event:'*',schema:'public',table:'calendar_events'},scheduleSync)
       .on('postgres_changes',{event:'*',schema:'public',table:'calendar_event_recipients'},scheduleSync)
+      .on('postgres_changes',{event:'*',schema:'public',table:'repertoire_songs'},scheduleSync)
       .subscribe(function(status){if(status==='SUBSCRIBED')scheduleSync()});
   }
 
