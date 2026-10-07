@@ -222,23 +222,23 @@
 
   function handleNativeBack(event){
     var screen=document.getElementById('moduleScreen');
-    if(!screen||!screen.classList.contains('is-active')||!screen.querySelector('.hn-rep-screen'))return;
+    if(!screen||!screen.classList.contains('is-active')||!screen.querySelector('.hn-rep-screen'))return false;
 
-    var stateEventId=String(event.state?.hnEventRepertoire||'');
+    var stateEventId=String(event?.state?.hnEventRepertoire||'');
     if(stateEventId){
       openEventId=stateEventId;
       eventHistoryArmed=true;
       renderCards();
-      event.stopImmediatePropagation();
-      return;
+      return true;
     }
 
     if(eventHistoryArmed||openEventId){
       eventHistoryArmed=false;
       openEventId='';
       renderCards();
-      event.stopImmediatePropagation();
+      return true;
     }
+    return false;
   }
 
   function renderCards(){
@@ -370,7 +370,7 @@
     window.addEventListener('hn:session-logout',stop);
     window.addEventListener('online',function(){if(logged())scheduleSync()});
     document.addEventListener('visibilitychange',function(){if(!document.hidden&&logged())scheduleSync()});
-    window.addEventListener('popstate',handleNativeBack,true);
+    window.hnEventRepertoireHandlePopstate=handleNativeBack;
   }
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});
