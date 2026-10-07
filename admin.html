@@ -56,7 +56,7 @@ $('nAdd').onclick=async()=>{const title=$('nTitle').value.trim(),message=$('nMes
 $('songAdd').onclick=async()=>{const title=$('songTitle').value.trim(),artist=$('songArtist').value.trim(),category=$('songCategory').value;if(!title){$('songMsg').textContent='Escribe un título';return}const{error}=await s.rpc('admin_create_repertoire_song',{p_title:title,p_artist:artist||null,p_category:category,p_position:songs.length+1});if(error){$('songMsg').textContent='No se pudo agregar';return}$('songTitle').value='';$('songArtist').value='';$('songMsg').textContent='Canción agregada';loadSongs()};
 $('logout').onclick=async()=>{await s.auth.signOut();check()};check();
 </script>
-<script src="./calendar-v1.js?v=f7456d56a234179b7032af959b5a0fe28bf7347f"></script>
+<script src="./calendar-v1.js?v=daef61115aaad259346c238fae2fafd552d7df02"></script>
 <script src="./admin-calendar-accordion-v1.js?v=881ec09028f069955e2aa467e7592d60a2b9b16f"></script>
 <script src="./admin-ui-v1.js?v=37eadfffde830b0dca5cf497d02c8ca3e5e80226"></script>
 <script src="./admin-notifications-accordion-v1.js?v=20f828b116179ca26b03fe1bb83b1822fcd29917"></script>
