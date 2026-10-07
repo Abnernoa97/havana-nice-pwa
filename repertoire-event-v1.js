@@ -1,10 +1,12 @@
-/* HAVANA NICE — MUSICIAN EVENT REPERTOIRE V2
+/* HAVANA NICE — MUSICIAN EVENT REPERTOIRE V3
    Read-only event setlists as separate accordions inside musician Repertoire.
+   Adds one native Back level for an opened event accordion.
    Additive layer only: does not alter master repertoire rendering or editing.
 */
 (function(){
   'use strict';
-  if(window.__hnMusicianEventRepertoireV2)return;
+  if(window.__hnMusicianEventRepertoireV3)return;
+  window.__hnMusicianEventRepertoireV3=true;
   window.__hnMusicianEventRepertoireV2=true;
 
   const STYLE_ID='hnMusicianEventRepertoireStyle';
@@ -17,6 +19,7 @@
   let channel=null;
   let groups=[];
   let openEventId='';
+  let eventHistoryArmed=false;
   let ready=false;
   let syncing=false;
   let syncTimer=null;
@@ -179,16 +182,63 @@
     '</section>';
   }
 
+  function armEventHistory(id){
+    try{
+      var nextState=Object.assign({},history.state||{},{hnRepertoire:true,hnEventRepertoire:id});
+      if(eventHistoryArmed){
+        history.replaceState(nextState,'',location.href);
+      }else{
+        history.pushState(nextState,'',location.href);
+        eventHistoryArmed=true;
+      }
+    }catch(_){}
+  }
+
+  function closeEventFromTap(){
+    if(eventHistoryArmed){
+      try{history.back();return}catch(_){}
+    }
+    eventHistoryArmed=false;
+    openEventId='';
+    renderCards();
+  }
+
   function bindCards(root){
     root.querySelectorAll('.hn-mer-toggle').forEach(function(toggle){
       toggle.onclick=function(event){
         event.preventDefault();
         event.stopPropagation();
         var id=String(toggle.dataset.eventId||'');
-        openEventId=String(openEventId)===id?'':id;
+        if(String(openEventId)===id){
+          closeEventFromTap();
+          return;
+        }
+        openEventId=id;
+        armEventHistory(id);
         renderCards();
       };
     });
+  }
+
+  function handleNativeBack(event){
+    var screen=document.getElementById('moduleScreen');
+    if(!screen||!screen.classList.contains('is-active')||!screen.querySelector('.hn-rep-screen'))return;
+
+    var stateEventId=String(event.state?.hnEventRepertoire||'');
+    if(stateEventId){
+      openEventId=stateEventId;
+      eventHistoryArmed=true;
+      renderCards();
+      event.stopImmediatePropagation();
+      return;
+    }
+
+    if(eventHistoryArmed||openEventId){
+      eventHistoryArmed=false;
+      openEventId='';
+      renderCards();
+      event.stopImmediatePropagation();
+    }
   }
 
   function renderCards(){
@@ -277,6 +327,7 @@
     channel=null;
     groups=[];
     openEventId='';
+    eventHistoryArmed=false;
     ready=false;
     document.getElementById(CARD_ID)?.remove();
   }
@@ -297,6 +348,7 @@
       classObserver=new MutationObserver(function(){
         if(!screen.classList.contains('is-active')){
           openEventId='';
+          eventHistoryArmed=false;
         }else if(screen.querySelector('.hn-rep-screen')){
           renderCards();
           scheduleSync();
@@ -318,6 +370,7 @@
     window.addEventListener('hn:session-logout',stop);
     window.addEventListener('online',function(){if(logged())scheduleSync()});
     document.addEventListener('visibilitychange',function(){if(!document.hidden&&logged())scheduleSync()});
+    window.addEventListener('popstate',handleNativeBack,true);
   }
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});
