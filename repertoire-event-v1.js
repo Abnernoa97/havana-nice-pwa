@@ -135,9 +135,11 @@
 
   function visibleGroups(){
     if(!groups.length)return [];
+    var created=groups.filter(function(group){return Array.isArray(group.items)&&group.items.length>0});
+    if(!created.length)return [];
     var now=today();
-    var future=groups.filter(function(group){return String(group.event_date||'')>=now});
-    return future.length?future:[groups[groups.length-1]];
+    var future=created.filter(function(group){return String(group.event_date||'')>=now});
+    return future.length?future:[created[created.length-1]];
   }
 
   function groupBodyMarkup(group){
