@@ -111,7 +111,8 @@
     }
   }
 
-  window.addEventListener('popstate', () => {
+  window.addEventListener('popstate', event => {
+    if (typeof window.hnEventRepertoireHandlePopstate === 'function' && window.hnEventRepertoireHandlePopstate(event)) return;
     if (calendar()?.classList.contains('is-active')) closeCalendar(false);
   });
 
