@@ -1,17 +1,18 @@
-/* HAVANA NICE — MUSICIAN EVENT REPERTOIRE V4
-   Read-only event setlists as separate accordions inside musician Repertoire.
-   Adds one native Back level and reference links for event songs.
-   Additive layer only: does not alter master repertoire rendering or editing.
+/* HAVANA NICE — MUSICIAN EVENT REPERTOIRE V5
+   Same event-repertoire logic, relocated inside each musician Calendar event card.
+   Read-only for musicians. Admin and master repertoire are untouched.
 */
 (function(){
   'use strict';
-  if(window.__hnMusicianEventRepertoireV4)return;
+  if(window.__hnMusicianEventRepertoireV5)return;
+  window.__hnMusicianEventRepertoireV5=true;
   window.__hnMusicianEventRepertoireV4=true;
   window.__hnMusicianEventRepertoireV3=true;
   window.__hnMusicianEventRepertoireV2=true;
 
   const STYLE_ID='hnMusicianEventRepertoireStyle';
-  const CARD_ID='hnMusicianEventRepertoire';
+  const SLOT_CLASS='hn-mer-calendar-slot';
+  const LEGACY_ROOT_ID='hnMusicianEventRepertoire';
   const SUPABASE_URL='https://xzfradccsxonmauinecl.supabase.co';
   const SUPABASE_KEY='sb_publishable_Ip5rGK0UVXIfOjs_RQ_LhA_c14foHN9';
 
@@ -24,8 +25,6 @@
   let ready=false;
   let syncing=false;
   let syncTimer=null;
-  let screenObserver=null;
-  let classObserver=null;
 
   function profile(){
     try{return JSON.parse(sessionStorage.getItem('hn_profile')||'null')}catch(_){return null}
@@ -73,42 +72,40 @@
     var style=document.createElement('style');
     style.id=STYLE_ID;
     style.textContent=`
-      .hn-rep-screen #${CARD_ID}{margin:14px 0 8px;text-align:left}
-      .hn-rep-screen .hn-mer-stack{display:grid;gap:8px}
-      .hn-rep-screen .hn-mer-card{border:1px solid rgba(229,189,98,.60);background:linear-gradient(180deg,rgba(13,16,12,.92),rgba(4,6,4,.90));overflow:hidden}
-      .hn-rep-screen .hn-mer-toggle{width:100%;min-height:68px;border:0;background:transparent;color:#f4f1e8;padding:14px 15px;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:14px;text-align:left}
-      .hn-rep-screen .hn-mer-kicker{display:block;color:#e5bd62;font-size:8px;font-weight:700;letter-spacing:.22em;text-transform:uppercase}
-      .hn-rep-screen .hn-mer-event{display:block;margin-top:6px;color:#f4f1e8;font:18px/1.05 Georgia,"Times New Roman",serif;letter-spacing:.02em}
-      .hn-rep-screen .hn-mer-meta{display:block;margin-top:6px;color:rgba(244,241,232,.56);font-size:8px;letter-spacing:.12em;text-transform:uppercase}
-      .hn-rep-screen .hn-mer-arrow{width:36px;height:36px;border:1px solid rgba(229,189,98,.42);display:grid;place-items:center;color:#fff1a8;font-size:18px;line-height:1;transition:transform .18s ease,background .18s ease}
-      .hn-rep-screen .hn-mer-card.is-open .hn-mer-arrow{transform:rotate(180deg);background:rgba(229,189,98,.06)}
-      .hn-rep-screen .hn-mer-body{display:none;border-top:1px solid rgba(229,189,98,.24);padding:14px}
-      .hn-rep-screen .hn-mer-card.is-open .hn-mer-body{display:block}
-      .hn-rep-screen .hn-mer-summary{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:8px}
-      .hn-rep-screen .hn-mer-count{color:#fff1a8;font:24px/1 Georgia,"Times New Roman",serif}
-      .hn-rep-screen .hn-mer-count-label{display:block;margin-top:4px;color:rgba(244,241,232,.42);font-size:7px;letter-spacing:.13em;text-transform:uppercase}
-      .hn-rep-screen .hn-mer-pending{color:rgba(244,241,232,.68);font-size:8px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;text-align:right}
-      .hn-rep-screen .hn-mer-progress{height:4px;margin-bottom:12px;background:rgba(229,189,98,.14);overflow:hidden}
-      .hn-rep-screen .hn-mer-progress>span{display:block;height:100%;background:#e5bd62;transition:width .18s ease}
-      .hn-rep-screen .hn-mer-list{border-top:1px solid rgba(255,255,255,.07)}
-      .hn-rep-screen .hn-mer-row{display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:center;gap:11px;min-height:58px;padding:9px 2px;border-bottom:1px solid rgba(255,255,255,.07)}
-      .hn-rep-screen .hn-mer-box{width:30px;height:30px;border:1.5px solid #e5bd62;display:grid;place-items:center;color:#020302;background:transparent;font-size:18px;font-weight:900;line-height:1}
-      .hn-rep-screen .hn-mer-row.is-done .hn-mer-box{background:#e5bd62;color:#020302}
-      .hn-rep-screen .hn-mer-song-title{color:#f4f1e8;font-size:11px;font-weight:600;line-height:1.22;letter-spacing:.07em;text-transform:uppercase}
-      .hn-rep-screen .hn-mer-song-artist{margin-top:3px;color:rgba(244,241,232,.46);font-size:8px;line-height:1.2;letter-spacing:.08em;text-transform:uppercase}
-      .hn-rep-screen .hn-mer-reference{display:inline-flex;align-items:center;justify-content:center;min-width:92px;min-height:38px;padding:9px 10px;border:1px solid rgba(229,189,98,.74);color:#fff1a8;text-decoration:none;text-align:center;font-size:7px;font-weight:700;line-height:1.15;letter-spacing:.11em;text-transform:uppercase;background:rgba(0,0,0,.28);white-space:nowrap}
-      .hn-rep-screen .hn-mer-reference:active{background:rgba(229,189,98,.10)}
-      .hn-rep-screen .hn-mer-row.is-done .hn-mer-song-title{text-decoration:line-through;text-decoration-thickness:1.5px;text-decoration-color:#e5bd62;color:rgba(244,241,232,.42)}
-      .hn-rep-screen .hn-mer-row.is-done .hn-mer-song-artist{text-decoration:line-through;color:rgba(244,241,232,.28)}
-      .hn-rep-screen .hn-mer-special{display:inline-block;margin-top:4px;color:#e5bd62;font-size:6px;font-weight:700;letter-spacing:.13em;text-transform:uppercase}
-      .hn-rep-screen .hn-mer-empty{padding:20px 6px;color:rgba(244,241,232,.42);font-size:8px;line-height:1.45;letter-spacing:.12em;text-align:center;text-transform:uppercase}
-      .hn-rep-screen .hn-mer-loading{border:1px solid rgba(229,189,98,.60);padding:15px;color:rgba(244,241,232,.42);font-size:8px;letter-spacing:.13em;text-transform:uppercase;text-align:center}
+      .calendar-event-card:not(.is-expanded) .${SLOT_CLASS}{display:none!important}
+      .calendar-event-card .${SLOT_CLASS}{margin:13px 0 2px;text-align:left}
+      .calendar-event-card .hn-mer-card{border:1px solid rgba(229,189,98,.60);background:linear-gradient(180deg,rgba(13,16,12,.92),rgba(4,6,4,.90));overflow:hidden}
+      .calendar-event-card .hn-mer-toggle{width:100%;min-height:68px;border:0;background:transparent;color:#f4f1e8;padding:14px 15px;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:14px;text-align:left}
+      .calendar-event-card .hn-mer-kicker{display:block;color:#e5bd62;font-size:8px;font-weight:700;letter-spacing:.22em;text-transform:uppercase}
+      .calendar-event-card .hn-mer-event{display:block;margin-top:6px;color:#f4f1e8;font:18px/1.05 Georgia,"Times New Roman",serif;letter-spacing:.02em}
+      .calendar-event-card .hn-mer-meta{display:block;margin-top:6px;color:rgba(244,241,232,.56);font-size:8px;letter-spacing:.12em;text-transform:uppercase}
+      .calendar-event-card .hn-mer-arrow{width:36px;height:36px;border:1px solid rgba(229,189,98,.42);display:grid;place-items:center;color:#fff1a8;font-size:18px;line-height:1;transition:transform .18s ease,background .18s ease}
+      .calendar-event-card .hn-mer-card.is-open .hn-mer-arrow{transform:rotate(180deg);background:rgba(229,189,98,.06)}
+      .calendar-event-card .hn-mer-body{display:none;border-top:1px solid rgba(229,189,98,.24);padding:14px}
+      .calendar-event-card .hn-mer-card.is-open .hn-mer-body{display:block}
+      .calendar-event-card .hn-mer-summary{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:8px}
+      .calendar-event-card .hn-mer-count{color:#fff1a8;font:24px/1 Georgia,"Times New Roman",serif}
+      .calendar-event-card .hn-mer-count-label{display:block;margin-top:4px;color:rgba(244,241,232,.42);font-size:7px;letter-spacing:.13em;text-transform:uppercase}
+      .calendar-event-card .hn-mer-pending{color:rgba(244,241,232,.68);font-size:8px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;text-align:right}
+      .calendar-event-card .hn-mer-progress{height:4px;margin-bottom:12px;background:rgba(229,189,98,.14);overflow:hidden}
+      .calendar-event-card .hn-mer-progress>span{display:block;height:100%;background:#e5bd62;transition:width .18s ease}
+      .calendar-event-card .hn-mer-list{border-top:1px solid rgba(255,255,255,.07)}
+      .calendar-event-card .hn-mer-row{display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:center;gap:11px;min-height:58px;padding:9px 2px;border-bottom:1px solid rgba(255,255,255,.07)}
+      .calendar-event-card .hn-mer-box{width:30px;height:30px;border:1.5px solid #e5bd62;display:grid;place-items:center;color:#020302;background:transparent;font-size:18px;font-weight:900;line-height:1}
+      .calendar-event-card .hn-mer-row.is-done .hn-mer-box{background:#e5bd62;color:#020302}
+      .calendar-event-card .hn-mer-song-title{color:#f4f1e8;font-size:11px;font-weight:600;line-height:1.22;letter-spacing:.07em;text-transform:uppercase}
+      .calendar-event-card .hn-mer-song-artist{margin-top:3px;color:rgba(244,241,232,.46);font-size:8px;line-height:1.2;letter-spacing:.08em;text-transform:uppercase}
+      .calendar-event-card .hn-mer-reference{display:inline-flex;align-items:center;justify-content:center;min-width:92px;min-height:38px;padding:9px 10px;border:1px solid rgba(229,189,98,.74);color:#fff1a8;text-decoration:none;text-align:center;font-size:7px;font-weight:700;line-height:1.15;letter-spacing:.11em;text-transform:uppercase;background:rgba(0,0,0,.28);white-space:nowrap}
+      .calendar-event-card .hn-mer-reference:active{background:rgba(229,189,98,.10)}
+      .calendar-event-card .hn-mer-row.is-done .hn-mer-song-title{text-decoration:line-through;text-decoration-thickness:1.5px;text-decoration-color:#e5bd62;color:rgba(244,241,232,.42)}
+      .calendar-event-card .hn-mer-row.is-done .hn-mer-song-artist{text-decoration:line-through;color:rgba(244,241,232,.28)}
+      .calendar-event-card .hn-mer-special{display:inline-block;margin-top:4px;color:#e5bd62;font-size:6px;font-weight:700;letter-spacing:.13em;text-transform:uppercase}
       @media(max-width:380px){
-        .hn-rep-screen .hn-mer-toggle{padding:13px 12px}
-        .hn-rep-screen .hn-mer-event{font-size:16px}
-        .hn-rep-screen .hn-mer-body{padding:12px}
-        .hn-rep-screen .hn-mer-row{grid-template-columns:31px minmax(0,1fr) auto;gap:8px}
-        .hn-rep-screen .hn-mer-reference{min-width:78px;min-height:36px;padding:8px 7px;font-size:6px;letter-spacing:.08em}
+        .calendar-event-card .hn-mer-toggle{padding:13px 12px}
+        .calendar-event-card .hn-mer-event{font-size:16px}
+        .calendar-event-card .hn-mer-body{padding:12px}
+        .calendar-event-card .hn-mer-row{grid-template-columns:31px minmax(0,1fr) auto;gap:8px}
+        .calendar-event-card .hn-mer-reference{min-width:78px;min-height:36px;padding:8px 7px;font-size:6px;letter-spacing:.08em}
       }
     `;
     document.head.appendChild(style);
@@ -144,7 +141,10 @@
     groups=[...byEvent.values()].sort(function(a,b){
       return String(a.event_date||'').localeCompare(String(b.event_date||''));
     });
-    if(openEventId&&!groups.some(function(group){return String(group.event_id)===String(openEventId)}))openEventId='';
+    if(openEventId&&!groups.some(function(group){return String(group.event_id)===String(openEventId)&&group.items.length>0})){
+      openEventId='';
+      eventHistoryArmed=false;
+    }
   }
 
   function visibleGroups(){
@@ -160,12 +160,6 @@
     var done=group.items.filter(function(item){return item.completed}).length;
     var total=group.items.length;
     var pending=Math.max(0,total-done);
-
-    if(!total){
-      return '<div class="hn-mer-summary"><div><div class="hn-mer-count">0 / 0</div><span class="hn-mer-count-label">Realizadas</span></div><div class="hn-mer-pending">0 pendientes</div></div>'+
-        '<div class="hn-mer-progress"><span style="width:0%"></span></div>'+
-        '<div class="hn-mer-empty">Todavía no hay canciones asignadas a este evento.</div>';
-    }
 
     return '<div class="hn-mer-summary"><div><div class="hn-mer-count">'+done+' / '+total+'</div><span class="hn-mer-count-label">Realizadas</span></div><div class="hn-mer-pending">'+pending+' pendientes</div></div>'+
       '<div class="hn-mer-progress"><span style="width:'+(total?Math.round(done/total*100):0)+'%"></span></div>'+
@@ -198,7 +192,7 @@
 
   function armEventHistory(id){
     try{
-      var nextState=Object.assign({},history.state||{},{hnRepertoire:true,hnEventRepertoire:id});
+      var nextState=Object.assign({},history.state||{},{hnCalendar:true,hnEventRepertoire:id});
       if(eventHistoryArmed){
         history.replaceState(nextState,'',location.href);
       }else{
@@ -214,10 +208,13 @@
     }
     eventHistoryArmed=false;
     openEventId='';
-    renderCards();
+    renderIntoCalendar();
   }
 
   function bindCards(root){
+    root.querySelectorAll('.hn-mer-card').forEach(function(card){
+      card.addEventListener('click',function(event){event.stopPropagation()});
+    });
     root.querySelectorAll('.hn-mer-toggle').forEach(function(toggle){
       toggle.onclick=function(event){
         event.preventDefault();
@@ -229,64 +226,60 @@
         }
         openEventId=id;
         armEventHistory(id);
-        renderCards();
+        renderIntoCalendar();
       };
     });
   }
 
   function handleNativeBack(event){
-    var screen=document.getElementById('moduleScreen');
-    if(!screen||!screen.classList.contains('is-active')||!screen.querySelector('.hn-rep-screen'))return false;
+    var screen=document.getElementById('calendarScreen');
+    if(!screen||!screen.classList.contains('is-active'))return false;
 
     var stateEventId=String(event?.state?.hnEventRepertoire||'');
     if(stateEventId){
       openEventId=stateEventId;
       eventHistoryArmed=true;
-      renderCards();
+      renderIntoCalendar();
       return true;
     }
 
     if(eventHistoryArmed||openEventId){
       eventHistoryArmed=false;
       openEventId='';
-      renderCards();
+      renderIntoCalendar();
       return true;
     }
     return false;
   }
 
-  function renderCards(){
-    var screen=document.getElementById('moduleScreen');
-    var inner=screen?.querySelector('.hn-rep-screen');
-    if(!inner)return;
+  function renderIntoCalendar(){
+    document.getElementById(LEGACY_ROOT_ID)?.remove();
 
-    var root=document.getElementById(CARD_ID);
-    if(!root){
-      root=document.createElement('div');
-      root.id=CARD_ID;
-      var topBack=inner.querySelector('.hn-r-back-top');
-      if(topBack&&topBack.nextSibling)inner.insertBefore(root,topBack.nextSibling);
-      else if(topBack)topBack.insertAdjacentElement('afterend',root);
-      else{
-        var head=inner.querySelector('.hn-r-head');
-        if(head&&head.nextSibling)inner.insertBefore(root,head.nextSibling);
-        else inner.prepend(root);
+    var screen=document.getElementById('calendarScreen');
+    if(!screen)return;
+
+    var visible=new Map(visibleGroups().map(function(group){return [String(group.event_id),group]}));
+    screen.querySelectorAll('.calendar-event-card').forEach(function(eventCard){
+      var eventId=String(eventCard.dataset.eventId||'');
+      var group=visible.get(eventId);
+      var slot=eventCard.querySelector(':scope > .'+SLOT_CLASS);
+
+      if(!ready||!group){
+        slot?.remove();
+        return;
       }
-    }
 
-    if(!ready){
-      root.innerHTML='<div class="hn-mer-loading">Cargando repertorios de eventos…</div>';
-      return;
-    }
+      if(!slot){
+        slot=document.createElement('div');
+        slot.className=SLOT_CLASS;
+        var mapLink=eventCard.querySelector(':scope > .calendar-map-button');
+        if(mapLink)eventCard.insertBefore(slot,mapLink);
+        else eventCard.appendChild(slot);
+      }
 
-    var visible=visibleGroups();
-    if(!visible.length){
-      root.innerHTML='<div class="hn-mer-loading">No tienes eventos asignados.</div>';
-      return;
-    }
-
-    root.innerHTML='<div class="hn-mer-stack">'+visible.map(cardMarkup).join('')+'</div>';
-    bindCards(root);
+      slot.innerHTML=cardMarkup(group);
+      bindCards(slot);
+    });
   }
 
   async function sync(){
@@ -295,7 +288,7 @@
     try{
       client=await getClient();
       var id=profileId();
-      if(!id){groups=[];openEventId='';ready=true;renderCards();return}
+      if(!id){groups=[];openEventId='';ready=true;renderIntoCalendar();return}
       var result=await client.rpc('get_event_repertoire_for_profile_v2',{p_profile_id:id});
       if(result.error){
         console.error('[HN Event Repertoire Musician]',result.error);
@@ -303,7 +296,7 @@
       }
       parseRows(Array.isArray(result.data)?result.data:[]);
       ready=true;
-      renderCards();
+      renderIntoCalendar();
     }catch(error){
       console.error('[HN Event Repertoire Musician]',error);
     }finally{
@@ -319,7 +312,7 @@
   function subscribe(){
     if(!client)return;
     if(channel)try{client.removeChannel(channel)}catch(_){}
-    channel=client.channel('hn-event-repertoire-musician-v4-'+String(profileId()||'none'))
+    channel=client.channel('hn-event-repertoire-musician-v5-'+String(profileId()||'none'))
       .on('postgres_changes',{event:'*',schema:'public',table:'calendar_events'},scheduleSync)
       .on('postgres_changes',{event:'*',schema:'public',table:'calendar_event_recipients'},scheduleSync)
       .on('postgres_changes',{event:'*',schema:'public',table:'repertoire_songs'},scheduleSync)
@@ -333,7 +326,7 @@
     ready=false;
     await sync();
     subscribe();
-    renderCards();
+    renderIntoCalendar();
   }
 
   function stop(){
@@ -344,40 +337,15 @@
     openEventId='';
     eventHistoryArmed=false;
     ready=false;
-    document.getElementById(CARD_ID)?.remove();
-  }
-
-  function installObservers(){
-    var screen=document.getElementById('moduleScreen');
-    if(!screen)return;
-
-    if(!screenObserver){
-      screenObserver=new MutationObserver(function(){
-        if(!screen.querySelector('.hn-rep-screen'))return;
-        if(!document.getElementById(CARD_ID))renderCards();
-      });
-      screenObserver.observe(screen,{childList:true,subtree:true});
-    }
-
-    if(!classObserver){
-      classObserver=new MutationObserver(function(){
-        if(!screen.classList.contains('is-active')){
-          openEventId='';
-          eventHistoryArmed=false;
-        }else if(screen.querySelector('.hn-rep-screen')){
-          renderCards();
-          scheduleSync();
-        }
-      });
-      classObserver.observe(screen,{attributes:true,attributeFilter:['class']});
-    }
+    document.getElementById(LEGACY_ROOT_ID)?.remove();
+    document.querySelectorAll('.'+SLOT_CLASS).forEach(function(node){node.remove()});
   }
 
   function init(){
     installStyle();
-    installObservers();
     if(logged())start();
 
+    window.addEventListener('hn-calendar-updated',renderIntoCalendar);
     window.addEventListener('hn:session-ready',function(){
       stop();
       start();
