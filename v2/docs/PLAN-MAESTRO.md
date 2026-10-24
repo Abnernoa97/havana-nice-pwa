@@ -1164,14 +1164,17 @@ El estado vigente siempre es el HEAD de `havana-nice-v2-foundation`. No fijar es
 - Entrega APK 2026-10-24: se detectó error `Library file not found` al abrir el primer vínculo generado por ChatGPT; se creó nueva copia APK directamente como archivo de conversación verificado con el SHA-256 ya registrado. GitHub Actions puede descargar el artifact original, pero la creación de GitHub Release pública con `GITHUB_TOKEN` devolvió HTTP 403; se retiró el workflow experimental. No se afectó Android, backend, main ni producción. Pendiente confirmar que el nuevo archivo sea descargable e instalable físicamente.
 
 
+- Capturas físicas recibidas 2026-10-24: Android nativo V2 release muestra `API CONECTADA`, `D1: ok`, `Schema: foundation-v1`, `Realtime: configured`, `Media: pending-r2-enable`; se confirma que el error de Metro fue resuelto en el dispositivo real. Segunda captura PWA con la misma salud, pero tiene controles inferiores de Android, de modo que NO acredita prueba física desde iPhone.
+- Corrección de presentación PWA: `v2/apps/pwa/index.html` incluía el texto escapado literal `\\n` junto al enlace de manifest, visible en esquina superior izquierda; sustituido por salto real de línea en commit `bb31f5fab1338096d391af84928352b3ec5e0663`. Validación CI/Pages posterior al commit pendiente al momento de documentación.
+
 ## En curso
-FASE 0 — infraestructura, CI y PWA completados técnicamente. Prueba física Android inicial FALLIDA (APK debug solicita Metro). APK autónomo release V2 compilado y validado técnicamente, entregado para nueva prueba física Android; iPhone PWA aún pendiente. FASE 0 NO cerrada hasta confirmación de ambos clientes.
+FASE 0 — ANDROID NATIVO APROBADO FÍSICAMENTE: APK release V2 autónomo arranca y muestra API CONECTADA, D1 ok, schema foundation-v1 y Realtime configured. PWA V2 también cargó y mostró esos datos en captura, pero el dispositivo de la captura parece Android; NO hay confirmación inequívoca de instalación/apertura desde iPhone real. Se corrigió un texto literal `\\n` en HTML de PWA. FASE 0 pendiente solo de prueba física real iPhone Home Screen y verificación final, no cerrada aún.
 
 ## Siguiente paso exacto
-1. instalar/probar el NUEVO APK autónomo release de Fundación en un Android real, sin Metro, confirmar API/DB/realtime;
-2. abrir e instalar la PWA V2 en Home Screen de un iPhone real;
-3. confirmar en ambos clientes: API CONECTADA, D1 ok, schema foundation-v1 y Realtime configured;
-4. si ambas pruebas físicas pasan, marcar FASE 0 CERRADA;
+1. ANDROID: APROBADO físicamente con APK release autónomo (`40070809476`), sin Metro; API/D1/realtime visibles y correctos;
+2. IPHONE: abrir e instalar `https://havana-nice-v2-dev.pages.dev/` en Safari → Añadir a pantalla de inicio, en un iPhone REAL; comprobar carga standalone;
+3. confirmar en iPhone API CONECTADA, D1 ok, schema foundation-v1 y Realtime configured; el rótulo del cliente dice «iPhone PWA» incluso al abrirse en Android, por lo que ese texto NO prueba el dispositivo;
+4. si la prueba física iPhone pasa, marcar FASE 0 CERRADA;
 5. iniciar CHAT 1 — TEXTO BÁSICO Android ↔ iPhone PWA.
 
 R2 se activa y crea antes de CHAT 6 — FOTOS, no antes.
