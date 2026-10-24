@@ -75,3 +75,85 @@ export interface LocalCache {
   remove(key: string): Promise<void>;
   clear(): Promise<void>;
 }
+
+/** CHAT 1 — shared contract across Android and iPhone PWA (V2 only). */
+export interface ChatSession {
+  token: string;
+  actorId: string;
+  displayName: string;
+  expiresAt: string;
+}
+
+export interface ChatMessage {
+  seq: number;
+  clientMessageId: string;
+  senderId: string;
+  senderName: string;
+  text: string;
+  sentAt: string;
+  pending?: boolean;
+  failed?: boolean;
+}
+
+export type ChatServerEvent =
+  | { type: 'chat.ready'; at: string }
+  | { type: 'chat.message'; message: ChatMessage }
+  | { type: 'chat.error'; error: string };
+
+export async function startLabChatSession(
+  displayName: string,
+  accessCode: string,
+  apiBaseUrl = HAVANA_V2_DEV_API_BASE_URL,
+): Promise<ChatSession> {
+  const response = await fetch(`${apiBaseUrl}/api/chat/session`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ displayName, accessCode }),
+  });
+  const data = await response.json() as ChatSession & { error?: string };
+  if (!response.ok) throw new Error(data.error || 'Could not join the lab chat');
+  return data;
+}
+
+export async function getChatMessages(
+  session: ChatSession,
+  apiBaseUrl = HAVANA_V2_DEV_API_BASE_URL,
+  afterSeq?: number,
+): Promise<ChatMessage[]> {
+  const suffix = afterSeq === undefined ? '' : `?afterSeq=${afterSeq}`;
+  const response = await fetch(`${apiBaseUrl}/api/chat/messages${suffix}`, {
+    headers: { Authorization: `Bearer ${session.token}` },
+  });
+  const data = await response.json() as { messages?: ChatMessage[]; error?: string };
+  if (!response.ok) throw new Error(data.error || 'Could not load chat history');
+  return data.messages || [];
+}
+
+export function openChatSocket(session: ChatSession): WebSocket {
+  const base = HAVANA_V2_DEV_API_BASE_URL.replace(/^http/, 'ws');
+  return new WebSocket(`${base}/ws`, ['havana-v2', `session.${session.token}`]);
+}
+
+export function newClientMessageId(): string {
+  return `m_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 14)}`;
+}
+
+export function reconcileChatMessages(
+  before: ChatMessage[],
+  incoming: ChatMessage[],
+): ChatMessage[] {
+  const map = new Map<string, ChatMessage>();
+  for (const message of [...before, ...incoming]) {
+    const key = `${message.senderId}:${message.clientMessageId}`;
+    const previous = map.get(key);
+    if (!previous || (previous.pending && !message.pending) || (!previous.seq && message.seq)) {
+      map.set(key, message);
+    }
+  }
+  return [...map.values()].sort((a, b) => {
+    if (a.seq && b.seq) return a.seq - b.seq;
+    if (a.seq) return -1;
+    if (b.seq) return 1;
+    return a.sentAt.localeCompare(b.sentAt);
+  });
+}
