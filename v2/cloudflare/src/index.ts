@@ -28,7 +28,7 @@ function trustedOrigin(origin) {
 }
 const LAB_CODE_SHA256 = '42edb4d61f92d416df49b91794149fa65e957e1fb5815e11eee9ab9011847a3e';
 function b64(bytes) {
-  return btoa(String.fromCharCode(...bytes)).replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');
+  return btoa(String.fromCharCode(...bytes)).split('+').join('-').split('/').join('_').replace(/=+$/, '');
 }
 function constantEqual(a, b) {
   let result = a.length ^ b.length;
