@@ -1183,11 +1183,19 @@ El estado vigente siempre es el HEAD de `havana-nice-v2-foundation`. No fijar es
 - CHAT 1 aún NO aprobado físicamente: faltan login auténtico con clave, comunicación bidireccional Android/iPhone, mensajes simultáneos, 20 mensajes continuos, abrir/cerrar, cambio de red y verificación de no duplicación. Los checks anteriores validan compilación y protección, pero NO sustituyen esas pruebas.
 - Limitación de laboratorio: el APK release se firma con keystore debug temporal del runner, de modo que actualizar sobre un APK de otra ejecución puede requerir desinstalar SOLO V2. Estabilizar firma antes de distribución general o datos locales permanentes; nunca desinstalar producción.
 
+## Entrega directa de APK CHAT 1 — 2026-10-24
+- El usuario reportó que el enlace de archivo dentro de ChatGPT fallaba con `Library file not found`; es un fallo de distribución/enlace, NO un fallo de compilación.
+- Se creó un workflow V2 aislado `.github/workflows/v2-apk-direct-download.yml` que descargó del run `40072538159` el APK CHAT 1 y verificó su SHA-256 `69233faeaa40399cfeb880369877494fdf8ddbfc53ffecb333fa1bee79e8eee1`.
+- Workflow de distribución `40105509935` — SUCCESS. El APK se publicó únicamente en la nueva rama huérfana `havana-nice-v2-apk-downloads` (commit `30e962a7dfd5fb77959d78950667b94c1659c3fb`); no cambió `main`, el backend ni la PWA actual.
+- **ENLACE EXTERNO DIRECTO VALIDADO**: `https://raw.githubusercontent.com/Abnernoa97/havana-nice-pwa/havana-nice-v2-apk-downloads/HAVANA-NICE-V2-CHAT1-ANDROID.apk`.
+- La verificación HTTP HEAD de GitHub Actions confirmó respuesta 200 del enlace final. No usar `sandbox:/mnt/data` para la entrega a teléfonos, pues puede fallar la biblioteca de ChatGPT.
+- Este enlace corresponde a la APK compilada de CHAT 1 (67,795,190 bytes), aún pendiente de instalación y pruebas físicas bidireccionales. Para próximas APK se debe actualizar el artefacto publicado en la rama exclusiva de distribución; no publicar binarios en `main`.
+
 ## En curso
 FASE 0 CERRADA. CHAT 1 — TEXTO BÁSICO en validación física. Backend, D1, Durable Object, UI Android/PWA, release APK, Pages y CI entregados técnicamente. Pendientes pruebas reales de envío y recepción cruzados. No adelantar CHAT 2 hasta que CHAT 1 pase.
 
 ## Siguiente paso exacto
-1. Instalar la NUEVA APK CHAT 1 en Android (si hay conflicto de firma, desinstalar SOLO `com.havananice.v2`, jamás producción).
+1. Instalar la NUEVA APK CHAT 1 desde la URL externa directa de la sección anterior (si hay conflicto de firma, desinstalar SOLO `com.havananice.v2`, jamás producción).
 2. Abrir/actualizar PWA V2 en iPhone y entrar con nombres distintos y la misma clave temporal de laboratorio suministrada en el chat (NO escrita en código).
 3. Enviar Android → iPhone y luego iPhone → Android; comprobar que llegan al instante, sin refresh.
 4. Probar 20 mensajes, envío simultáneo, cierre/arranque, Wi-Fi/datos y ausencia de duplicados; registrar problemas.
