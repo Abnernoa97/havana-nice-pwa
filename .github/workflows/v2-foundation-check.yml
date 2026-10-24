@@ -67,6 +67,20 @@ jobs:
           grep -q '"ok":true' /tmp/havana-realtime-health.json
           grep -q '"durableObject":"ChatRoom"' /tmp/havana-realtime-health.json
 
+      - name: Verify CHAT 1 rejects unauthenticated requests
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE="https://havana-nice-v2-dev.soloaplicaciones97.workers.dev"
+          STATUS=$(curl --silent --show-error -o /tmp/v2-chat-unauthorized.json -w '%{http_code}' "$BASE/api/chat/messages")
+          test "$STATUS" = "401"
+          grep -q 'error' /tmp/v2-chat-unauthorized.json
+          STATUS=$(curl --silent --show-error -o /tmp/v2-chat-denied.json -w '%{http_code}' \
+            -X POST "$BASE/api/chat/session" \
+            -H 'Content-Type: application/json' \
+            --data '{"displayName":"CI validation","accessCode":"not-a-valid-code"}')
+          test "$STATUS" = "401"
+
       - name: Verify live iPhone PWA
         shell: bash
         run: |
