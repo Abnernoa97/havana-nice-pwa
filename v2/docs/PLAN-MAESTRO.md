@@ -140,7 +140,7 @@ No entregar instrucciones cuando se pueda entregar el resultado.
 
 # 3. REGLAS ABSOLUTAS
 
-## 2.1 HAVANA NICE actual
+## 3.1 HAVANA NICE actual
 
 La aplicación HAVANA NICE actual es PRODUCCIÓN y está totalmente prohibido:
 
@@ -161,7 +161,7 @@ Solo se puede:
 - reutilizar ideas funcionales;
 - consultar estructura como referencia.
 
-## 2.2 FAMILIA NOA
+## 3.2 FAMILIA NOA
 
 FAMILIA NOA es otro proyecto independiente.
 
@@ -176,11 +176,11 @@ Se pueden estudiar patrones técnicos útiles, pero HAVANA NICE V2 NO compartir�
 - deploy;
 - lógica de producción.
 
-## 2.3 Costo
+## 3.3 Costo
 
 No introducir un servicio de pago como requisito de funcionamiento sin aprobación expresa del usuario.
 
-## 2.4 Validación
+## 3.4 Validación
 
 Nunca decir “ya funciona” por haber escrito código.
 
@@ -235,7 +235,7 @@ GitHub Actions / Wrangler → validación y despliegue automatizado
 
 # 5. RESPONSABILIDAD DE CADA PIEZA
 
-## 4.1 Cloudflare Worker — API central
+## 5.1 Cloudflare Worker — API central
 
 Será la única puerta de entrada del backend.
 
@@ -271,7 +271,7 @@ Estructura prevista:
 /health
 ```
 
-## 4.2 D1 — fuente persistente de datos
+## 5.2 D1 — fuente persistente de datos
 
 D1 guardará información estructurada:
 
@@ -294,7 +294,7 @@ D1 guardará información estructurada:
 
 D1 NO guardará blobs pesados de fotos, videos o audio.
 
-## 4.3 Durable Objects + WebSockets — realtime
+## 5.3 Durable Objects + WebSockets — realtime
 
 La ruta rápida del Chat no debe esperar a la base de datos.
 
@@ -333,7 +333,7 @@ volver a consultar
 mostrar
 ```
 
-## 4.4 R2 — media
+## 5.4 R2 — media
 
 R2 guardará:
 
@@ -348,7 +348,7 @@ La base guardará únicamente metadata y referencias.
 
 Los archivos privados no deben depender de una URL pública eterna.
 
-## 4.5 FCM y Web Push
+## 5.5 FCM y Web Push
 
 Android:
 - FCM para notificaciones cuando la app esté cerrada o el teléfono bloqueado.
@@ -366,7 +366,7 @@ No se utilizará un sistema empresarial complicado de identidad si no aporta val
 
 HAVANA NICE tiene pocos usuarios y roles claros.
 
-## 5.1 Roles iniciales
+## 6.1 Roles iniciales
 
 ### ADMIN
 Puede:
@@ -390,7 +390,7 @@ Puede:
 ### INACTIVO / BLOQUEADO
 No puede acceder aunque conserve la app instalada.
 
-## 5.2 Permisos
+## 6.2 Permisos
 
 El servidor siempre verifica permisos.
 
@@ -411,7 +411,7 @@ notifications.read
 admin.access
 ```
 
-## 5.3 Sesiones
+## 6.3 Sesiones
 
 Objetivo:
 
@@ -424,7 +424,7 @@ Objetivo:
 - cambio inmediato a bloqueado;
 - no guardar secretos sensibles en PWA o APK.
 
-## 5.4 Diseño de acceso
+## 6.4 Diseño de acceso
 
 Primera versión prevista:
 
@@ -1097,8 +1097,8 @@ Cada punto cierra Android + PWA antes de avanzar.
 ## Rama de trabajo
 `havana-nice-v2-foundation`
 
-## Último checkpoint técnico
-`01931bfe26513b021259b4418368534a56d47849`
+## Control de versión
+El estado vigente siempre es el HEAD de `havana-nice-v2-foundation`. No fijar este documento a su propio commit porque cada actualización del plan genera un commit nuevo.
 
 ## Ya hecho
 - plan de desarrollo vertical;
