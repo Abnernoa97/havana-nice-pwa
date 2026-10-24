@@ -552,12 +552,13 @@ Crear recursos independientes para HAVANA NICE V2:
 
 - Worker;
 - D1;
-- R2;
 - Durable Object namespace;
 - variables y secretos;
 - entorno development;
 - health endpoint;
 - deploy automatizado.
+
+R2 sigue siendo el almacenamiento oficial de media, pero Cloudflare exige una activación inicial de la suscripción R2 mediante checkout en el dashboard antes de permitir su API. Como R2 no es necesario para Chat de texto ni para cerrar la base técnica inicial, su activación se difiere hasta justo antes de CHAT 6 — FOTOS. No bloquear FASE 0 por R2.
 
 No reutilizar Worker ni recursos de FAMILIA NOA.
 
@@ -603,9 +604,9 @@ FASE 0 solo se cierra cuando:
 - /health responde;
 - Android consume /health;
 - PWA consume /health;
-- D1 existe;
-- R2 existe;
-- Durable Objects está preparado;
+- D1 existe y responde;
+- Durable Objects está preparado y responde;
+- R2 puede permanecer pendiente hasta el módulo de media si Cloudflare sigue exigiendo activación manual de suscripción;
 - primer APK laboratorio existe;
 - preview PWA existe;
 - Android arranca físicamente;
@@ -1118,25 +1119,33 @@ El estado vigente siempre es el HEAD de `havana-nice-v2-foundation`. No fijar es
 - complemento oficial de Cloudflare instalado y autenticado;
 - acceso directo confirmado a las cuentas Cloudflare autorizadas;
 - lectura de Workers existentes confirmada sin modificar recursos;
-- modo operativo “usuario pide → ChatGPT ejecuta todo → entrega lista” establecido como regla oficial.
+- modo operativo “usuario pide → ChatGPT ejecuta todo → entrega lista” establecido como regla oficial;
+- Worker Cloudflare creado: `havana-nice-v2-dev`;
+- Worker deployment inicial: `ead5da47803447f4860514803c8d667d`;
+- workers.dev habilitado: `https://havana-nice-v2-dev.soloaplicaciones97.workers.dev`;
+- D1 creado: `havana-nice-v2-dev`;
+- D1 UUID: `6a4abd3a-c01b-4d4f-b0ed-49f7eaca0cc5`;
+- D1 foundation schema aplicado: `foundation-v1`;
+- Durable Object creado: `ChatRoom`;
+- Durable Object namespace: `9ad73b6bb654447ab5b4a3ba4fae9185`;
+- Durable Object SQLite verificado mediante consulta directa exitosa;
+- Worker observability/invocation logs habilitados;
+- Android y PWA apuntan al mismo endpoint Cloudflare `/health`;
+- R2 detectado como no activado en la cuenta; Cloudflare exige checkout inicial desde dashboard y se difiere hasta el módulo de media.
 
 ## En curso
-FASE 0 — crear y conectar directamente la infraestructura Cloudflare aislada de HAVANA NICE V2.
+FASE 0 — infraestructura Cloudflare central creada; validación de builds y clientes en curso.
 
 ## Siguiente paso exacto
-1. crear directamente desde el complemento oficial de Cloudflare el Worker V2 independiente;
-2. crear D1 V2;
-3. crear R2 V2;
-4. crear/configurar Durable Objects;
-5. configurar entorno development;
-6. conectar Android y PWA a `/health`;
-7. generar lockfile;
-8. compilar ambos clientes;
-9. publicar preview PWA;
-10. producir APK laboratorio;
-11. prueba física Android;
-12. prueba física iPhone;
-13. cerrar FASE 0.
+1. validar CI completo con instalación de dependencias, typecheck, PWA build y Android export;
+2. generar lockfile reproducible;
+3. publicar preview PWA;
+4. producir APK laboratorio;
+5. probar Android físicamente;
+6. probar iPhone PWA físicamente;
+7. cerrar FASE 0.
+
+R2 se activa y crea antes de CHAT 6 — FOTOS, no antes.
 
 ## Primer módulo después de FASE 0
 CHAT 1 — TEXTO BÁSICO Android ↔ iPhone PWA.
@@ -1152,6 +1161,7 @@ CHAT 1 — TEXTO BÁSICO Android ↔ iPhone PWA.
 - Datos: D1.
 - Realtime Chat: Durable Objects + WebSockets.
 - Media: R2.
+- R2 se activa solo cuando empiece media; su checkout inicial no bloquea Fundación ni Chat de texto.
 - Android push: FCM.
 - iPhone push: Web Push.
 - Auth/permisos: sistema propio pequeño, server-side.
