@@ -69,9 +69,14 @@ export class ChatRoom {
   async fetch(request) {
     if (new URL(request.url).pathname === '/health') return Response.json({ ok: true, durableObject: 'ChatRoom', environment: this.env.HAVANA_ENV || 'development' });
     if ((request.headers.get('upgrade') || '').toLowerCase() !== 'websocket') return respond({ error: 'WebSocket required' }, 426);
-    const actorId = request.headers.get('x-havana-actor-id');
-    const name = request.headers.get('x-havana-actor-name');
-    if (!actorId || !name) return respond({ error: 'Unauthorized' }, 401);
+    // Authenticated in both Worker and DO, without rebuilding the upgrade Request:
+    // cloning the original WebSocket handshake can break protocol upgrade.
+    const protocolHeader = request.headers.get('sec-websocket-protocol') || '';
+    const sessionProtocol = protocolHeader.split(',').map(x => x.trim()).find(x => x.startsWith('session.'));
+    const session = sessionProtocol ? await verifySession(this.env, sessionProtocol.slice(8)) : null;
+    if (!session) return respond({ error: 'Unauthorized' }, 401);
+    const actorId = session.actorId;
+    const name = session.displayName;
     const pair = new WebSocketPair();
     const client = pair[0], server = pair[1];
     server.accept();
@@ -85,7 +90,12 @@ export class ChatRoom {
     const cleanup = () => this.sockets.delete(server);
     server.addEventListener('close', cleanup);
     server.addEventListener('error', cleanup);
-    return new Response(null, { status: 101, webSocket: client });
+    // Client offered havana-v2; explicitly select it in 101 response.
+    return new Response(null, {
+      status: 101,
+      webSocket: client,
+      headers: { 'Sec-WebSocket-Protocol': 'havana-v2' },
+    });
   }
   send(socket, data) {
     try { if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(data)); } catch {}
@@ -159,12 +169,9 @@ export default {
       const session = await verifySession(env, protocol.slice(8));
       if (!session) return respond({ error: 'Unauthorized' }, 401, origin);
       if ((request.headers.get('upgrade') || '').toLowerCase() !== 'websocket') return respond({ error: 'Upgrade required' }, 426, origin);
-      const headers = new Headers(request.headers);
-      headers.set('x-havana-actor-id', session.actorId);
-      headers.set('x-havana-actor-name', session.displayName);
-      headers.set('sec-websocket-protocol', 'havana-v2');
-      const upgraded = new Request(request, { headers });
-      return env.CHAT_ROOMS.get(env.CHAT_ROOMS.idFromName(ROOM)).fetch(upgraded);
+      // Forward original Upgrade and offered subprotocols unchanged.
+      // The Durable Object verifies the session independently.
+      return env.CHAT_ROOMS.get(env.CHAT_ROOMS.idFromName(ROOM)).fetch(request);
     }
     return respond({ error: 'Not found' }, 404, origin);
   },
