@@ -1,0 +1,10 @@
+{
+  "name": "HAVANA NICE V2",
+  "short_name": "HAVANA NICE",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#F2EBDD",
+  "theme_color": "#F2EBDD",
+  "orientation": "portrait"
+}

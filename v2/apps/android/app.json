@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "name": "HAVANA NICE V2",
+    "slug": "havana-nice-v2",
+    "version": "0.0.1",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "android": {
+      "package": "com.havananice.v2"
+    },
+    "extra": {
+      "environment": "development"
+    }
+  }
+}

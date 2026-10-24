@@ -1,0 +1,24 @@
+name: HAVANA NICE V2 foundation check
+
+on:
+  push:
+    branches:
+      - havana-nice-v2-foundation
+    paths:
+      - 'v2/**'
+      - '.github/workflows/v2-foundation-check.yml'
+  workflow_dispatch:
+
+jobs:
+  structure:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: v2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate V2 foundation structure
+        run: node scripts/check-structure.mjs
