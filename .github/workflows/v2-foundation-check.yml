@@ -10,15 +10,29 @@ on:
   workflow_dispatch:
 
 jobs:
-  structure:
+  foundation:
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: v2
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+
       - name: Validate V2 foundation structure
         run: node scripts/check-structure.mjs
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Typecheck all workspaces
+        run: npm run typecheck
+
+      - name: Build iPhone PWA
+        run: npm run build:pwa
+
+      - name: Export Android bundle
+        run: npm run export -w @havana/android
