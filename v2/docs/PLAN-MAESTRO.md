@@ -1159,15 +1159,16 @@ El estado vigente siempre es el HEAD de `havana-nice-v2-foundation`. No fijar es
 - Primer APK laboratorio extraído del artifact de GitHub Actions y verificado: `146037722` bytes, SHA-256 `5433f123b31bccf4ae1965fd94eff5a35b2e81834deea57b351e077bb4ba3041`; pendiente confirmar instalación/arranque en Android real.
 - Confirmación física pendiente en Android y en iPhone PWA; NO marcar FASE 0 como cerrada hasta que el usuario compruebe ambos.
 - Prueba física Android 2026-10-24: la app V2 anterior (`assembleDebug`, run `40068929315`) se instaló, pero falló al iniciar con `Unable to load script / Metro`, porque el JS no estaba embebido para ejecución autónoma. Capturas de usuario documentan el bloqueo. NO reutilizar ese APK para instalación.
-- Corrección aplicada exclusivamente al workflow `.github/workflows/v2-android-apk.yml` en commit `b5ed00b9ce21481786ecff5bd9c54b3f28a4ad88`: `assembleRelease` y comprobaciones de bundle `assets/index.android.bundle`, firma `apksigner`, paquete `com.havananice.v2`; GitHub run `40070809476` iniciado. Resultado y prueba física pendientes.
+- Corrección aplicada exclusivamente al workflow `.github/workflows/v2-android-apk.yml` en commit `b5ed00b9ce21481786ecff5bd9c54b3f28a4ad88`: `assembleRelease` y comprobaciones de bundle `assets/index.android.bundle`, firma `apksigner`, paquete `com.havananice.v2`; GitHub run `40070809476` — SUCCESS, incluida subida de artifact `12551153324`.
+- APK autónomo entregado para Android `HAVANA-NICE-V2-STANDALONE-ANDROID.apk`: 67,784,170 bytes; contiene `assets/index.android.bundle` (1,250,680 bytes); SHA-256 `51c8b5f6e222a07b168e9e6717999ed7dba5bffa6cc631f9a1b6326c813b0e88`. El usuario aún debe confirmar físicamente su arranque sin Metro. En caso de conflicto de firma durante actualización, desinstalar SOLO paquete V2, nunca producción.
 - Entrega APK 2026-10-24: se detectó error `Library file not found` al abrir el primer vínculo generado por ChatGPT; se creó nueva copia APK directamente como archivo de conversación verificado con el SHA-256 ya registrado. GitHub Actions puede descargar el artifact original, pero la creación de GitHub Release pública con `GITHUB_TOKEN` devolvió HTTP 403; se retiró el workflow experimental. No se afectó Android, backend, main ni producción. Pendiente confirmar que el nuevo archivo sea descargable e instalable físicamente.
 
 
 ## En curso
-FASE 0 — infraestructura, CI y PWA completados técnicamente. Prueba física Android realizada y FALLIDA: el APK anterior fue debug y mostró pantalla roja `Unable to load script` al solicitar Metro. Corregido el workflow para `assembleRelease` con JavaScript embebido y verificaciones de bundle/firma; compilación y validación de nuevo APK autónomo en curso. Prueba física iPhone aún pendiente. FASE 0 NO cerrada.
+FASE 0 — infraestructura, CI y PWA completados técnicamente. Prueba física Android inicial FALLIDA (APK debug solicita Metro). APK autónomo release V2 compilado y validado técnicamente, entregado para nueva prueba física Android; iPhone PWA aún pendiente. FASE 0 NO cerrada hasta confirmación de ambos clientes.
 
 ## Siguiente paso exacto
-1. instalar/probar el APK Fundación en un Android real;
+1. instalar/probar el NUEVO APK autónomo release de Fundación en un Android real, sin Metro, confirmar API/DB/realtime;
 2. abrir e instalar la PWA V2 en Home Screen de un iPhone real;
 3. confirmar en ambos clientes: API CONECTADA, D1 ok, schema foundation-v1 y Realtime configured;
 4. si ambas pruebas físicas pasan, marcar FASE 0 CERRADA;
