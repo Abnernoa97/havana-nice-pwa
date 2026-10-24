@@ -1,18 +1,36 @@
 # HAVANA NICE V2
 
-Nueva generación de HAVANA NICE construida en paralelo a producción.
+Nueva generación de HAVANA NICE, construida desde cero y completamente separada de producción.
 
-## Objetivo
-- Android: aplicación nativa real.
-- iPhone: PWA premium mientras el costo objetivo sea 0 MXN.
-- Backend: Supabase.
-- Tiempo real: Broadcast/Presence.
-- Desarrollo vertical: cada capacidad se cierra en Android + PWA antes de pasar a la siguiente.
+## Arquitectura oficial
+- Android: app nativa con React Native / Expo.
+- iPhone: PWA premium mientras el objetivo de costo siga siendo 0 MXN.
+- Backend: Cloudflare.
+- API: Cloudflare Worker.
+- Datos persistentes: Cloudflare D1.
+- Realtime de Chat: Durable Objects + WebSockets.
+- Fotos, videos, audios y thumbnails: Cloudflare R2.
+- Android push: FCM.
+- iPhone PWA push: Web Push.
+- Código: GitHub.
+- Desarrollo: vertical, capacidad por capacidad, Android + PWA antes de avanzar.
 
 ## Estado
-FASE 0 — FUNDACIÓN.
+FASE 0 — FUNDACIÓN EN CURSO.
 
-Este directorio está completamente aislado de la HAVANA NICE actual. Producción no lo carga ni lo ejecuta.
+## Producción actual
+La HAVANA NICE actual está totalmente fuera de alcance para V2:
+- no modificar,
+- no migrar,
+- no reutilizar como backend de pruebas,
+- no tocar datos ni despliegue,
+- solo consultar arquitectura y comportamiento como referencia.
 
-## Regla de oro
-Nada de V2 sustituye producción hasta que el usuario lo confirme físicamente.
+FAMILIA NOA también permanece independiente. Se pueden reutilizar patrones técnicos, nunca compartir Worker, D1, R2, datos o lógica de producción.
+
+## Fuente única de verdad
+Leer únicamente:
+
+`v2/docs/PLAN-MAESTRO.md`
+
+No crear documentos paralelos de continuidad, decisiones o planes alternativos.

@@ -18,8 +18,7 @@ export interface HavanaUser {
 }
 
 export interface PublicBackendConfig {
-  supabaseUrl: string;
-  supabasePublishableKey: string;
+  apiBaseUrl: string;
 }
 
 export interface RealtimeEnvelope<TPayload = unknown> {

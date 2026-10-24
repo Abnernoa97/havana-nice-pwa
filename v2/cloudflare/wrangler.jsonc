@@ -1,0 +1,9 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "havana-nice-v2",
+  "main": "./src/index.ts",
+  "compatibility_date": "2026-10-23",
+  "vars": {
+    "HAVANA_ENV": "development"
+  }
+}
