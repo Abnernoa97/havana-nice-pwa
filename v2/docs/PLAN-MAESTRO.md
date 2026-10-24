@@ -1,7 +1,7 @@
 # HAVANA NICE V2 — PLAN MAESTRO ÚNICO
 
 **Última actualización:** 2026-10-24  
-**Estado:** FASE 0 — FUNDACIÓN EN CURSO  
+**Estado:** FASE 0 — CERRADA; CHAT 1 — TEXTO BÁSICO EN CURSO  
 **Costo objetivo permanente:** 0 MXN  
 **Plataformas:** Android nativo + iPhone PWA premium  
 **Backend oficial:** Cloudflare  
@@ -1167,20 +1167,22 @@ El estado vigente siempre es el HEAD de `havana-nice-v2-foundation`. No fijar es
 - Capturas físicas recibidas 2026-10-24: Android nativo V2 release muestra `API CONECTADA`, `D1: ok`, `Schema: foundation-v1`, `Realtime: configured`, `Media: pending-r2-enable`; se confirma que el error de Metro fue resuelto en el dispositivo real. Segunda captura PWA con la misma salud, pero tiene controles inferiores de Android, de modo que NO acredita prueba física desde iPhone.
 - Corrección de presentación PWA: `v2/apps/pwa/index.html` incluía el texto escapado literal `\\n` junto al enlace de manifest, visible en esquina superior izquierda; sustituido por salto real de línea en commit `bb31f5fab1338096d391af84928352b3ec5e0663`. Validación CI/Pages posterior al commit pendiente al momento de documentación.
 
+- Confirmación expresa 2026-10-24: el usuario indicó «Ya quedó. Seguimos», por lo que FASE 0 se marca CERRADA y se inicia vertical CHAT 1. Se conserva la distinción entre prueba de arranque y prueba real de mensajería (aún no completada).
+
 ## En curso
-FASE 0 — ANDROID NATIVO APROBADO FÍSICAMENTE: APK release V2 autónomo arranca y muestra API CONECTADA, D1 ok, schema foundation-v1 y Realtime configured. PWA V2 también cargó y mostró esos datos en captura, pero el dispositivo de la captura parece Android; NO hay confirmación inequívoca de instalación/apertura desde iPhone real. Se corrigió un texto literal `\\n` en HTML de PWA. FASE 0 pendiente solo de prueba física real iPhone Home Screen y verificación final, no cerrada aún.
+FASE 0 — CERRADA POR CONFIRMACIÓN DEL USUARIO el 2026-10-24 («Ya quedó. Seguimos»), tras evidencias físicas Android y PWA con API/D1/realtime correctos. CHAT 1 — TEXTO BÁSICO EN CURSO. Pruebas de mensajería cruzada entre dispositivos aún pendientes.
 
 ## Siguiente paso exacto
-1. ANDROID: APROBADO físicamente con APK release autónomo (`40070809476`), sin Metro; API/D1/realtime visibles y correctos;
-2. IPHONE: abrir e instalar `https://havana-nice-v2-dev.pages.dev/` en Safari → Añadir a pantalla de inicio, en un iPhone REAL; comprobar carga standalone;
-3. confirmar en iPhone API CONECTADA, D1 ok, schema foundation-v1 y Realtime configured; el rótulo del cliente dice «iPhone PWA» incluso al abrirse en Android, por lo que ese texto NO prueba el dispositivo;
-4. si la prueba física iPhone pasa, marcar FASE 0 CERRADA;
-5. iniciar CHAT 1 — TEXTO BÁSICO Android ↔ iPhone PWA.
+1. Implementar CHAT 1 — TEXTO BÁSICO de forma aislada en Worker/D1/Durable Object, cliente compartido, Android y PWA;
+2. validar autenticación de laboratorio (sin credenciales embebidas), envío, deduplicación, orden y realtime;
+3. compilar APK Android release autónomo y desplegar PWA V2;
+4. ejecutar pruebas físicas Android ↔ iPhone PWA en ambos sentidos, 20 mensajes, reconexión y envío simultáneo;
+5. solo tras aprobación física marcar CHAT 1 CERRADO.
 
 R2 se activa y crea antes de CHAT 6 — FOTOS, no antes.
 
 ## Primer módulo después de FASE 0
-CHAT 1 — TEXTO BÁSICO Android ↔ iPhone PWA.
+CHAT 1 — TEXTO BÁSICO Android ↔ iPhone PWA (EN CURSO).
 
 ---
 
