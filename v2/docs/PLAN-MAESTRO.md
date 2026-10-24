@@ -1140,6 +1140,7 @@ El estado vigente siempre es el HEAD de `havana-nice-v2-foundation`. No fijar es
 - Pages project ID: `737f5483-cd45-4711-bd97-d2b06fd94313`;
 - URL PWA V2 reservada: `https://havana-nice-v2-dev.pages.dev`;
 - Pages V2 usa rama `havana-nice-v2-foundation`, root `v2`, build `npm ci && npm run build:pwa`, output `apps/pwa/dist`;
+- filtro de despliegue Pages corregido a `*` para que Cloudflare detecte commits del monorepo con root `v2`;
 - workflow APK Android creado; build de laboratorio en validación.
 
 ## En curso
