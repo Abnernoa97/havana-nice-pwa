@@ -1141,17 +1141,27 @@ El estado vigente siempre es el HEAD de `havana-nice-v2-foundation`. No fijar es
 - URL PWA V2 reservada: `https://havana-nice-v2-dev.pages.dev`;
 - Pages V2 usa rama `havana-nice-v2-foundation`, root `v2`, build `npm ci && npm run build:pwa`, output `apps/pwa/dist`;
 - filtro de despliegue Pages corregido a `*` para que Cloudflare detecte commits del monorepo con root `v2`;
-- workflow APK Android creado; build de laboratorio en validación.
+- workflow APK Android creado y validado;
+- APK Android Fundación compilado: `HAVANA-NICE-V2-FOUNDATION.apk`;
+- Android APK workflow run: `40068929315` — SUCCESS;
+- Android APK artifact ID: `12550492280`;
+- Android APK tamaño: `146037722` bytes (~140 MB, debug foundation);
+- Android APK SHA-256: `5433f123b31bccf4ae1965fd94eff5a35b2e81834deea57b351e077bb4ba3041`;
+- Cloudflare Pages deploy real: SUCCESS;
+- Pages deployment con iconos: `68cae54f-d160-4dc1-a306-733ce171907e`;
+- PWA estable: `https://havana-nice-v2-dev.pages.dev`;
+- CI Fundación con validación PWA en vivo: run `40069278714` — SUCCESS;
+- PWA incluye manifest standalone y assets de icono HAVANA NICE 192/512.
 
 ## En curso
-FASE 0 — infraestructura central y CI reproducible validados; publicación PWA y APK de laboratorio en curso.
+FASE 0 — infraestructura, CI, PWA y APK de laboratorio terminados técnicamente; pendiente únicamente prueba física del usuario en Android e iPhone.
 
 ## Siguiente paso exacto
-1. confirmar primer deploy de Pages V2;
-2. completar y descargar APK Android laboratorio;
-3. probar Android físicamente;
-4. instalar/probar PWA en iPhone físicamente;
-5. cerrar FASE 0.
+1. instalar/probar el APK Fundación en un Android real;
+2. abrir e instalar la PWA V2 en Home Screen de un iPhone real;
+3. confirmar en ambos clientes: API CONECTADA, D1 ok, schema foundation-v1 y Realtime configured;
+4. si ambas pruebas físicas pasan, marcar FASE 0 CERRADA;
+5. iniciar CHAT 1 — TEXTO BÁSICO Android ↔ iPhone PWA.
 
 R2 se activa y crea antes de CHAT 6 — FOTOS, no antes.
 
