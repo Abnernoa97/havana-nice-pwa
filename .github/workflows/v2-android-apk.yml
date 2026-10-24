@@ -46,22 +46,35 @@ jobs:
           CI: '1'
         run: npx expo prebuild --platform android --clean --no-install
 
-      - name: Build debug APK
+      # The installed APK must be a standalone app: debug builds require Metro.
+      - name: Build standalone release APK with embedded JS bundle
         working-directory: v2/apps/android/android
         run: |
           chmod +x gradlew
-          ./gradlew --no-daemon assembleDebug
+          ./gradlew --no-daemon --stacktrace assembleRelease
+
+      - name: Verify JS bundle is packaged and APK is signed
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=v2/apps/android/android/app/build/outputs/apk/release/app-release.apk
+          test -s "$APK"
+          unzip -Z1 "$APK" | grep -Fxq 'assets/index.android.bundle'
+          SDK_BUILD_TOOLS="$(find "${ANDROID_HOME:-$ANDROID_SDK_ROOT}/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+          "$SDK_BUILD_TOOLS/apksigner" verify --verbose "$APK"
+          "$SDK_BUILD_TOOLS/aapt" dump badging "$APK" | grep -F "package: name='com.havananice.v2'"
+          sha256sum "$APK"
 
       - name: Rename APK
         shell: bash
         run: |
-          cp v2/apps/android/android/app/build/outputs/apk/debug/app-debug.apk \
-             HAVANA-NICE-V2-FOUNDATION.apk
+          cp v2/apps/android/android/app/build/outputs/apk/release/app-release.apk \
+             HAVANA-NICE-V2-FOUNDATION-STANDALONE.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: HAVANA-NICE-V2-FOUNDATION-APK
-          path: HAVANA-NICE-V2-FOUNDATION.apk
+          name: HAVANA-NICE-V2-FOUNDATION-STANDALONE-APK
+          path: HAVANA-NICE-V2-FOUNDATION-STANDALONE.apk
           if-no-files-found: error
           retention-days: 30
