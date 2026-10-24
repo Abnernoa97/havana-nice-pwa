@@ -66,3 +66,16 @@ jobs:
             | tee /tmp/havana-realtime-health.json
           grep -q '"ok":true' /tmp/havana-realtime-health.json
           grep -q '"durableObject":"ChatRoom"' /tmp/havana-realtime-health.json
+
+      - name: Verify live iPhone PWA
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --retry 10 --retry-all-errors --retry-delay 3 \
+            https://havana-nice-v2-dev.pages.dev/ \
+            | tee /tmp/havana-pwa.html
+          grep -q 'HAVANA NICE V2' /tmp/havana-pwa.html
+          curl --fail --silent --show-error --retry 10 --retry-all-errors --retry-delay 3 \
+            https://havana-nice-v2-dev.pages.dev/manifest.webmanifest \
+            | tee /tmp/havana-manifest.json
+          grep -q 'HAVANA NICE V2' /tmp/havana-manifest.json
