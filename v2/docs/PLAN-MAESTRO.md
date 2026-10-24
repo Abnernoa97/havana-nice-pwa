@@ -5,7 +5,8 @@
 **Costo objetivo permanente:** 0 MXN  
 **Plataformas:** Android nativo + iPhone PWA premium  
 **Backend oficial:** Cloudflare  
-**Fuente única de verdad de continuidad:** este archivo
+**Fuente única de verdad de continuidad:** este archivo  
+**Modo operativo:** el usuario pide el resultado; ChatGPT ejecuta todo el trabajo técnico de punta a punta
 
 ---
 
@@ -28,7 +29,116 @@ La nueva app debe:
 
 ---
 
-# 2. REGLAS ABSOLUTAS
+# 2. MODELO OPERATIVO — ENTREGA LLAVE EN MANO
+
+La regla de trabajo de HAVANA NICE V2 es:
+
+```
+USUARIO
+“Quiero X”
+↓
+CHATGPT
+arquitectura
+código
+Cloudflare
+GitHub
+permisos
+infraestructura
+base de datos
+storage
+realtime
+seguridad
+tests
+builds
+deploy
+diagnóstico
+correcciones
+↓
+ENTREGA LISTA
+```
+
+El usuario NO debe encargarse de tareas técnicas manuales como:
+
+- entrar a Cloudflare para crear recursos;
+- crear Workers;
+- crear D1;
+- crear R2;
+- configurar Durable Objects;
+- crear bindings;
+- crear rutas;
+- editar variables;
+- crear permisos internos;
+- escribir SQL;
+- crear tablas;
+- configurar GitHub Actions;
+- copiar tokens;
+- ejecutar Wrangler;
+- compilar Android;
+- preparar PWA;
+- revisar logs;
+- diagnosticar errores;
+- hacer deploy;
+- corregir fallos de infraestructura;
+- mantener sincronizados Android y PWA.
+
+ChatGPT debe hacer directamente todo lo anterior usando las herramientas conectadas y automatizaciones disponibles.
+
+## 2.1 Acceso directo a Cloudflare
+
+El complemento oficial de Cloudflare para ChatGPT está instalado y autenticado.
+
+Está autorizado para trabajar sobre las cuentas Cloudflare existentes seleccionadas por el propietario.
+
+El flujo oficial pasa a ser:
+
+```
+ChatGPT
+├── Cloudflare oficial → crear / leer / modificar / desplegar infraestructura
+├── GitHub → código fuente, commits, ramas y automatizaciones
+└── builds/tests → validar antes de entregar
+```
+
+Para HAVANA NICE V2 se debe usar infraestructura NUEVA y aislada.
+
+No reutilizar ni modificar recursos existentes de otros proyectos salvo orden expresa del usuario.
+
+## 2.2 Intervención del usuario
+
+Objetivo: cero intervención técnica del usuario.
+
+Solo se solicitará una acción al usuario cuando una plataforma externa exija obligatoriamente una acción personal del propietario que no pueda ejecutarse por API o por las herramientas conectadas, por ejemplo:
+
+- aceptar una autorización OAuth;
+- aprobar una acción especialmente sensible;
+- iniciar sesión cuando la plataforma exija presencia humana;
+- instalar físicamente un APK/PWA en un teléfono;
+- realizar una prueba física que no pueda ejecutarse remotamente.
+
+Estas excepciones NO deben convertirse en trabajo técnico delegado al usuario.
+
+Nunca pedirle al usuario que haga manualmente un paso que ChatGPT pueda ejecutar.
+
+## 2.3 Entrega
+
+Cuando el usuario pida una función, ChatGPT debe intentar completar en la misma tarea:
+
+1. diseño;
+2. implementación;
+3. backend;
+4. permisos;
+5. infraestructura;
+6. pruebas automáticas;
+7. compilación;
+8. despliegue;
+9. verificación;
+10. documentación;
+11. entrega del artefacto o enlace listo para usar.
+
+No entregar instrucciones cuando se pueda entregar el resultado.
+
+---
+
+# 3. REGLAS ABSOLUTAS
 
 ## 2.1 HAVANA NICE actual
 
@@ -87,7 +197,7 @@ Una función queda terminada únicamente cuando:
 
 ---
 
-# 3. ARQUITECTURA OFICIAL
+# 4. ARQUITECTURA OFICIAL
 
 ```
                     HAVANA NICE V2
@@ -123,7 +233,7 @@ GitHub Actions / Wrangler → validación y despliegue automatizado
 
 ---
 
-# 4. RESPONSABILIDAD DE CADA PIEZA
+# 5. RESPONSABILIDAD DE CADA PIEZA
 
 ## 4.1 Cloudflare Worker — API central
 
@@ -250,7 +360,7 @@ El Worker centralizará la lógica para que una misma notificación pueda salir 
 
 ---
 
-# 5. ACCESO, SESIONES Y PERMISOS
+# 6. ACCESO, SESIONES Y PERMISOS
 
 No se utilizará un sistema empresarial complicado de identidad si no aporta valor.
 
@@ -334,7 +444,7 @@ Passkeys se pueden añadir después si mejoran claramente la experiencia.
 
 ---
 
-# 6. ESTRATEGIA DE CÓDIGO
+# 7. ESTRATEGIA DE CÓDIGO
 
 Un solo proyecto lógico y una sola fuente de verdad.
 
@@ -369,7 +479,7 @@ Si cambia una decisión importante, se reescribe ESTE documento.
 
 ---
 
-# 7. METODOLOGÍA DE CONSTRUCCIÓN
+# 8. METODOLOGÍA DE CONSTRUCCIÓN
 
 Se trabaja VERTICALMENTE.
 
@@ -403,7 +513,7 @@ No se abre la siguiente capacidad mientras la actual esté incompleta.
 
 ---
 
-# 8. FASE 0 — FUNDACIÓN
+# 9. FASE 0 — FUNDACIÓN
 
 Objetivo: dejar una base técnica estable antes de hacer funciones visibles complejas.
 
@@ -504,7 +614,7 @@ FASE 0 solo se cierra cuando:
 
 ---
 
-# 9. CHAT — PRIMER MÓDULO FUNCIONAL
+# 10. CHAT — PRIMER MÓDULO FUNCIONAL
 
 Chat será el primer módulo completo porque obliga a validar realtime, caché, archivos, reconexión y push.
 
@@ -725,7 +835,7 @@ SALIDA: Chat V2 aprobado físicamente en Android + iPhone.
 
 ---
 
-# 10. RESTO DE MÓDULOS
+# 11. RESTO DE MÓDULOS
 
 Después de Chat se mantiene la misma metodología vertical.
 
@@ -790,7 +900,7 @@ No conectar ni mezclar datos con la app FAMILIA NOA.
 
 ---
 
-# 11. ADMIN V2
+# 12. ADMIN V2
 
 Administrador utiliza la MISMA API central.
 
@@ -818,7 +928,7 @@ Reglas:
 
 ---
 
-# 12. CACHÉ Y OFFLINE
+# 13. CACHÉ Y OFFLINE
 
 Android y PWA deben compartir reglas, no necesariamente la misma tecnología física.
 
@@ -835,7 +945,7 @@ Principios:
 
 ---
 
-# 13. MEDIA
+# 14. MEDIA
 
 Principios:
 
@@ -850,7 +960,7 @@ Principios:
 
 ---
 
-# 14. SEGURIDAD
+# 15. SEGURIDAD
 
 Reglas mínimas:
 
@@ -870,7 +980,7 @@ Reglas mínimas:
 
 ---
 
-# 15. PERFORMANCE
+# 16. PERFORMANCE
 
 Objetivos:
 
@@ -888,7 +998,7 @@ Objetivos:
 
 ---
 
-# 16. LIMITACIONES FREE A VIGILAR
+# 17. LIMITACIONES FREE A VIGILAR
 
 La arquitectura se diseña para mantenerse cómodamente dentro del nivel gratuito.
 
@@ -908,7 +1018,7 @@ Si un límite cambia, se optimiza arquitectura antes de aceptar un costo.
 
 ---
 
-# 17. REGLAS PARA NO REPETIR LA DEUDA DE LA APP ACTUAL
+# 18. REGLAS PARA NO REPETIR LA DEUDA DE LA APP ACTUAL
 
 1. No crear archivos `fix2`, `patch-final`, etc.
 2. No duplicar lógica Android/PWA.
@@ -928,7 +1038,7 @@ Si un límite cambia, se optimiza arquitectura antes de aceptar un costo.
 
 ---
 
-# 18. FLUJO DE TRABAJO EN CADA CHAT FUTURO
+# 19. FLUJO DE TRABAJO EN CADA CHAT FUTURO
 
 Al entrar a cualquier chat de HAVANA NICE V2:
 
@@ -951,7 +1061,7 @@ No crear:
 
 ---
 
-# 19. ORDEN OFICIAL
+# 20. ORDEN OFICIAL
 
 ```
 0. FUNDACIÓN
@@ -982,13 +1092,13 @@ Cada punto cierra Android + PWA antes de avanzar.
 
 ---
 
-# 20. ESTADO ACTUAL
+# 21. ESTADO ACTUAL
 
 ## Rama de trabajo
 `havana-nice-v2-foundation`
 
-## Último checkpoint técnico conocido antes de esta actualización
-`3c743b7c22441a357b4abf766dee6e582f7fc2cf`
+## Último checkpoint técnico
+`01931bfe26513b021259b4418368534a56d47849`
 
 ## Ya hecho
 - plan de desarrollo vertical;
@@ -1004,16 +1114,20 @@ Cada punto cierra Android + PWA antes de avanzar.
 - decisión API central Worker;
 - decisión FCM Android + Web Push iPhone;
 - decisión de acceso propio y simple;
-- decisión de no reutilizar infraestructura de FAMILIA NOA.
+- decisión de no reutilizar infraestructura de FAMILIA NOA;
+- complemento oficial de Cloudflare instalado y autenticado;
+- acceso directo confirmado a las cuentas Cloudflare autorizadas;
+- lectura de Workers existentes confirmada sin modificar recursos;
+- modo operativo “usuario pide → ChatGPT ejecuta todo → entrega lista” establecido como regla oficial.
 
 ## En curso
-FASE 0 — adaptar completamente el scaffold a Cloudflare.
+FASE 0 — crear y conectar directamente la infraestructura Cloudflare aislada de HAVANA NICE V2.
 
 ## Siguiente paso exacto
-1. crear/validar Worker V2 independiente;
+1. crear directamente desde el complemento oficial de Cloudflare el Worker V2 independiente;
 2. crear D1 V2;
 3. crear R2 V2;
-4. preparar Durable Objects;
+4. crear/configurar Durable Objects;
 5. configurar entorno development;
 6. conectar Android y PWA a `/health`;
 7. generar lockfile;
@@ -1029,7 +1143,7 @@ CHAT 1 — TEXTO BÁSICO Android ↔ iPhone PWA.
 
 ---
 
-# 21. DECISIONES DEFINITIVAS
+# 22. DECISIONES DEFINITIVAS
 
 - Android: nativo.
 - iPhone: PWA premium mientras costo objetivo sea 0 MXN.
@@ -1047,3 +1161,8 @@ CHAT 1 — TEXTO BÁSICO Android ↔ iPhone PWA.
 - Producción actual: intocable.
 - FAMILIA NOA: independiente.
 - No depender de infraestructura de las apps actuales.
+- Cloudflare oficial conectado a ChatGPT es la vía principal de administración de infraestructura.
+- GitHub Actions queda como automatización reproducible de builds/deploys.
+- El usuario no realiza trabajo técnico manual: pide el resultado y ChatGPT ejecuta el ciclo completo.
+- Solo se pide intervención humana cuando una plataforma la exige obligatoriamente y no existe vía API/herramienta conectada.
+- Siempre preferir entregar un resultado listo antes que instrucciones para que el usuario lo construya.
