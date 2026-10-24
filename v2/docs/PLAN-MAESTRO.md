@@ -1131,19 +1131,26 @@ El estado vigente siempre es el HEAD de `havana-nice-v2-foundation`. No fijar es
 - Durable Object SQLite verificado mediante consulta directa exitosa;
 - Worker observability/invocation logs habilitados;
 - Android y PWA apuntan al mismo endpoint Cloudflare `/health`;
-- R2 detectado como no activado en la cuenta; Cloudflare exige checkout inicial desde dashboard y se difiere hasta el módulo de media.
+- R2 detectado como no activado en la cuenta; Cloudflare exige checkout inicial desde dashboard y se difiere hasta el módulo de media;
+- dependencias bloqueadas en `v2/package-lock.json` (lockfile v3);
+- CI reproducible usa `npm ci`;
+- CI Fundación verde: run `40068871342`;
+- CI verifica estructura, dependencias exactas, typecheck, build PWA, export Android, Worker/D1 vivo y Durable Object vivo;
+- Cloudflare Pages V2 creado: `havana-nice-v2-dev`;
+- Pages project ID: `737f5483-cd45-4711-bd97-d2b06fd94313`;
+- URL PWA V2 reservada: `https://havana-nice-v2-dev.pages.dev`;
+- Pages V2 usa rama `havana-nice-v2-foundation`, root `v2`, build `npm ci && npm run build:pwa`, output `apps/pwa/dist`;
+- workflow APK Android creado; build de laboratorio en validación.
 
 ## En curso
-FASE 0 — infraestructura Cloudflare central creada; validación de builds y clientes en curso.
+FASE 0 — infraestructura central y CI reproducible validados; publicación PWA y APK de laboratorio en curso.
 
 ## Siguiente paso exacto
-1. validar CI completo con instalación de dependencias, typecheck, PWA build y Android export;
-2. generar lockfile reproducible;
-3. publicar preview PWA;
-4. producir APK laboratorio;
-5. probar Android físicamente;
-6. probar iPhone PWA físicamente;
-7. cerrar FASE 0.
+1. confirmar primer deploy de Pages V2;
+2. completar y descargar APK Android laboratorio;
+3. probar Android físicamente;
+4. instalar/probar PWA en iPhone físicamente;
+5. cerrar FASE 0.
 
 R2 se activa y crea antes de CHAT 6 — FOTOS, no antes.
 
