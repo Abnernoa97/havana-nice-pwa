@@ -10,11 +10,11 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: havana-nice-v2-foundation-check
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   foundation:
@@ -24,35 +24,18 @@ jobs:
         working-directory: v2
     steps:
       - uses: actions/checkout@v5
-        with:
-          ref: havana-nice-v2-foundation
 
       - uses: actions/setup-node@v5
         with:
           node-version: '22'
+          cache: npm
+          cache-dependency-path: v2/package-lock.json
 
       - name: Validate V2 foundation structure
         run: node scripts/check-structure.mjs
 
-      - name: Install dependencies
-        run: |
-          if [ -f package-lock.json ]; then
-            npm ci
-          else
-            npm install
-          fi
-
-      - name: Commit lockfile once
-        shell: bash
-        run: |
-          set -euo pipefail
-          if git status --porcelain -- package-lock.json | grep -q .; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add package-lock.json
-            git commit -m "Lock HAVANA NICE V2 dependencies"
-            git push origin HEAD:havana-nice-v2-foundation
-          fi
+      - name: Install exact dependencies
+        run: npm ci
 
       - name: Typecheck all workspaces
         run: npm run typecheck
