@@ -1169,15 +1169,29 @@ El estado vigente siempre es el HEAD de `havana-nice-v2-foundation`. No fijar es
 
 - Confirmación expresa 2026-10-24: el usuario indicó «Ya quedó. Seguimos», por lo que FASE 0 se marca CERRADA y se inicia vertical CHAT 1. Se conserva la distinción entre prueba de arranque y prueba real de mensajería (aún no completada).
 
+## CHAT 1 — implementación de laboratorio del 2026-10-24
+- FASE 0 cerrada por confirmación del usuario («Ya quedó. Seguimos»). No confundir prueba de Fundación con prueba de CHAT 1.
+- Backend fuente única `v2/cloudflare/src/index.ts`: ruta `POST /api/chat/session`, `GET /api/chat/messages`, websocket `/ws`; Durable Object `ChatRoom` distribuye mensajes; D1 guarda mensajes e IDs de cliente con restricción `UNIQUE(sender_id,client_message_id)`.
+- Persistencia D1 V2: migraciones `0002_chat_text.sql` y `0003_chat_sessions.sql` aplicadas, tablas `chat_messages` y `chat_sessions` confirmadas. `schema_version` de Fundación se conserva en `foundation-v1`.
+- Acceso LAB: clave aleatoria de alta entropía entregada privadamente al propietario, únicamente su SHA-256 reside en fuente; el Worker compara la huella, genera tokens aleatorios y almacena solo SHA-256 de token + caducidad de 12 horas en D1. NO introducir clave original ni tokens en el repositorio, aplicaciones, logs o documentación. Este acceso temporal NO sustituye el módulo de autenticación final.
+- Worker nuevo V2 `havana-nice-v2-dev` desplegado: versión `70e6084c-9c43-4813-8760-6024656dd91b`, bindings D1 y DO preservados. Nunca tocar el Worker de la app original.
+- Contratos compartidos en `v2/packages/shared/src/index.ts`: sesión, mensaje, lectura de historial, WebSocket y reconciliación/deduplicación.
+- Android `v2/apps/android/App.tsx` + PWA `v2/apps/pwa/src/App.tsx`: entrada por nombre + clave temporal, sala, envío local optimista, recepción realtime, historial y reconexión manual de laboratorio. Reconexión y cola offline automáticas corresponden a CHAT 2.
+- Android release `HAVANA-NICE-V2-CHAT1-ANDROID.apk`: GitHub Actions run `40072538159` — SUCCESS, artifact ID `12551702638`; 67,795,190 bytes; contiene bundle JavaScript del CHAT 1 de 1,261,700 bytes; SHA-256 `69233faeaa40399cfeb880369877494fdf8ddbfc53ffecb333fa1bee79e8eee1`. Requiere instalación y prueba física.
+- PWA `https://havana-nice-v2-dev.pages.dev/`: Pages deployment `2e66b6b6-c378-43ed-a6f9-6274d9c4704f` — SUCCESS sobre commit `39cc2e82ebbe381d0296ae742ff51ca30a9f8513`.
+- CI run `40072987235` — SUCCESS (typecheck, build PWA, export Android, API health, Durable Object health, rechazo HTTP 401 para lectura sin sesión y para código inválido, PWA viva).
+- CHAT 1 aún NO aprobado físicamente: faltan login auténtico con clave, comunicación bidireccional Android/iPhone, mensajes simultáneos, 20 mensajes continuos, abrir/cerrar, cambio de red y verificación de no duplicación. Los checks anteriores validan compilación y protección, pero NO sustituyen esas pruebas.
+- Limitación de laboratorio: el APK release se firma con keystore debug temporal del runner, de modo que actualizar sobre un APK de otra ejecución puede requerir desinstalar SOLO V2. Estabilizar firma antes de distribución general o datos locales permanentes; nunca desinstalar producción.
+
 ## En curso
-FASE 0 — CERRADA POR CONFIRMACIÓN DEL USUARIO el 2026-10-24 («Ya quedó. Seguimos»), tras evidencias físicas Android y PWA con API/D1/realtime correctos. CHAT 1 — TEXTO BÁSICO EN CURSO. Pruebas de mensajería cruzada entre dispositivos aún pendientes.
+FASE 0 CERRADA. CHAT 1 — TEXTO BÁSICO en validación física. Backend, D1, Durable Object, UI Android/PWA, release APK, Pages y CI entregados técnicamente. Pendientes pruebas reales de envío y recepción cruzados. No adelantar CHAT 2 hasta que CHAT 1 pase.
 
 ## Siguiente paso exacto
-1. Implementar CHAT 1 — TEXTO BÁSICO de forma aislada en Worker/D1/Durable Object, cliente compartido, Android y PWA;
-2. validar autenticación de laboratorio (sin credenciales embebidas), envío, deduplicación, orden y realtime;
-3. compilar APK Android release autónomo y desplegar PWA V2;
-4. ejecutar pruebas físicas Android ↔ iPhone PWA en ambos sentidos, 20 mensajes, reconexión y envío simultáneo;
-5. solo tras aprobación física marcar CHAT 1 CERRADO.
+1. Instalar la NUEVA APK CHAT 1 en Android (si hay conflicto de firma, desinstalar SOLO `com.havananice.v2`, jamás producción).
+2. Abrir/actualizar PWA V2 en iPhone y entrar con nombres distintos y la misma clave temporal de laboratorio suministrada en el chat (NO escrita en código).
+3. Enviar Android → iPhone y luego iPhone → Android; comprobar que llegan al instante, sin refresh.
+4. Probar 20 mensajes, envío simultáneo, cierre/arranque, Wi-Fi/datos y ausencia de duplicados; registrar problemas.
+5. Solo cuando el usuario confirme todas las pruebas, marcar CHAT 1 CERRADO y comenzar CHAT 2 — ESTADOS / RECONEXIÓN.
 
 R2 se activa y crea antes de CHAT 6 — FOTOS, no antes.
 
