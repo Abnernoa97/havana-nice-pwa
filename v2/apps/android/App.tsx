@@ -20,7 +20,7 @@ export default function App() {
   const [connection, setConnection] = useState('desconectado');
   const [joining, setJoining] = useState(false);
   const socket = useRef<WebSocket | null>(null);
-  const scroll = useRef<ScrollView | null>(null);
+  const scroll = useRef<React.ElementRef<typeof ScrollView> | null>(null);
 
   useEffect(() => {
     void fetchBackendHealth()
@@ -88,7 +88,7 @@ export default function App() {
 
   return (
     <SafeAreaView style={styles.screen}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F3EDDF" />
+      <StatusBar barStyle="dark-content" />
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={styles.header}>
           <View>
