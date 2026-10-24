@@ -50,7 +50,6 @@ jobs:
           git config user.name "havana-nice-v2-automation"
           git config user.email "actions@users.noreply.github.com"
           git switch --orphan "$DEST_BRANCH"
-          git rm -rf --quiet .
           cp "/tmp/havana-v2-apk/$APK_NAME" "./$APK_NAME"
           printf '%s  %s\n' "$APK_SHA256" "$APK_NAME" > SHA256SUMS.txt
           printf '%s\n' 'HAVANA NICE V2 - isolated Chat 1 Android APK (lab only).' 'Contains no backend secrets. No production application files are stored on this branch.' > README.txt
