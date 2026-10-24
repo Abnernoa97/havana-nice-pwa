@@ -9,6 +9,13 @@ on:
       - '.github/workflows/v2-foundation-check.yml'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: havana-nice-v2-foundation-check
+  cancel-in-progress: true
+
 jobs:
   foundation:
     runs-on: ubuntu-latest
@@ -16,16 +23,16 @@ jobs:
       run:
         working-directory: v2
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '22'
 
       - name: Validate V2 foundation structure
         run: node scripts/check-structure.mjs
 
-      - name: Install dependencies
+      - name: Install dependencies and generate lockfile
         run: npm install
 
       - name: Typecheck all workspaces
@@ -36,3 +43,31 @@ jobs:
 
       - name: Export Android bundle
         run: npm run export -w @havana/android
+
+      - name: Verify live Cloudflare API
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --retry 3 \
+            https://havana-nice-v2-dev.soloaplicaciones97.workers.dev/health \
+            | tee /tmp/havana-health.json
+          grep -q '"ok":true' /tmp/havana-health.json
+          grep -q '"database":"ok"' /tmp/havana-health.json
+          grep -q '"schemaVersion":"foundation-v1"' /tmp/havana-health.json
+
+      - name: Verify live Durable Object
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --retry 3 \
+            https://havana-nice-v2-dev.soloaplicaciones97.workers.dev/realtime/health \
+            | tee /tmp/havana-realtime-health.json
+          grep -q '"ok":true' /tmp/havana-realtime-health.json
+          grep -q '"durableObject":"ChatRoom"' /tmp/havana-realtime-health.json
+
+      - name: Save generated package lock
+        uses: actions/upload-artifact@v4
+        with:
+          name: havana-nice-v2-package-lock
+          path: v2/package-lock.json
+          if-no-files-found: error
