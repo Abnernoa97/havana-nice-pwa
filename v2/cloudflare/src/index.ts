@@ -26,37 +26,34 @@ function trustedOrigin(origin) {
   } catch {}
   return '';
 }
+const LAB_CODE_SHA256 = '42edb4d61f92d416df49b91794149fa65e957e1fb5815e11eee9ab9011847a3e';
 function b64(bytes) {
-  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-function unb64(value) {
-  return Uint8Array.from(atob(value.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - value.length % 4) % 4)), c => c.charCodeAt(0));
+  return btoa(String.fromCharCode(...bytes)).replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');
 }
 function constantEqual(a, b) {
-  const x = encoder.encode(a), y = encoder.encode(b);
-  let result = x.length ^ y.length;
-  for (let i = 0; i < Math.max(x.length, y.length); i++) result |= (x[i] || 0) ^ (y[i] || 0);
+  let result = a.length ^ b.length;
+  for (let i = 0; i < Math.max(a.length, b.length); i++) result |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0);
   return result === 0;
 }
-async function mac(key, value) {
-  const cryptoKey = await crypto.subtle.importKey('raw', encoder.encode(key), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-  return b64(new Uint8Array(await crypto.subtle.sign('HMAC', cryptoKey, encoder.encode(value))));
+async function sha256(value) {
+  return [...new Uint8Array(await crypto.subtle.digest('SHA-256', encoder.encode(value)))].map(x => x.toString(16).padStart(2, '0')).join('');
 }
 async function createSession(env, displayName) {
-  const session = { actorId: crypto.randomUUID(), displayName, exp: Date.now() + 12 * 60 * 60 * 1000 };
-  const payload = b64(encoder.encode(JSON.stringify(session)));
-  return { token: payload + '.' + await mac(env.CHAT_LAB_CODE, payload), actorId: session.actorId, displayName: session.displayName, expiresAt: new Date(session.exp).toISOString() };
+  const actorId = crypto.randomUUID();
+  const token = b64(crypto.getRandomValues(new Uint8Array(32)));
+  const exp = Date.now() + 12 * 60 * 60 * 1000;
+  await env.DB.prepare('INSERT INTO chat_sessions (token_hash, actor_id, display_name, expires_at) VALUES (?, ?, ?, ?)')
+    .bind(await sha256(token), actorId, displayName, exp).run();
+  return { token, actorId, displayName, expiresAt: new Date(exp).toISOString() };
 }
 async function verifySession(env, token) {
-  if (typeof token !== 'string' || token.length > 1500) return null;
-  const [payload, signature, tail] = token.split('.');
-  if (!payload || !signature || tail !== undefined || !env.CHAT_LAB_CODE) return null;
-  const expected = await mac(env.CHAT_LAB_CODE, payload);
-  if (!constantEqual(expected, signature)) return null;
+  if (typeof token !== 'string' || !/^[A-Za-z0-9_-]{40,100}$/.test(token)) return null;
   try {
-    const data = JSON.parse(decoder.decode(unb64(payload)));
-    if (!data || typeof data.actorId !== 'string' || !/^[0-9a-f-]{36}$/.test(data.actorId) || typeof data.displayName !== 'string' || data.displayName.length > 32 || !Number.isFinite(data.exp) || Date.now() >= data.exp) return null;
-    return data;
+    const row = await env.DB.prepare(
+      'SELECT actor_id, display_name, expires_at FROM chat_sessions WHERE token_hash = ?'
+    ).bind(await sha256(token)).first();
+    if (!row || !Number.isFinite(row.expires_at) || row.expires_at <= Date.now()) return null;
+    return { actorId: row.actor_id, displayName: row.display_name, exp: row.expires_at };
   } catch { return null; }
 }
 function mapMessage(row) {
@@ -135,10 +132,10 @@ export default {
     }
     if (url.pathname === '/realtime/health') return env.CHAT_ROOMS.get(env.CHAT_ROOMS.idFromName('foundation-health')).fetch('https://internal/health');
     if (url.pathname === '/api/chat/session' && request.method === 'POST') {
-      if (!env.CHAT_LAB_CODE) return respond({ error: 'Lab chat not configured' }, 503, origin);
+      
       let payload;
       try { payload = await request.json(); } catch { return respond({ error: 'Invalid input' }, 400, origin); }
-      if (typeof payload?.accessCode !== 'string' || payload.accessCode.length > CODE_LENGTH_LIMIT || !constantEqual(payload.accessCode, env.CHAT_LAB_CODE)) return respond({ error: 'Invalid access code' }, 401, origin);
+      if (typeof payload?.accessCode !== 'string' || payload.accessCode.length > CODE_LENGTH_LIMIT || !constantEqual(await sha256(payload.accessCode), LAB_CODE_SHA256)) return respond({ error: 'Invalid access code' }, 401, origin);
       const name = typeof payload.displayName === 'string' ? payload.displayName.trim() : '';
       if (!name || name.length > 28) return respond({ error: 'Name must be 1–28 characters' }, 400, origin);
       return respond(await createSession(env, name), 200, origin);
