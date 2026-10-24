@@ -1,6 +1,6 @@
 # HAVANA NICE V2 — PLAN MAESTRO ÚNICO
 
-**Última actualización:** 2026-10-23  
+**Última actualización:** 2026-10-24  
 **Estado:** FASE 0 — FUNDACIÓN EN CURSO  
 **Costo objetivo permanente:** 0 MXN  
 **Plataformas:** Android nativo + iPhone PWA premium  
@@ -1152,6 +1152,13 @@ El estado vigente siempre es el HEAD de `havana-nice-v2-foundation`. No fijar es
 - PWA estable: `https://havana-nice-v2-dev.pages.dev`;
 - CI Fundación con validación PWA en vivo: run `40069278714` — SUCCESS;
 - PWA incluye manifest standalone y assets de icono HAVANA NICE 192/512.
+- Auditoría de continuidad 2026-10-24: rama, plan completo, APK descargado y SHA-256 del APK comprobados directamente.
+- GitHub Actions V2 última validación verificada sobre commit `d9d6091d917612d9e1bc17331bf90c4bb81e08f0`: run `40069493140` — SUCCESS (incluye comprobaciones en vivo de API, Durable Object y PWA).
+- Cloudflare Pages último deployment verificado sobre ese commit: `48f6457e-3b56-421d-aa00-14be4fb1d9b5` — SUCCESS.
+- D1 consulta directa de lectura confirmó `system_meta.schema_version = foundation-v1`; sin escrituras sobre los datos.
+- Primer APK laboratorio extraído del artifact de GitHub Actions y verificado: `146037722` bytes, SHA-256 `5433f123b31bccf4ae1965fd94eff5a35b2e81834deea57b351e077bb4ba3041`; pendiente confirmar instalación/arranque en Android real.
+- Confirmación física pendiente en Android y en iPhone PWA; NO marcar FASE 0 como cerrada hasta que el usuario compruebe ambos.
+
 
 ## En curso
 FASE 0 — infraestructura, CI, PWA y APK de laboratorio terminados técnicamente; pendiente únicamente prueba física del usuario en Android e iPhone.
