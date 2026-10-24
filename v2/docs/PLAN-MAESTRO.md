@@ -1191,11 +1191,20 @@ El estado vigente siempre es el HEAD de `havana-nice-v2-foundation`. No fijar es
 - La verificación HTTP HEAD de GitHub Actions confirmó respuesta 200 del enlace final. No usar `sandbox:/mnt/data` para la entrega a teléfonos, pues puede fallar la biblioteca de ChatGPT.
 - Este enlace corresponde a la APK compilada de CHAT 1 (67,795,190 bytes), aún pendiente de instalación y pruebas físicas bidireccionales. Para próximas APK se debe actualizar el artefacto publicado en la rama exclusiva de distribución; no publicar binarios en `main`.
 
+## Incidencia CHAT 1 — WebSocket desconectado (24 de octubre de 2026)
+- Las capturas de los dos clientes (Android nativo y PWA) muestran entrada al chat con sesión emitida, pero indicador `desconectado` y botón Enviar inactivo. El fallo era en el establecimiento del WebSocket, no en la instalación APK.
+- Diagnóstico del Worker: se reconstruía la solicitud Upgrade con `new Request(request,{headers})`, se reemplazaba `Sec-WebSocket-Protocol` y el DO no confirmaba explícitamente el subprotocolo. La negociación no estaba validada por ninguna prueba anterior.
+- CORREGIDO SOLO en `v2/cloudflare/src/index.ts` commit `c3f25b2d3403d069b72131c558d2ba8af71a460e`: el Worker autentica y reenvía el Upgrade original intacto al Durable Object; el DO revalida el token de sesión, selecciona `havana-v2` en respuesta 101 y mantiene el mismo modelo de persistencia D1/realtime.
+- Worker V2 `havana-nice-v2-dev` desplegado y confirmado al 100% con versión `8f6e66f3-80c2-4879-ae45-857171d86462`. No requiere recompilar ni reinstalar el APK Android ni cambiar la PWA.
+- **Prueba REAL automatizada sobre Cloudflare en vivo**: GitHub Actions run `40106457975`, SUCCESS. Dos WebSocket simultáneos negociaron `havana-v2`, el emisor y receptor recibieron el mismo mensaje, D1 persistió el evento y `GET /api/chat/messages` autenticado devolvió el mensaje. CI de Fundación posterior al cambio: `40106333983` SUCCESS.
+- Los dos tokens efímeros, sesiones y mensaje generado exclusivamente para QA fueron eliminados de D1; consulta confirmó `0` sesiones y `0` mensajes QA. El workflow temporal de diagnóstico (que contenía credenciales temporales de prueba) se retiró del árbol activo de la rama en commit `b50e8a61bb38f0c19cdb9f893c354f13d42bd4e9`.
+- **Pendiente**: prueba física del usuario tocando `Reconectar` en Android y PWA, verificar `en vivo`, enviar mensajes en ambos sentidos y hacer las pruebas de CHAT 1 pactadas. NO cerrar CHAT 1 solo por CI.
+
 ## En curso
-FASE 0 CERRADA. CHAT 1 — TEXTO BÁSICO en validación física. Backend, D1, Durable Object, UI Android/PWA, release APK, Pages y CI entregados técnicamente. Pendientes pruebas reales de envío y recepción cruzados. No adelantar CHAT 2 hasta que CHAT 1 pase.
+FASE 0 CERRADA. CHAT 1 — TEXTO BÁSICO en validación física. Fallo de handshake WebSocket corregido y comprobado mediante envío realtime automático entre 2 clientes. No requiere nueva APK. Pendiente confirmar en dispositivos físicos que el indicador pasa de «desconectado» a «en vivo» al pulsar Reconectar, y probar el envío y recepción cruzados. No adelantar CHAT 2 hasta confirmación.
 
 ## Siguiente paso exacto
-1. Instalar la NUEVA APK CHAT 1 desde la URL externa directa de la sección anterior (si hay conflicto de firma, desinstalar SOLO `com.havananice.v2`, jamás producción).
+1. Con la APK CHAT 1 ya instalada y la PWA abierta, tocar **Reconectar** en ambas interfaces. No reinstalar; la corrección está en el Worker.
 2. Abrir/actualizar PWA V2 en iPhone y entrar con nombres distintos y la misma clave temporal de laboratorio suministrada en el chat (NO escrita en código).
 3. Enviar Android → iPhone y luego iPhone → Android; comprobar que llegan al instante, sin refresh.
 4. Probar 20 mensajes, envío simultáneo, cierre/arranque, Wi-Fi/datos y ausencia de duplicados; registrar problemas.
