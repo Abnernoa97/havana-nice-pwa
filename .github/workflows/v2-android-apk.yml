@@ -1,0 +1,68 @@
+name: HAVANA NICE V2 Android APK
+
+on:
+  push:
+    branches:
+      - havana-nice-v2-foundation
+    paths:
+      - 'v2/apps/android/**'
+      - 'v2/packages/shared/**'
+      - 'v2/package.json'
+      - 'v2/package-lock.json'
+      - '.github/workflows/v2-android-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: havana-nice-v2-android-apk
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: v2/package-lock.json
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Install exact dependencies
+        working-directory: v2
+        run: npm ci
+
+      - name: Generate native Android project
+        working-directory: v2/apps/android
+        env:
+          CI: '1'
+        run: npx expo prebuild --platform android --clean --no-install
+
+      - name: Build debug APK
+        working-directory: v2/apps/android/android
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleDebug
+
+      - name: Rename APK
+        shell: bash
+        run: |
+          cp v2/apps/android/android/app/build/outputs/apk/debug/app-debug.apk \
+             HAVANA-NICE-V2-FOUNDATION.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: HAVANA-NICE-V2-FOUNDATION-APK
+          path: HAVANA-NICE-V2-FOUNDATION.apk
+          if-no-files-found: error
+          retention-days: 30
