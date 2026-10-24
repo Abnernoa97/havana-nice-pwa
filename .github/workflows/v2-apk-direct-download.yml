@@ -1,0 +1,75 @@
+name: HAVANA NICE V2 direct Android APK distribution
+
+on:
+  push:
+    branches:
+      - havana-nice-v2-foundation
+    paths:
+      - '.github/workflows/v2-apk-direct-download.yml'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish-v2-chat1-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      APK_RUN_ID: '40072538159'
+      APK_ARTIFACT: 'HAVANA-NICE-V2-FOUNDATION-STANDALONE-APK'
+      APK_SHA256: '69233faeaa40399cfeb880369877494fdf8ddbfc53ffecb333fa1bee79e8eee1'
+      DEST_BRANCH: 'havana-nice-v2-apk-downloads'
+      APK_NAME: 'HAVANA-NICE-V2-CHAT1-ANDROID.apk'
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: true
+
+      - name: Fetch previously validated Chat 1 APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/havana-v2-apk
+          gh run download "$APK_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+            --name "$APK_ARTIFACT" --dir /tmp/havana-v2-apk
+          mv /tmp/havana-v2-apk/HAVANA-NICE-V2-FOUNDATION-STANDALONE.apk "/tmp/havana-v2-apk/$APK_NAME"
+          printf '%s  %s\n' "$APK_SHA256" "/tmp/havana-v2-apk/$APK_NAME" | sha256sum --check
+
+      - name: Publish binary ONLY on dedicated V2 downloads branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --heads origin "$DEST_BRANCH" >/dev/null; then
+            echo "Dedicated branch already exists; refusing to overwrite it" >&2
+            exit 1
+          fi
+          git config user.name "havana-nice-v2-automation"
+          git config user.email "actions@users.noreply.github.com"
+          git switch --orphan "$DEST_BRANCH"
+          git rm -rf --quiet .
+          cp "/tmp/havana-v2-apk/$APK_NAME" "./$APK_NAME"
+          printf '%s  %s\n' "$APK_SHA256" "$APK_NAME" > SHA256SUMS.txt
+          printf '%s\n' 'HAVANA NICE V2 - isolated Chat 1 Android APK (lab only).' 'Contains no backend secrets. No production application files are stored on this branch.' > README.txt
+          git add "$APK_NAME" SHA256SUMS.txt README.txt
+          git commit -m "Distribute verified HAVANA NICE V2 Chat 1 Android APK"
+          git -c http.postBuffer=524288000 push origin "HEAD:refs/heads/$DEST_BRANCH"
+
+      - name: Check link availability
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL="https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$DEST_BRANCH/$APK_NAME"
+          for attempt in 1 2 3 4 5; do
+            STATUS=$(curl -L -s -o /dev/null -w '%{http_code}' -I "$URL")
+            if [ "$STATUS" = 200 ]; then
+              echo "DIRECT_APK_URL=$URL"
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "APK committed, but raw delivery verification still pending" >&2
+          exit 1
