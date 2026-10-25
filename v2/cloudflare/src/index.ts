@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { handleChatMedia, mediaReadiness } from './drive-media.js';
 // HAVANA NICE V2 isolated development Worker — Chat 1 laboratory.
 // Runtime JS syntax is intentional: Cloudflare's connected API can deploy this
 // module directly. The permanent typed auth module will replace lab access.
@@ -192,14 +193,19 @@ export default {
     const origin = trustedOrigin(request.headers.get('origin'));
     if (request.method === 'OPTIONS') return new Response(null, {
       status: 204, headers: { 'access-control-allow-origin': origin || 'https://havana-nice-v2-dev.pages.dev',
-        'access-control-allow-methods': 'GET, POST, OPTIONS', 'access-control-allow-headers': 'Authorization, Content-Type',
+        'access-control-allow-methods': 'GET, POST, OPTIONS', 'access-control-allow-headers': 'Authorization, Content-Type, X-Havana-Client-Asset-Id',
         'access-control-max-age': '3600', 'vary': 'Origin' },
     });
     if (request.headers.has('origin') && !origin) return respond({ error: 'Origin not allowed' }, 403);
     if (url.pathname === '/health') {
       let row = null, database = 'error';
       try { row = await env.DB.prepare('SELECT value FROM system_meta WHERE key = ?').bind('schema_version').first(); database = 'ok'; } catch {}
-      return respond({ ok: database === 'ok', app: 'havana-nice-v2', environment: env.HAVANA_ENV || 'development', database, schemaVersion: row?.value ?? null, realtime: 'configured', media: 'pending-r2-enable', chat: 'chat-1-text' }, database === 'ok' ? 200 : 503, origin);
+      return respond({ ok: database === 'ok', app: 'havana-nice-v2', environment: env.HAVANA_ENV || 'development', database, schemaVersion: row?.value ?? null, realtime: 'configured', media: mediaReadiness(env).enabled ? 'google-drive-v2' : 'independent-drive-oauth-pending', chat: 'chat-1-text' }, database === 'ok' ? 200 : 503, origin);
+    }
+    if (url.pathname.startsWith('/api/chat/media/')) {
+      const session = await verifySession(env, (request.headers.get('authorization') || '').replace(/^Bearer\\s+/i, ''));
+      if (!session) return respond({ error: 'Unauthorized' }, 401, origin);
+      return handleChatMedia(request, env, session, url, origin, respond);
     }
     if (url.pathname === '/realtime/health') return env.CHAT_ROOMS.get(env.CHAT_ROOMS.idFromName('foundation-health')).fetch('https://internal/health');
     if (url.pathname === '/api/chat/session' && request.method === 'POST') {
