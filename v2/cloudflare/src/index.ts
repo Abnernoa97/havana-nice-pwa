@@ -9,6 +9,7 @@ const CODE_LENGTH_LIMIT = 256;
 const ROOM = 'main-chat-v2';
 const MAX_TEXT = 2000;
 const MAX_HISTORY = 100;
+const CHAT_EDIT_WINDOW_MS = 15 * 60 * 1000;
 
 function respond(data, status = 200, origin = '') {
   return new Response(JSON.stringify(data), { status, headers: {
@@ -73,7 +74,7 @@ function websocketSessionToken(request) {
 }
 
 function mapMessage(row) {
-  return { seq: row.seq, clientMessageId: row.client_message_id, senderId: row.sender_id, senderName: row.sender_name, text: row.body, sentAt: row.created_at, replyToSeq: row.reply_to_seq ?? null };
+  return {seq:row.seq,clientMessageId:row.client_message_id,senderId:row.sender_id,senderName:row.sender_name,text:row.deleted_at?'':row.body,sentAt:row.created_at,replyToSeq:row.reply_to_seq??null,editedAt:row.edited_at??null,deletedAt:row.deleted_at??null};
 }
 
 export class ChatRoom {
@@ -145,11 +146,57 @@ export class ChatRoom {
       for (const other of this.sockets) if (other !== socket) this.send(other, signal);
       return;
     }
+
+    if (input.type === 'chat.read') {
+      if (!Number.isSafeInteger(input.seq) || input.seq < 1) return;
+      // Never claim a receipt ahead of the persisted server history.
+      const cap = await this.env.DB.prepare('SELECT MAX(seq) AS newest FROM chat_messages').first();
+      const upto = Math.min(input.seq, Number(cap?.newest || 0));
+      if (!upto) return;
+      await this.env.DB.prepare(
+        'INSERT INTO chat_read_receipts(actor_id,display_name,last_read_seq,updated_at) VALUES(?,?,?,?) ' +
+        'ON CONFLICT(actor_id) DO UPDATE SET last_read_seq=MAX(chat_read_receipts.last_read_seq,excluded.last_read_seq), updated_at=excluded.updated_at'
+      ).bind(senderId,senderName,upto,new Date().toISOString()).run();
+      this.broadcast({type:'chat.read',actorId:senderId,displayName:senderName,seq:upto});
+      return;
+    }
+    if (input.type === 'chat.edit' || input.type === 'chat.delete') {
+      if (!Number.isSafeInteger(input.seq) || input.seq <= 0) {
+        this.send(socket,{type:'chat.error',error:'Identificador inválido'});return;
+      }
+      const own = await this.env.DB.prepare(
+        'SELECT seq,sender_id,created_at,deleted_at FROM chat_messages WHERE seq=?'
+      ).bind(input.seq).first();
+      if (!own || own.sender_id !== senderId || own.deleted_at ||
+          Date.now() - Date.parse(own.created_at) > CHAT_EDIT_WINDOW_MS ||
+          !Number.isFinite(Date.parse(own.created_at))) {
+        this.send(socket,{type:'chat.error',error:'No puedes modificar este mensaje'});return;
+      }
+      const now = new Date().toISOString();
+      if (input.type === 'chat.edit') {
+        if (typeof input.text !== 'string' || !input.text.trim() || input.text.trim().length > MAX_TEXT) {
+          this.send(socket,{type:'chat.error',error:'Texto inválido'});return;
+        }
+        await this.env.DB.prepare(
+          'UPDATE chat_messages SET body=?,edited_at=? WHERE seq=? AND sender_id=? AND deleted_at IS NULL'
+        ).bind(input.text.trim(),now,input.seq,senderId).run();
+      } else {
+        await this.env.DB.prepare(
+          "UPDATE chat_messages SET body='',deleted_at=? WHERE seq=? AND sender_id=? AND deleted_at IS NULL"
+        ).bind(now,input.seq,senderId).run();
+        await this.env.DB.prepare('DELETE FROM chat_reactions WHERE message_seq=?').bind(input.seq).run();
+      }
+      const current = await this.env.DB.prepare(
+        'SELECT seq,client_message_id,sender_id,sender_name,body,created_at,reply_to_seq,edited_at,deleted_at FROM chat_messages WHERE seq=?'
+      ).bind(input.seq).first();
+      if (current) this.broadcast({type:'chat.updated',message:mapMessage(current)});
+      return;
+    }
     if (input.type === 'chat.react') {
       if (!Number.isSafeInteger(input.messageSeq) || input.messageSeq < 1 || !['❤️','😂','👍'].includes(input.emoji)) {
         this.send(socket, {type:'chat.error',error:'Invalid reaction'}); return;
       }
-      const exists = await this.env.DB.prepare('SELECT seq FROM chat_messages WHERE seq = ?').bind(input.messageSeq).first();
+      const exists = await this.env.DB.prepare('SELECT seq FROM chat_messages WHERE seq = ? AND deleted_at IS NULL').bind(input.messageSeq).first();
       if (!exists) { this.send(socket,{type:'chat.error',error:'Message not found'}); return; }
       const current = await this.env.DB.prepare('SELECT actor_id FROM chat_reactions WHERE message_seq=? AND actor_id=? AND emoji=?')
         .bind(input.messageSeq,senderId,input.emoji).first();
@@ -178,7 +225,7 @@ export class ChatRoom {
       'INSERT OR IGNORE INTO chat_messages (client_message_id, sender_id, sender_name, body, created_at, reply_to_seq) VALUES (?, ?, ?, ?, ?, ?)'
     ).bind(input.clientMessageId, senderId, senderName, text, new Date().toISOString(), reply).run();
     const row = await this.env.DB.prepare(
-      'SELECT seq, client_message_id, sender_id, sender_name, body, created_at, reply_to_seq FROM chat_messages WHERE sender_id = ? AND client_message_id = ?'
+      'SELECT seq, client_message_id, sender_id, sender_name, body, created_at, reply_to_seq, edited_at, deleted_at FROM chat_messages WHERE sender_id = ? AND client_message_id = ?'
     ).bind(senderId, input.clientMessageId).first();
     if (!row) throw new Error('Persistence failure');
     const event = { type: 'chat.message', message: mapMessage(row) };
@@ -220,14 +267,29 @@ export default {
     if (url.pathname === '/api/chat/messages' && request.method === 'GET') {
       const session = await verifySession(env, (request.headers.get('authorization') || '').replace(/^Bearer\s+/i, ''));
       if (!session) return respond({ error: 'Session expired; enter lab code again' }, 401, origin);
+      const before = url.searchParams.get('beforeSeq');
+      const earlier = before === null ? null : Number(before);
+      if (earlier !== null && (!Number.isSafeInteger(earlier) || earlier < 1)) return respond({error:'Invalid beforeSeq'},400,origin);
+      const search = url.searchParams.get('search');
+      if (search !== null && (search.trim().length < 2 || search.length > 80)) return respond({error:'Search must contain 2–80 characters'},400,origin);
+      if (search !== null) {
+        const needle = '%'+search.trim().replace(/[\\%_]/g,x=>'\\'+x)+'%';
+        const result = await env.DB.prepare(
+          "SELECT seq,client_message_id,sender_id,sender_name,body,created_at,reply_to_seq,edited_at,deleted_at FROM chat_messages WHERE deleted_at IS NULL AND body LIKE ? ESCAPE '\\' ORDER BY seq DESC LIMIT 60"
+        ).bind(needle).all();
+        return respond({messages:(result.results||[]).map(mapMessage).reverse(),hasMore:false,reactions:[]},200,origin);
+      }
       const after = url.searchParams.get('afterSeq');
       const seq = after === null ? null : Number(after);
       if (seq !== null && (!Number.isSafeInteger(seq) || seq < 0)) return respond({ error: 'Invalid cursor' }, 400, origin);
-      const query = seq === null
-        ? env.DB.prepare('SELECT seq, client_message_id, sender_id, sender_name, body, created_at, reply_to_seq FROM chat_messages ORDER BY seq DESC LIMIT ?').bind(MAX_HISTORY)
-        : env.DB.prepare('SELECT seq, client_message_id, sender_id, sender_name, body, created_at, reply_to_seq FROM chat_messages WHERE seq > ? ORDER BY seq ASC LIMIT ?').bind(seq, MAX_HISTORY);
+      if (seq !== null && earlier !== null) return respond({error:'Incompatible cursors'},400,origin);
+      const query = earlier !== null
+        ? env.DB.prepare('SELECT seq,client_message_id,sender_id,sender_name,body,created_at,reply_to_seq,edited_at,deleted_at FROM chat_messages WHERE seq < ? ORDER BY seq DESC LIMIT ?').bind(earlier,MAX_HISTORY)
+        : seq === null
+        ? env.DB.prepare('SELECT seq,client_message_id,sender_id,sender_name,body,created_at,reply_to_seq,edited_at,deleted_at FROM chat_messages ORDER BY seq DESC LIMIT ?').bind(MAX_HISTORY)
+        : env.DB.prepare('SELECT seq,client_message_id,sender_id,sender_name,body,created_at,reply_to_seq,edited_at,deleted_at FROM chat_messages WHERE seq > ? ORDER BY seq ASC LIMIT ?').bind(seq,MAX_HISTORY);
       const rows = (await query.all()).results || [];
-      if (seq === null) rows.reverse();
+      if (seq === null || earlier !== null) rows.reverse();
       const messageSeqs = rows.map(row => row.seq);
       let reactions = [];
       if (messageSeqs.length) {
@@ -236,7 +298,11 @@ export default {
           .bind(...messageSeqs).all();
         reactions = query.results || [];
       }
-      return respond({ messages: rows.map(mapMessage), reactions: reactions.map(r => ({messageSeq:r.message_seq,actorId:r.actor_id,emoji:r.emoji})), hasMore: rows.length === MAX_HISTORY }, 200, origin);
+      const receipts = await env.DB.prepare('SELECT actor_id,display_name,last_read_seq FROM chat_read_receipts WHERE updated_at > ? LIMIT 100')
+        .bind(new Date(Date.now()-7*86400000).toISOString()).all();
+      return respond({ messages: rows.map(mapMessage), reactions: reactions.map(r => ({messageSeq:r.message_seq,actorId:r.actor_id,emoji:r.emoji})),
+        receipts: (receipts.results||[]).map(r => ({actorId:r.actor_id,displayName:r.display_name,seq:r.last_read_seq})),
+        hasMore: rows.length === MAX_HISTORY }, 200, origin);
     }
     if (url.pathname === '/ws') {
       const session = await verifySession(env, websocketSessionToken(request));
