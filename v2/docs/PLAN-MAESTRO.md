@@ -1200,8 +1200,18 @@ El estado vigente siempre es el HEAD de `havana-nice-v2-foundation`. No fijar es
 - Los dos tokens efímeros, sesiones y mensaje generado exclusivamente para QA fueron eliminados de D1; consulta confirmó `0` sesiones y `0` mensajes QA. El workflow temporal de diagnóstico (que contenía credenciales temporales de prueba) se retiró del árbol activo de la rama en commit `b50e8a61bb38f0c19cdb9f893c354f13d42bd4e9`.
 - **Pendiente**: prueba física del usuario tocando `Reconectar` en Android y PWA, verificar `en vivo`, enviar mensajes en ambos sentidos y hacer las pruebas de CHAT 1 pactadas. NO cerrar CHAT 1 solo por CI.
 
+## CHAT 1 — Android nativo: conexión + campo de escritura (2026-10-25)
+- Capturas físicas posteriores al fix del handshake: PWA muestra `en vivo` y mensaje enviado; Android nativo sigue `desconectado` con botón Enviar inactivo. Además, composer (campo de texto + Enviar) invade botones de navegación Android. Esto NO es una validación completa de CHAT 1.
+- En V2 `v2/cloudflare/src/index.ts`: nuevo método compatible con React Native que acepta `Authorization: Bearer <sesión>` en la apertura WebSocket y valida otra vez en Durable Object; conserva sin cambios el acceso anterior de PWA por subprotocolo `session.<token>`. No se admiten credenciales en URL/query string.
+- En V2 `v2/apps/android/App.tsx`: Android utiliza constructor WebSocket nativo con autorización por header y el único protocolo `havana-v2`, en lugar de colocar el token en la lista de protocolos; manejo explícito de errores/cierre y protección contra eventos de sockets obsoletos.
+- Layout Android: espacio inferior de 42dp reservado para navegación de tres botones/edge-to-edge y `softwareKeyboardLayoutMode: resize` en app.json para alzar el composer al abrir teclado. Requiere comprobación visual física.
+- Backend V2 `havana-nice-v2-dev` actualizado a `1dce1f33a6b443ff8923f73ebebafe5b`; se conservaron bindings D1/DO. PWA antigua de V2 y app de producción no se modificaron.
+- Prueba automatizada real: dos conexiones de WebSocket contra Cloudflare (una con encabezado Authorization de Android, otra con subprotocolo PWA), recepción del mismo mensaje y persistencia D1: PASS en GitHub Actions `40171919196`. Los mensajes y sesiones exclusivamente QA eliminados de D1 (0 restantes); workflow temporal retirado del árbol activo.
+- GitHub Actions CI typecheck, build PWA y export Android: run `40171655371` — SUCCESS. Build nativo release `40171655288` iniciado; esperar SUCCESS y publicar APK en rama exclusiva de descargas, sin tocar main.
+- PENDIENTE: descarga de nuevo APK, verificación visual del composer sobre barra Android, envío y recepción Android ↔ PWA en teléfono real; no cerrar CHAT 1 antes de esas pruebas.
+
 ## En curso
-FASE 0 CERRADA. CHAT 1 — TEXTO BÁSICO en validación física. Fallo de handshake WebSocket corregido y comprobado mediante envío realtime automático entre 2 clientes. No requiere nueva APK. Pendiente confirmar en dispositivos físicos que el indicador pasa de «desconectado» a «en vivo» al pulsar Reconectar, y probar el envío y recepción cruzados. No adelantar CHAT 2 hasta confirmación.
+FASE 0 CERRADA. CHAT 1 — TEXTO BÁSICO aún en validación física: PWA en vivo, Android nativo no conectaba y composer invadía barra del sistema. Se corrigió WebSocket nativo mediante encabezado Authorization (backend + App Android), y safe padding/teclado (App Android). Pruebas automáticas del protocolo pasaron; nueva APK y prueba física pendientes. No iniciar CHAT 2.
 
 ## Siguiente paso exacto
 1. Con la APK CHAT 1 ya instalada y la PWA abierta, tocar **Reconectar** en ambas interfaces. No reinstalar; la corrección está en el Worker.
