@@ -39,13 +39,18 @@ export default function App() {
   const typingLast = useRef(0);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const storageQueue = useRef<Promise<void>>(Promise.resolve());
+  const latestDraft = useRef('');
+  const restoredStorage = useRef(false);
+  const draftTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const connectLatest = useRef<(next: ChatSession) => void>(() => {});
   const refreshLatest = useRef<() => void>(() => {});
 
   function persist() {
+    if (!restoredStorage.current) return;
     const value = activeSession.current ? {
       session: activeSession.current,
       outbox: [...outbox.current.values()].map(m => ({...m, deliveryStatus:'queued' as const, pending:true})),
+      draft: latestDraft.current,
     } : null;
     storageQueue.current = storageQueue.current.catch(() => {}).then(() => saveLocalChat(value)).catch(() => {});
   }
@@ -205,6 +210,7 @@ export default function App() {
           if (value.actorId !== next.actorId) {
             setTyping(value.active ? `${value.senderName} está escribiendo…` : '');
             if (typingTimer.current) clearTimeout(typingTimer.current);
+      if (draftTimer.current) clearTimeout(draftTimer.current);
             if (value.active) typingTimer.current = setTimeout(() => setTyping(''), 4200);
           }
         } else if (value.type === 'chat.updated') {
@@ -247,14 +253,19 @@ export default function App() {
   useEffect(() => {
     disposed.current = false;
     void loadLocalChat().then(saved => {
-      if (disposed.current || !saved || !saved.session || Date.parse(saved.session.expiresAt) <= Date.now()) return;
+      restoredStorage.current = true;
+      if(disposed.current)return;
+      if(activeSession.current){persist();return;}
+      if (!saved || !saved.session || Date.parse(saved.session.expiresAt) <= Date.now()) return;
       activeSession.current = saved.session;
       outbox.current = new Map((saved.outbox || []).map(m => [m.clientMessageId,{...m,pending:true,deliveryStatus:'queued' as const}]));
       setMessages([...outbox.current.values()]);
       setSession(saved.session);
+      latestDraft.current = saved.draft || '';
+      setDraft(latestDraft.current);
       setName(saved.session.displayName);
       connectLatest.current(saved.session);
-    }).catch(() => {});
+    }).catch(() => {restoredStorage.current=true;});
     void fetchBackendHealth().then(data => {
       if (!disposed.current) setHealth(data);
     }).catch(() => { if (!disposed.current) setError('No se pudo conectar a la API'); });
@@ -291,6 +302,15 @@ export default function App() {
       if (typingTimer.current) clearTimeout(typingTimer.current);
     };
   }, []);
+
+  useEffect(() => {
+    latestDraft.current = draft;
+    if(!restoredStorage.current || !activeSession.current)return;
+    if(draftTimer.current)clearTimeout(draftTimer.current);
+    draftTimer.current=setTimeout(()=>{draftTimer.current=null;persist();},350);
+    return ()=>{if(draftTimer.current)clearTimeout(draftTimer.current);};
+  },[draft]);
+
 
   useEffect(() => {
     bottom.current?.scrollIntoView({ block: 'end', behavior: 'smooth' });
