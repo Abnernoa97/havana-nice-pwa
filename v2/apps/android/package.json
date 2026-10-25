@@ -12,6 +12,7 @@
   "dependencies": {
     "@havana/shared": "0.0.1",
     "expo": "58.0.14",
+    "expo-sqlite": "~58.0.14",
     "react": "19.3.0",
     "react-native": "0.88.0"
   },
