@@ -6,6 +6,7 @@ import {
   reconcileReactions, reconcileUpdatedMessage, type ChatReaction, type ChatEmoji, type ChatReadReceipt,
 } from '@havana/shared';
 import { loadLocalChat, saveLocalChat } from './local';
+import SwipeMessage from './SwipeMessage';
 
 export default function App() {
   const [health, setHealth] = useState<BackendHealth | null>(null);
@@ -28,6 +29,7 @@ export default function App() {
   const [searchResults, setSearchResults] = useState<ChatMessage[] | null>(null);
   const [searching, setSearching] = useState(false);
   const [editing, setEditing] = useState<ChatMessage | null>(null);
+  const [menuMessage,setMenuMessage] = useState<ChatMessage | null>(null);
   const socket = useRef<WebSocket | null>(null);
   const activeSession = useRef<ChatSession | null>(null);
   const outbox = useRef<Map<string, ChatMessage>>(new Map());
@@ -81,10 +83,17 @@ export default function App() {
     catch(e){setError(e instanceof Error?e.message:'Error de búsqueda');}
     finally {setSearching(false);}
   }
+  function replyToMessage(message:ChatMessage){
+    if(message.seq<1||message.deletedAt)return;
+    setMenuMessage(null);setEditing(null);setReplyTo(message);
+  }
   function updateOwn(message: ChatMessage, deleting = false) {
     if(message.senderId!==session?.actorId || message.seq<1 || message.deletedAt || connection!=='en vivo') return;
-    if (Date.now()-Date.parse(message.sentAt)>15*60*1000) {setError('Solo puedes editar durante 15 minutos');return;}
+    if (Date.now()-Date.parse(message.sentAt)>(deleting?48*60*60*1000:15*60*1000)) {
+      setError(deleting?'El plazo para eliminar terminó':'Solo puedes editar durante 15 minutos');return;
+    }
     if(!deleting){setEditing(message);setDraft(message.text);setReplyTo(null);return;}
+    setError('');
     if(socket.current?.readyState===WebSocket.OPEN)socket.current.send(JSON.stringify({type:'chat.delete',seq:message.seq}));
   }
   function clearAck(id: string) {
@@ -217,6 +226,8 @@ export default function App() {
           }
         } else if (value.type === 'chat.updated') {
           setMessages(before=>reconcileUpdatedMessage(before,value.message));
+          if(value.message.deletedAt)setReactions(before=>before.filter(r=>r.messageSeq!==value.message.seq));
+          setError('');
         } else if (value.type === 'chat.read') {
           setReceipts(before=>[
             ...before.filter(r=>r.actorId!==value.actorId),
@@ -436,31 +447,61 @@ export default function App() {
             {messages.length === 0 && <p className="empty-chat">¡Hola! Escribe el primer mensaje.</p>}
             {(searchResults??messages).map(message => {
               const mine = message.senderId === session.actorId;
-              return <article className={mine ? 'bubble mine' : 'bubble theirs'} key={message.senderId + ':' + message.clientMessageId}>
-                {!mine && <span className="sender">{message.senderName}</span>}
-                {message.replyToSeq && <div className="reply-original">↪ {messages.find(m=>m.seq===message.replyToSeq)?.text.slice(0,55)||`Mensaje #${message.replyToSeq}`}</div>}
-                <div>{message.deletedAt?'Mensaje eliminado':message.text}</div>
-                <span className="message-meta">
-                  {new Date(message.sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  {message.editedAt&&!message.deletedAt?' · editado':''}{mine ? ' · ' + messageDeliveryLabel(message) : ''}{mine&&!message.pending&&lastReadByOther(receipts,session.actorId)>=message.seq?' · leído':''}
-                </span>
-                {message.seq > 0 && !message.deletedAt && <div className="bubble-tools">
-                  <button type="button" onClick={() => setReplyTo(message)}>Responder</button>
-                  {mine && connection==='en vivo' && Date.now()-Date.parse(message.sentAt)<15*60*1000 && <>
-                    <button type="button" onClick={()=>updateOwn(message)}>Editar</button>
-                    <button type="button" onClick={()=>{if(window.confirm('¿Eliminar este mensaje?'))updateOwn(message,true);}}>Eliminar</button>
-                  </>}
-                  {(['❤️','😂','👍'] as ChatEmoji[]).map(emoji => <button type="button" key={emoji} onClick={() => react(message.seq, emoji)}>{emoji} {reactions.filter(r => r.messageSeq === message.seq && r.emoji === emoji).length || ''}</button>)}
+              return <SwipeMessage className={mine?'bubble mine':'bubble theirs'}
+                key={message.senderId+':'+message.clientMessageId}
+                onSwipeRight={()=>replyToMessage(message)}
+                onLongPress={()=>{if(!message.deletedAt)setMenuMessage(message);}}>
+                {!mine&&<span className="sender">{message.senderName}</span>}
+                {message.replyToSeq&&<div className="reply-original">
+                  ↪ {messages.find(m=>m.seq===message.replyToSeq)?.text.slice(0,70)||'Mensaje anterior'}
                 </div>}
-                {mine && message.pending && message.deliveryStatus === 'error' && (
-                  <button type="button" className="retry-message" onClick={() => retryMessage(message.clientMessageId)}>
-                    Reintentar envío
-                  </button>
-                )}
-              </article>;
+                <div className={message.deletedAt?'deleted-message':''}>{message.deletedAt?'Mensaje eliminado':message.text}</div>
+                {message.seq>0&&!message.deletedAt&&reactions.some(r=>r.messageSeq===message.seq)&&
+                  <div className="reaction-counts">
+                    {(['❤️','😂','👍'] as ChatEmoji[])
+                      .filter(emoji=>reactions.some(r=>r.messageSeq===message.seq&&r.emoji===emoji))
+                      .map(emoji=><span key={emoji}>{emoji}{reactions.filter(r=>r.messageSeq===message.seq&&r.emoji===emoji).length}</span>)}
+                  </div>}
+                <span className="message-meta">
+                  {new Date(message.sentAt).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}
+                  {message.editedAt&&!message.deletedAt?' · editado':''}
+                  {mine?' · '+messageDeliveryLabel(message):''}
+                  {mine&&!message.pending&&lastReadByOther(receipts,session.actorId)>=message.seq?' · leído':''}
+                </span>
+                {mine&&message.pending&&message.deliveryStatus==='error'&&
+                  <button type="button" className="retry-message"
+                    onClick={()=>retryMessage(message.clientMessageId)}>Reintentar envío</button>}
+              </SwipeMessage>;
             })}
             <div ref={bottom} />
           </section>
+          {menuMessage&&<div className="message-menu-overlay" onClick={()=>setMenuMessage(null)}>
+            <div className="message-menu" role="dialog" aria-label="Opciones del mensaje"
+              onClick={e=>e.stopPropagation()}>
+              <p className="message-menu-preview">{menuMessage.text.slice(0,100)}</p>
+              <div className="message-menu-emoji">
+                {(['❤️','😂','👍'] as ChatEmoji[]).map(emoji=>
+                  <button type="button" key={emoji} onClick={()=>{react(menuMessage.seq,emoji);setMenuMessage(null);}}>
+                    {emoji}
+                  </button>)}
+              </div>
+              <button type="button" className="message-menu-action" onClick={()=>{
+                const m=menuMessage;setMenuMessage(null);replyToMessage(m);
+              }}>↪ Responder</button>
+              {menuMessage.senderId===session.actorId&&!menuMessage.pending&&connection==='en vivo'&&
+                Date.now()-Date.parse(menuMessage.sentAt)<15*60*1000&&
+                <button type="button" className="message-menu-action" onClick={()=>{
+                  const m=menuMessage;setMenuMessage(null);updateOwn(m);
+                }}>Editar</button>}
+              {menuMessage.senderId===session.actorId&&!menuMessage.pending&&connection==='en vivo'&&
+                Date.now()-Date.parse(menuMessage.sentAt)<48*60*60*1000&&
+                <button type="button" className="message-menu-action dangerous" onClick={()=>{
+                  const m=menuMessage;setMenuMessage(null);
+                  if(window.confirm('¿Eliminar este mensaje para todos?'))updateOwn(m,true);
+                }}>Eliminar para todos</button>}
+              <button type="button" className="message-menu-dismiss" onClick={()=>setMenuMessage(null)}>Cancelar</button>
+            </div>
+          </div>}
           {error && <div className="inline-error" role="alert">{error}</div>}
           {connection !== 'en vivo' && <button className="reconnect" onClick={() => reconnect(session)}>Reintentar conexión</button>}
           {editing && <div className="reply-preview">Editando mensaje <button type="button" onClick={()=>{setEditing(null);setDraft('');}}>Cancelar</button></div>}
