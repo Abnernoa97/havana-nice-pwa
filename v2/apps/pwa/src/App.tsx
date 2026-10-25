@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  fetchBackendHealth, getChatMessages, messageDeliveryLabel, newClientMessageId,
+  fetchBackendHealth, getChatMessages, getChatSnapshot, messageDeliveryLabel, newClientMessageId,
   openChatSocket, reconcileChatMessages, startLabChatSession,
   type BackendHealth, type ChatMessage, type ChatServerEvent, type ChatSession,
+  reconcileReactions, type ChatReaction, type ChatEmoji,
 } from '@havana/shared';
+import { loadLocalChat, saveLocalChat } from './local';
 
 export default function App() {
   const [health, setHealth] = useState<BackendHealth | null>(null);
@@ -15,6 +17,10 @@ export default function App() {
   const [connection, setConnection] = useState('desconectado');
   const [error, setError] = useState('');
   const [joining, setJoining] = useState(false);
+  const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
+  const [reactions, setReactions] = useState<ChatReaction[]>([]);
+  const [onlineUsers, setOnlineUsers] = useState(0);
+  const [typing, setTyping] = useState('');
   const socket = useRef<WebSocket | null>(null);
   const activeSession = useRef<ChatSession | null>(null);
   const outbox = useRef<Map<string, ChatMessage>>(new Map());
@@ -23,9 +29,19 @@ export default function App() {
   const retryCount = useRef(0);
   const disposed = useRef(false);
   const bottom = useRef<HTMLDivElement | null>(null);
+  const typingLast = useRef(0);
+  const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const storageQueue = useRef<Promise<void>>(Promise.resolve());
   const connectLatest = useRef<(next: ChatSession) => void>(() => {});
   const refreshLatest = useRef<() => void>(() => {});
 
+  function persist() {
+    const value = activeSession.current ? {
+      session: activeSession.current,
+      outbox: [...outbox.current.values()].map(m => ({...m, deliveryStatus:'queued' as const, pending:true})),
+    } : null;
+    storageQueue.current = storageQueue.current.catch(() => {}).then(() => saveLocalChat(value)).catch(() => {});
+  }
   function clearAck(id: string) {
     const t = ackTimers.current.get(id);
     if (t) clearTimeout(t);
@@ -35,6 +51,7 @@ export default function App() {
     const original = outbox.current.get(id);
     if (!original) return;
     outbox.current.set(id, { ...original, deliveryStatus: state, failed: state === 'error' });
+    persist();
     setMessages(before => before.map(m =>
       m.clientMessageId === id && m.senderId === original.senderId && m.pending
         ? { ...m, deliveryStatus: state, failed: state === 'error' } : m
@@ -44,6 +61,7 @@ export default function App() {
     if (!message.pending && message.senderId === activeSession.current?.actorId) {
       outbox.current.delete(message.clientMessageId);
       clearAck(message.clientMessageId);
+      persist();
     }
   }
   function pausePending() {
@@ -65,7 +83,7 @@ export default function App() {
     if (!item || item.deliveryStatus !== 'queued') return;
     {
       try {
-        ws.send(JSON.stringify({ type: 'chat.send', clientMessageId: item.clientMessageId, text: item.text }));
+        ws.send(JSON.stringify({ type: 'chat.send', clientMessageId: item.clientMessageId, text: item.text, replyToSeq: item.replyToSeq || null }));
         markOutgoing(item.clientMessageId, 'sending');
         clearAck(item.clientMessageId);
         ackTimers.current.set(item.clientMessageId, setTimeout(() => {
@@ -78,9 +96,10 @@ export default function App() {
     }
   }
   function refresh(next: ChatSession) {
-    void getChatMessages(next).then(history => {
+    void getChatSnapshot(next).then(({messages:history,reactions:reactionHistory}) => {
       if (disposed.current || activeSession.current?.actorId !== next.actorId) return;
       history.forEach(confirm);
+      setReactions(reactionHistory);
       setMessages(before => reconcileChatMessages(before, history));
       flushOutbox();
     }).catch(e => {
@@ -109,6 +128,7 @@ export default function App() {
     old?.close();
     setConnection('conectando…');
     const ws = openChatSocket(next);
+    persist();
     socket.current = ws;
     function retry() {
       if (disposed.current || socket.current !== ws || retryTimer.current ||
@@ -136,7 +156,19 @@ export default function App() {
       if (disposed.current || socket.current !== ws) return;
       try {
         const value = JSON.parse(String(event.data)) as ChatServerEvent;
-        if (value.type === 'chat.message') {
+        if (value.type === 'chat.ready') {
+          setOnlineUsers(value.users?.length || 1);
+        } else if (value.type === 'chat.presence') {
+          setOnlineUsers(value.users.length);
+        } else if (value.type === 'chat.typing') {
+          if (value.actorId !== next.actorId) {
+            setTyping(value.active ? `${value.senderName} está escribiendo…` : '');
+            if (typingTimer.current) clearTimeout(typingTimer.current);
+            if (value.active) typingTimer.current = setTimeout(() => setTyping(''), 4200);
+          }
+        } else if (value.type === 'chat.reaction') {
+          setReactions(before => reconcileReactions(before, value));
+        } else if (value.type === 'chat.message') {
           confirm(value.message);
           setMessages(before => reconcileChatMessages(before, [value.message]));
           flushOutbox();
@@ -164,6 +196,15 @@ export default function App() {
 
   useEffect(() => {
     disposed.current = false;
+    void loadLocalChat().then(saved => {
+      if (disposed.current || !saved || !saved.session || Date.parse(saved.session.expiresAt) <= Date.now()) return;
+      activeSession.current = saved.session;
+      outbox.current = new Map((saved.outbox || []).map(m => [m.clientMessageId,{...m,pending:true,deliveryStatus:'queued' as const}]));
+      setMessages([...outbox.current.values()]);
+      setSession(saved.session);
+      setName(saved.session.displayName);
+      connectLatest.current(saved.session);
+    }).catch(() => {});
     void fetchBackendHealth().then(data => {
       if (!disposed.current) setHealth(data);
     }).catch(() => { if (!disposed.current) setError('No se pudo conectar a la API'); });
@@ -197,6 +238,7 @@ export default function App() {
       ackTimers.current.clear();
       socket.current?.close();
       socket.current = null;
+      if (typingTimer.current) clearTimeout(typingTimer.current);
     };
   }, []);
 
@@ -215,6 +257,7 @@ export default function App() {
       outbox.current.clear();
       setSession(next);
       activeSession.current = next;
+      persist();
       retryCount.current = 0;
       reconnect(next);
     } catch (reason) {
@@ -233,12 +276,27 @@ export default function App() {
     const clientMessageId = newClientMessageId();
     const message: ChatMessage = {
       seq: 0, clientMessageId, senderId: session.actorId, senderName: session.displayName,
-      text, sentAt: new Date().toISOString(), pending: true, deliveryStatus: 'queued',
+      text, sentAt: new Date().toISOString(), pending: true, deliveryStatus: 'queued', replyToSeq: replyTo?.seq || null,
     };
     outbox.current.set(clientMessageId, message);
+    persist();
+    setReplyTo(null);
     setMessages(before => reconcileChatMessages(before, [message]));
     setDraft('');
     flushOutbox();
+  }
+  function react(seq: number, emoji: ChatEmoji) {
+    if (seq > 0 && socket.current?.readyState === WebSocket.OPEN) {
+      socket.current.send(JSON.stringify({type:'chat.react',messageSeq:seq,emoji}));
+    }
+  }
+  function typeText(value: string) {
+    setDraft(value);
+    const now = Date.now();
+    if (now - typingLast.current > 1700 && socket.current?.readyState === WebSocket.OPEN) {
+      typingLast.current = now;
+      socket.current.send(JSON.stringify({type:'chat.typing',active:!!value.trim()}));
+    }
   }
   function retryMessage(id: string) {
     if (!outbox.current.has(id)) return;
@@ -279,7 +337,7 @@ export default function App() {
         <>
           <div className="room-title">
             <span>Conversación de laboratorio</span>
-            <span className="room-user">{session.displayName}</span>
+            <span className="room-user">{typing || `${onlineUsers} en línea · ${session.displayName}`}</span>
           </div>
           <section className="chat-messages" aria-label="Mensajes">
             {messages.length === 0 && <p className="empty-chat">¡Hola! Escribe el primer mensaje.</p>}
@@ -287,11 +345,16 @@ export default function App() {
               const mine = message.senderId === session.actorId;
               return <article className={mine ? 'bubble mine' : 'bubble theirs'} key={message.senderId + ':' + message.clientMessageId}>
                 {!mine && <span className="sender">{message.senderName}</span>}
+                {message.replyToSeq && <div className="reply-original">Responde al mensaje #{message.replyToSeq}</div>}
                 <div>{message.text}</div>
                 <span className="message-meta">
                   {new Date(message.sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   {mine ? ' · ' + messageDeliveryLabel(message) : ''}
                 </span>
+                {message.seq > 0 && <div className="bubble-tools">
+                  <button type="button" onClick={() => setReplyTo(message)}>Responder</button>
+                  {(['❤️','😂','👍'] as ChatEmoji[]).map(emoji => <button type="button" key={emoji} onClick={() => react(message.seq, emoji)}>{emoji} {reactions.filter(r => r.messageSeq === message.seq && r.emoji === emoji).length || ''}</button>)}
+                </div>}
                 {mine && message.pending && message.deliveryStatus === 'error' && (
                   <button type="button" className="retry-message" onClick={() => retryMessage(message.clientMessageId)}>
                     Reintentar envío
@@ -303,8 +366,9 @@ export default function App() {
           </section>
           {error && <div className="inline-error" role="alert">{error}</div>}
           {connection !== 'en vivo' && <button className="reconnect" onClick={() => reconnect(session)}>Reintentar conexión</button>}
+          {replyTo && <div className="reply-preview">Respondiendo a: {replyTo.text.slice(0,65)} <button type="button" onClick={() => setReplyTo(null)}>Cancelar</button></div>}
           <form className="chat-composer" onSubmit={event => { event.preventDefault(); send(); }}>
-            <input aria-label="Escribir mensaje" value={draft} maxLength={2000} onChange={event => setDraft(event.target.value)} placeholder={connection === 'en vivo' ? 'Escribe un mensaje…' : 'Sin conexión: se enviará después…'} />
+            <input aria-label="Escribir mensaje" value={draft} maxLength={2000} onChange={event => typeText(event.target.value)} placeholder={connection === 'en vivo' ? 'Escribe un mensaje…' : 'Sin conexión: se enviará después…'} />
             <button aria-label="Enviar" disabled={!draft.trim()} type="submit">Enviar</button>
           </form>
         </>
