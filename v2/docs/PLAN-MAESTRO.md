@@ -1,7 +1,7 @@
 # HAVANA NICE V2 — PLAN MAESTRO ÚNICO
 
 **Última actualización:** 2026-10-25  
-**Estado:** FASE 0 y CHAT 1 aprobados; paquete CHAT 2/3/4/5 validado parcialmente en dispositivos; CHAT 6 fotos pendiente de activación R2  
+**Estado:** FASE 0 y CHAT 1 aprobados; paquete CHAT 2/3/4/5 validado parcialmente; CHAT 6 fotos se rediseña sin R2 ni suscripciones de pago  
 **Costo objetivo permanente:** 0 MXN  
 **Plataformas:** Android nativo + iPhone PWA premium  
 **Backend oficial:** Cloudflare  
@@ -23,7 +23,7 @@ La nueva app debe:
 - funcionar de forma coherente entre Android e iPhone;
 - permitir fotos, video, audio y push;
 - tener un sistema de acceso pequeño y seguro;
-- mantener costo de infraestructura y distribución en 0 MXN siempre que sea técnicamente posible;
+- tener costo real 0 MXN, sin activaciones de productos de cobro por uso, pagos, suscripciones o tarjetas para habilitar módulos; si una función no puede cumplirlo, ajustar alcance o detenerla;
 - ser administrable y desplegable de forma automatizada;
 - dejar a producción actual completamente fuera de riesgo.
 
@@ -176,9 +176,19 @@ Se pueden estudiar patrones técnicos útiles, pero HAVANA NICE V2 NO compartir�
 - deploy;
 - lógica de producción.
 
-## 3.3 Costo
+## 3.3 Costo — REGLA ABSOLUTA (2026-10-25)
 
-No introducir un servicio de pago como requisito de funcionamiento sin aprobación expresa del usuario.
+**HAVANA NICE 2 debe costar exactamente 0 MXN, sin cobros por uso, sin suscripciones de pago, sin introducir tarjeta ni checkout y sin riesgo automático de excedentes.** El usuario confirmó expresamente «No quiero pagar un peso». Esta regla prevalece sobre cualquier plan técnico previo que dependiera de R2.
+
+- No activar Cloudflare R2: aunque incluye 10 GB-mes, 1M operaciones clase A y 10M clase B gratuitas al mes, es un producto de suscripción con cobro automático por excedentes; no satisface el requisito estricto de 0 MXN.
+- No contratar otros productos de consumo variable, ni activar Workers Paid, ni introducir medios de pago como dependencia de V2.
+- Usar solamente recursos disponibles en el plan realmente gratuito y verificar sus límites antes de desplegar. En D1 Free las operaciones o escrituras se detienen al alcanzar los límites, en lugar de pasar automáticamente al nivel de pago.
+- Cuando un límite gratuito se aproxime, la app debe **rechazar nuevas subidas de forma segura**, mostrar el motivo y nunca intentar una compra o escalado automático.
+- Nunca prometer uso ilimitado o disponibilidad total bajo un presupuesto cero. Si el usuario pide original multimedia grande que no cabe en recursos gratuitos, explicar límites y proponer una versión local/punto a punto sin tarifa.
+- La infraestructura y gastos ajenos a V2 no se alteran; este proyecto no debe generar obligaciones económicas adicionales.
+
+**Alternativa inicial para CHAT 6:** D1 Free aislada de la base de datos de texto cuando sea viable, fotos WebP/JPEG optimizadas y thumbnails bajo límites estrictos. Tamaño BLOB/valor/fila <=2 MB, máximo 500 MB por base de datos D1 Free, con cuota interna de medios deliberadamente inferior al máximo (por ejemplo 100 MB), límites por foto, expiración y controles de acceso. Nunca almacenar originales ilimitados ni usar R2.
+
 
 ## 3.4 Validación
 
@@ -333,20 +343,14 @@ volver a consultar
 mostrar
 ```
 
-## 5.4 R2 — media
+## 5.4 Multimedia — modo estricto 0 MXN (R2 DESCARTADO)
 
-R2 guardará:
+R2 queda descartado para V2 mientras exista riesgo de cargos automáticos. No completar su checkout ni habilitar suscripción R2.
 
-- fotos;
-- videos;
-- audios;
-- thumbnails;
-- posters;
-- archivos de Chat cuando corresponda.
+Para **CHAT 6 fotografías** preparar una base de datos D1 Free V2 aislada, si el cupo real lo permite: imágenes comprimidas al dispositivo (WebP/JPEG), miniaturas de tamaño acotado, acceso privado autenticado por Worker, cuota total y por usuario, caducidad/purga y stop seguro por saturación. D1 Free limita las filas/BLOB a 2 MB y el tamaño de cada base a 500 MB; dimensionar el medio muy por debajo de esos límites. Evitar almacenar archivos originales pesados o mezclar imágenes con mensajes/usuarios si se puede separar.
 
-La base guardará únicamente metadata y referencias.
+Para audio/video posteriores no asumir que D1 puede funcionar como almacén de archivos grandes: investigar flujo local/punto a punto y limitaciones del tier Free. Si no hay solución comprobable con 0 MXN y control estricto, dejar el módulo sin desplegar en vez de introducir cobros.
 
-Los archivos privados no deben depender de una URL pública eterna.
 
 ## 5.5 FCM y Web Push
 
@@ -717,13 +721,13 @@ Android + PWA:
 
 ## CHAT 6 — FOTOS
 
-### R2
-- metadata;
-- tipo;
-- tamaño;
-- thumbnail;
-- estado upload;
-- acceso privado/controlado.
+### Almacenamiento gratuito con límites estrictos (SIN R2)
+- D1 Free V2 aislada y cuota de almacenamiento propia por debajo del techo gratuito, si los recursos y tamaño actual lo permiten;
+- optimizar imágenes y thumbnails en cliente con límites estrictos de bytes y dimensiones;
+- metadata, tipo, tamaño y estado de subida;
+- acceso privado mediante Worker y autorización por sesión;
+- política de eliminación/caducidad; cuando la cuota esté llena, rechazar la nueva subida sin cargos;
+- no aceptar originales grandes ni prometer almacenamiento ilimitado.
 
 ### Android
 - cámara/selector;
@@ -759,7 +763,7 @@ Android + PWA:
 - metadata;
 - thumbnail/poster;
 - duración;
-- upload R2;
+- upload solo si existe una solución de video 0 MXN comprobada, con límites seguros;
 - progreso;
 - cancelación;
 - retry;
@@ -1257,17 +1261,23 @@ El estado vigente siempre es el HEAD de `havana-nice-v2-foundation`. No fijar es
 - Verificación R2 real mediante Cloudflare conectado: `GET /accounts/.../r2/buckets` devolvió **HTTP 403 / código 10042 «Please enable R2 through the Cloudflare Dashboard»**. La conexión ya dispone de permisos R2 read/write; reconectar no resuelve esta prohibición. Solo la activación inicial en el Dashboard oficial por parte del titular desbloquea el almacenamiento R2; NO se intentó bypass ni se cambió producción.
 - Hasta esa autorización, no marcar CHAT 6 listo ni afirmar que fotos se pueden subir. Se conserva el objetivo de paquete consolidado, evitando una APK por corrección menor.
 
+## Bloqueo económico aclarado — 2026-10-25
+- El usuario mostró el checkout «Comenzar con R2» que ofrece uso gratuito mensual y tarifas de excedentes. Reiteró que todo el proyecto debe costar **0 MXN y no pagar absolutamente nada**.
+- Decisión definitiva: NO activar R2 ni aceptar suscripciones que permitan cobros automáticos. El intento anterior de crear bucket falló HTTP 403/10042, sin recursos R2 creados ni pagos iniciados.
+- Diseño sustituto CHAT 6: fotos comprimidas para chat privado y cuotadas en recursos D1 Free **separados de la DB principal si existe cupo disponible**, control server-side de tamaños y almacenamiento, stop al alcanzar cuotas, expiración, acceso privado. Confirmar plan y límites efectivos antes del despliegue. Esta alternativa NO soporta tamaño original ilimitado.
+- No cambiar cuenta de Cloudflare a modalidad de pago, no solicitar tarjeta, no abrir checkout por terceros, ni tocar `main`/producción. 
+
 ## En curso
-FASE 0 cerrada, CHAT 1 aprobado. Paquete CHAT 2/3/4/5 comprobado visualmente en Android y PWA por el usuario el 2026-10-25 (ambos «en vivo», historial, reacciones sincronizadas y controles de respuesta). Pendientes pruebas operativas de responder/escribiendo/offline tras cierre, necesarias para cerrar módulos. CHAT 6 — FOTOS requiere activación inicial R2 en Dashboard (HTTP 403 / 10042); no tocar producción ni ofrecer multimedia hasta desbloqueo.
+FASE 0 cerrada, CHAT 1 aprobado. Paquete CHAT 2/3/4/5 comprobado visualmente en Android y PWA; faltan pruebas específicas de respuestas, typing y cola tras cierre. CHAT 6 — FOTOS REDISEÑADO SIN R2 por decisión definitiva del usuario: 0 MXN sin suscripción ni riesgo de cobros. Evaluar solo D1 Free aislado y subidas comprimidas con límites estrictos; no tocar producción.
 
 ## Siguiente paso exacto
 1. Marcar paquete CHAT 2/3/4/5 como validado visualmente en los dos clientes; NO cerrar pruebas de mensajes offline, respuestas funcionales, typing y sesiones caducadas sin evidencia.
-2. En el Dashboard oficial de Cloudflare, el titular debe activar R2 para la cuenta **Soloaplicaciones**; API R2 confirmó HTTP 403 / 10042 y exige activación inicial manual. No hay solución con permisos o reconexión del conector.
-3. Tras la activación, crear solo bucket privado de HAVANA NICE V2, enlazarlo únicamente a `havana-nice-v2-dev`, diseñar acceso autenticado y preparar CHAT 6 FOTOS Android + PWA.
+2. **NO activar R2 ni completar ningún checkout/suscripción de Cloudflare.** El nivel gratuito de R2 admite facturación de excedentes y no cumple la política 0 MXN estricta.
+3. Auditar límites y cuota real de D1 Free de la cuenta y diseñar almacenamiento privado **aislado para fotos comprimidas** con cuota interna, rechazo por límite y acceso autorizado, sin contratar servicios ni añadir un medio de pago.
 4. Validar fotos en ambos sentidos, varios archivos, red lenta, compresión, vista previa, reconexión y acceso privado antes de declarar CHAT 6 terminado.
 5. Entregar las próximas APK siempre con enlace Markdown exacto **[Descarga directa alternativa]** verificado HTTP 200, manteniendo `main` y producción intactos.
 
-R2 se activa y crea antes de CHAT 6 — FOTOS, no antes.
+R2 NO se activa para V2; CHAT 6 se implementará solo si cabe en recursos gratuitos y límites estrictos.
 
 ## Primer módulo después de FASE 0
 CHAT 1 — TEXTO BÁSICO aprobado para continuidad. CHAT 2 — ESTADOS Y RECONEXIÓN EN CURSO.
@@ -1282,8 +1292,8 @@ CHAT 1 — TEXTO BÁSICO aprobado para continuidad. CHAT 2 — ESTADOS Y RECONEX
 - API: Worker.
 - Datos: D1.
 - Realtime Chat: Durable Objects + WebSockets.
-- Media: R2.
-- R2 se activa solo cuando empiece media; su checkout inicial no bloquea Fundación ni Chat de texto.
+- Fotos: compresión + cuota estricta con D1 Free aislado, sujeto a verificación; SIN R2 y sin checkout.
+- Videos y audios: buscar alternativa estrictamente 0 MXN, o no desplegar el módulo si implica posible facturación.
 - Android push: FCM.
 - iPhone push: Web Push.
 - Auth/permisos: sistema propio pequeño, server-side.
