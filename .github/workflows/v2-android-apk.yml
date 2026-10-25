@@ -10,6 +10,7 @@ on:
       - 'v2/package.json'
       - 'v2/package-lock.json'
       - '.github/workflows/v2-android-apk.yml'
+      - '.github/workflows/v2-apk-direct-download.yml'
   workflow_dispatch:
 
 permissions:
