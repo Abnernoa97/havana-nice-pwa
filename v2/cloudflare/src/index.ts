@@ -56,6 +56,19 @@ async function verifySession(env, token) {
     return { actorId: row.actor_id, displayName: row.display_name, exp: row.expires_at };
   } catch { return null; }
 }
+// Never accept the session from an URL query string (would leak into access logs).
+function websocketSessionToken(request) {
+  const protocols = request.headers.get('sec-websocket-protocol') || '';
+  const offered = protocols.split(',').map(s => s.trim());
+  const browserToken = offered.find(s => s.startsWith('session.'));
+  if (browserToken) return browserToken.slice(8);
+  // Native React Native WebSocket can supply Authorization at handshake time.
+  // Browsers cannot set this header with the WebSocket API.
+  const auth = request.headers.get('authorization') || '';
+  const match = /^Bearer ([A-Za-z0-9_-]{40,100})$/i.exec(auth);
+  return match ? match[1] : '';
+}
+
 function mapMessage(row) {
   return { seq: row.seq, clientMessageId: row.client_message_id, senderId: row.sender_id, senderName: row.sender_name, text: row.body, sentAt: row.created_at };
 }
@@ -71,9 +84,9 @@ export class ChatRoom {
     if ((request.headers.get('upgrade') || '').toLowerCase() !== 'websocket') return respond({ error: 'WebSocket required' }, 426);
     // Authenticated in both Worker and DO, without rebuilding the upgrade Request:
     // cloning the original WebSocket handshake can break protocol upgrade.
-    const protocolHeader = request.headers.get('sec-websocket-protocol') || '';
-    const sessionProtocol = protocolHeader.split(',').map(x => x.trim()).find(x => x.startsWith('session.'));
-    const session = sessionProtocol ? await verifySession(this.env, sessionProtocol.slice(8)) : null;
+    // PWA: session token in offered subprotocol; Android native: Authorization header.
+    // Both modes are checked again inside this Durable Object.
+    const session = await verifySession(this.env, websocketSessionToken(request));
     if (!session) return respond({ error: 'Unauthorized' }, 401);
     const actorId = session.actorId;
     const name = session.displayName;
@@ -164,9 +177,7 @@ export default {
       return respond({ messages: rows.map(mapMessage), hasMore: rows.length === MAX_HISTORY }, 200, origin);
     }
     if (url.pathname === '/ws') {
-      const header = request.headers.get('sec-websocket-protocol') || '';
-      const protocol = header.split(',').map(s => s.trim()).find(s => s.startsWith('session.')) || '';
-      const session = await verifySession(env, protocol.slice(8));
+      const session = await verifySession(env, websocketSessionToken(request));
       if (!session) return respond({ error: 'Unauthorized' }, 401, origin);
       if ((request.headers.get('upgrade') || '').toLowerCase() !== 'websocket') return respond({ error: 'Upgrade required' }, 426, origin);
       // Forward original Upgrade and offered subprotocols unchanged.
