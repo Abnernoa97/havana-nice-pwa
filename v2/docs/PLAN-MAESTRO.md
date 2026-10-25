@@ -1,7 +1,7 @@
 # HAVANA NICE V2 — PLAN MAESTRO ÚNICO
 
 **Última actualización:** 2026-10-25  
-**Estado:** FASE 0 y CHAT 1 aprobados; paquete CHAT 2/3/4/5 validado parcialmente; CHAT 6 fotos se rediseña sin R2 ni suscripciones de pago  
+**Estado:** FASE 0 y CHAT 1 aprobados; paquete CHAT 2/3/4/5 validado parcialmente; CHAT 6 evalúa Google Drive de HAVANA CLOUD con adaptador aislado, sin R2 ni costos  
 **Costo objetivo permanente:** 0 MXN  
 **Plataformas:** Android nativo + iPhone PWA premium  
 **Backend oficial:** Cloudflare  
@@ -187,7 +187,7 @@ Se pueden estudiar patrones técnicos útiles, pero HAVANA NICE V2 NO compartir�
 - Nunca prometer uso ilimitado o disponibilidad total bajo un presupuesto cero. Si el usuario pide original multimedia grande que no cabe en recursos gratuitos, explicar límites y proponer una versión local/punto a punto sin tarifa.
 - La infraestructura y gastos ajenos a V2 no se alteran; este proyecto no debe generar obligaciones económicas adicionales.
 
-**Alternativa inicial para CHAT 6:** D1 Free aislada de la base de datos de texto cuando sea viable, fotos WebP/JPEG optimizadas y thumbnails bajo límites estrictos. Tamaño BLOB/valor/fila <=2 MB, máximo 500 MB por base de datos D1 Free, con cuota interna de medios deliberadamente inferior al máximo (por ejemplo 100 MB), límites por foto, expiración y controles de acceso. Nunca almacenar originales ilimitados ni usar R2.
+**Alternativa preferida en evaluación para CHAT 6:** aprovechar la capacidad gratuita de las cuentas Google Drive que utiliza HAVANA CLOUD, mediante autorización y adaptador independientes de V2, con carpeta privada exclusiva y cuotas estrictas. No utilizar ni modificar el Worker, catálogo, secretos, DO, login u originales de HAVANA CLOUD. D1 V2 almacena metadatos y referencias. Si Drive no puede ofrecer 0 MXN comprobable o no se dispone de autorización independiente, evaluar D1 Free limitado para imágenes comprimidas, nunca R2.
 
 
 ## 3.4 Validación
@@ -347,7 +347,7 @@ mostrar
 
 R2 queda descartado para V2 mientras exista riesgo de cargos automáticos. No completar su checkout ni habilitar suscripción R2.
 
-Para **CHAT 6 fotografías** preparar una base de datos D1 Free V2 aislada, si el cupo real lo permite: imágenes comprimidas al dispositivo (WebP/JPEG), miniaturas de tamaño acotado, acceso privado autenticado por Worker, cuota total y por usuario, caducidad/purga y stop seguro por saturación. D1 Free limita las filas/BLOB a 2 MB y el tamaño de cada base a 500 MB; dimensionar el medio muy por debajo de esos límites. Evitar almacenar archivos originales pesados o mezclar imágenes con mensajes/usuarios si se puede separar.
+Para **CHAT 6 fotografías**, primera opción en evaluación: reutilizar capacidad gratis de Google Drive usada por HAVANA CLOUD (proyecto privado `Abnernoa97/havana-nice-cloud`) a través de un **adaptador y credenciales OAuth propios de V2**, carpeta exclusiva, metadatos en D1 V2, acceso privado autenticado por Worker y cuotas duras. No depender del login por cookie de HAVANA CLOUD, ni extraer/copiar sus refresh tokens o modificar su Worker/catálogo/archivos. Puede requerir consentimiento OAuth del propietario para permitir acceso de V2. Alternativa si no es viable: D1 Free V2 para fotografías reducidas con tamaño por valor/fila y cuota interna muy conservadores, nunca originales grandes. El diseño no garantiza almacenaje ilimitado.
 
 Para audio/video posteriores no asumir que D1 puede funcionar como almacén de archivos grandes: investigar flujo local/punto a punto y limitaciones del tier Free. Si no hay solución comprobable con 0 MXN y control estricto, dejar el módulo sin desplegar en vez de introducir cobros.
 
@@ -722,7 +722,8 @@ Android + PWA:
 ## CHAT 6 — FOTOS
 
 ### Almacenamiento gratuito con límites estrictos (SIN R2)
-- D1 Free V2 aislada y cuota de almacenamiento propia por debajo del techo gratuito, si los recursos y tamaño actual lo permiten;
+- Preferencia: Google Drive de las cuentas ya usadas como destino físico por HAVANA CLOUD, accedido exclusivamente por un **adaptador V2 separado**, carpeta privada V2, autorización OAuth V2 específica y cuotas internas. No modificar la app de nube, su Worker o los originales existentes; nunca exponer datos del chat en su catálogo/galería.
+- Si no hay acceso autorizado sin gastos, alternativa limitada: D1 Free V2 aislada y cuota estricta muy por debajo del techo gratuito, con fotos reducidas;
 - optimizar imágenes y thumbnails en cliente con límites estrictos de bytes y dimensiones;
 - metadata, tipo, tamaño y estado de subida;
 - acceso privado mediante Worker y autorización por sesión;
@@ -1267,15 +1268,24 @@ El estado vigente siempre es el HEAD de `havana-nice-v2-foundation`. No fijar es
 - Diseño sustituto CHAT 6: fotos comprimidas para chat privado y cuotadas en recursos D1 Free **separados de la DB principal si existe cupo disponible**, control server-side de tamaños y almacenamiento, stop al alcanzar cuotas, expiración, acceso privado. Confirmar plan y límites efectivos antes del despliegue. Esta alternativa NO soporta tamaño original ilimitado.
 - No cambiar cuenta de Cloudflare a modalidad de pago, no solicitar tarjeta, no abrir checkout por terceros, ni tocar `main`/producción. 
 
+## Viabilidad de reutilizar almacenamiento HAVANA CLOUD — 2026-10-25
+- Pregunta expresa del usuario: «¿Podemos utilizar la aplicación de HAVANA CLOUD como almacenamiento?» Se inspeccionó en **solo lectura** el repositorio real privado `Abnernoa97/havana-nice-cloud` (rama `main`), `README.md`, `wrangler.jsonc`, `worker/index.ts`, `docs/HAVANA_CLOUD_3_BASELINE.md` y configuración Worker.
+- **Confirmado:** HAVANA CLOUD utiliza Google Drive como almacenamiento físico, Google OAuth y Durable Object `GOOGLE_ACCOUNTS` para tokens/catálogo. Su Worker `havana-nice-cloud` exige sesión privada (cookie), no ofrece una API interaplicaciones de V2 autorizada de forma independiente. No confundir su caché local con storage remoto. El worker conectado muestra bindings `GOOGLE_ACCOUNTS`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (privado) y protección de acceso.
+- **Decisión arquitectónica preliminar**: reutilizar, en la medida de lo posible, **la capacidad física de Google Drive**, no el backend/secretos de producción de HAVANA CLOUD. Construir adaptador propio en `havana-nice-v2-dev`, con OAuth explícito del propietario si es necesario, permiso por archivo `drive.file`, carpeta propia y sin indexación en la galería actual.
+- Google Drive ofrece hasta 15 GB gratuitos por cuenta personal según condiciones de la cuenta y compartidos con Gmail/Photos, pero las cuotas de API son propias y Google anunció facturación de excedentes API más adelante en 2026 para proyectos con facturación. **No prometer que esta integración cuesta siempre 0 MXN sin verificar facturación y establecer límites duros o sin billing habilitado.**
+- NUNCA compartir/copiar refresh tokens ni relajar la autenticación de la nube actual; nunca editar Worker `havana-nice-cloud`, originales, catalogación, ramas de respaldo o main; V2 mantiene metadata y control de acceso propios.
+- Estado: **viabilidad investigada, no implementada ni autorizada**. Crear adaptador de V2 y hacer pruebas controladas únicamente tras garantizar aislamiento, cuotas y consentimiento OAuth si es indispensable.
+
 ## En curso
-FASE 0 cerrada, CHAT 1 aprobado. Paquete CHAT 2/3/4/5 comprobado visualmente en Android y PWA; faltan pruebas específicas de respuestas, typing y cola tras cierre. CHAT 6 — FOTOS REDISEÑADO SIN R2 por decisión definitiva del usuario: 0 MXN sin suscripción ni riesgo de cobros. Evaluar solo D1 Free aislado y subidas comprimidas con límites estrictos; no tocar producción.
+FASE 0 cerrada, CHAT 1 aprobado. Paquete CHAT 2/3/4/5 comprobado visualmente en Android y PWA; faltan pruebas funcionales de respuestas, typing y cola tras cierre. CHAT 6 — FOTOS sin R2 ni pagos: se verificó que HAVANA CLOUD usa múltiples cuentas Google Drive, DO de OAuth y Worker protegido por cookie. Evaluar conexión V2 independiente a Drive con carpeta exclusiva y límites estrictos, sin modificar HAVANA CLOUD ni producción. D1 queda como metadata/respaldo de opción reducida. Integración aún no implementada.
 
 ## Siguiente paso exacto
 1. Marcar paquete CHAT 2/3/4/5 como validado visualmente en los dos clientes; NO cerrar pruebas de mensajes offline, respuestas funcionales, typing y sesiones caducadas sin evidencia.
 2. **NO activar R2 ni completar ningún checkout/suscripción de Cloudflare.** El nivel gratuito de R2 admite facturación de excedentes y no cumple la política 0 MXN estricta.
-3. Auditar límites y cuota real de D1 Free de la cuenta y diseñar almacenamiento privado **aislado para fotos comprimidas** con cuota interna, rechazo por límite y acceso autorizado, sin contratar servicios ni añadir un medio de pago.
-4. Validar fotos en ambos sentidos, varios archivos, red lenta, compresión, vista previa, reconexión y acceso privado antes de declarar CHAT 6 terminado.
-5. Entregar las próximas APK siempre con enlace Markdown exacto **[Descarga directa alternativa]** verificado HTTP 200, manteniendo `main` y producción intactos.
+3. Auditar capacidad disponible y condiciones sin facturación de la(s) cuenta(s) Google Drive de HAVANA CLOUD. Preparar un nuevo adaptador V2 al API Google Drive, con OAuth V2 bajo permiso `drive.file`, carpeta privada exclusiva, límites de API y tamaño, sin usar credenciales, secretos, sesiones ni Worker existentes. Verificar ausencia de facturación automática en el proyecto API. Si no cumple 0 MXN, optar por D1 Free V2 de capacidad limitada.
+4. Mantener el repositorio `Abnernoa97/havana-nice-cloud`, su producción, catálogos, tokens, archivos originales y backups **solo lectura** durante esta integración.
+5. Validar fotos en ambos sentidos, varios archivos, red lenta, compresión, vista previa, reconexión y acceso privado antes de declarar CHAT 6 terminado.
+6. Entregar próximas APK siempre con enlace Markdown exacto **[Descarga directa alternativa]** verificado HTTP 200, manteniendo `main` y producción intactos.
 
 R2 NO se activa para V2; CHAT 6 se implementará solo si cabe en recursos gratuitos y límites estrictos.
 
@@ -1292,7 +1302,7 @@ CHAT 1 — TEXTO BÁSICO aprobado para continuidad. CHAT 2 — ESTADOS Y RECONEX
 - API: Worker.
 - Datos: D1.
 - Realtime Chat: Durable Objects + WebSockets.
-- Fotos: compresión + cuota estricta con D1 Free aislado, sujeto a verificación; SIN R2 y sin checkout.
+- Fotos: Google Drive usado por HAVANA CLOUD como capacidad existente preferida, **solo mediante V2 aislada y OAuth propio**, pendiente de viabilidad y autorización; alternativa D1 Free pequeña. SIN R2, sin checkout y sin tocar la nube actual.
 - Videos y audios: buscar alternativa estrictamente 0 MXN, o no desplegar el módulo si implica posible facturación.
 - Android push: FCM.
 - iPhone push: Web Push.
