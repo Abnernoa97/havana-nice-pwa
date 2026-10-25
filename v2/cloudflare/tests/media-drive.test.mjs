@@ -43,3 +43,28 @@ test('Only strict JPEG, PNG or WebP bytes are accepted; never SVG or GIF',()=>{
   assert.equal(sniffImageMime(new TextEncoder().encode('<svg onload=alert(1)>')),null);
   assert.equal(sniffImageMime(new TextEncoder().encode('GIF89a01234567890')),null);
 });
+
+import { inspectHavanaCloudBridge } from '../src/havana-cloud-bridge-client.js';
+
+test('Havana Cloud bridge is off by default without binding and secret',async()=>{
+  assert.deepEqual(await inspectHavanaCloudBridge({}), {
+    ready:false,provider:'havana-cloud-google-drive',reason:'private_bridge_not_authorized',
+  });
+});
+
+test('Havana Cloud bridge remains closed when provider has not enabled uploads',async()=>{
+  let invoked=0;
+  const result=await inspectHavanaCloudBridge({
+    V2_CLOUD_BRIDGE_ENABLED:'enabled',
+    V2_CLOUD_BRIDGE_SECRET:'x'.repeat(55),
+    HAVANA_CLOUD_BRIDGE: {fetch:async(req,init)=>{
+      invoked++;
+      assert.equal(init.headers['x-havana-v2-internal-token'].length,55);
+      return Response.json({ready:true,eligibleAccounts:2,uploadRouteEnabled:false});
+    }},
+  });
+  assert.equal(invoked,1);
+  assert.equal(result.ready,false);
+  assert.equal(result.eligibleAccounts,2);
+  assert.equal(result.reason,'upload_bridge_not_ready');
+});
