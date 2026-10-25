@@ -4,10 +4,11 @@ import {
   StatusBar, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import {
-  HAVANA_V2_DEV_API_BASE_URL, fetchBackendHealth, getChatMessages, messageDeliveryLabel, newClientMessageId,
-  reconcileChatMessages, startLabChatSession,
-  type ChatMessage, type ChatServerEvent, type ChatSession,
+  HAVANA_V2_DEV_API_BASE_URL, fetchBackendHealth, getChatSnapshot, messageDeliveryLabel, newClientMessageId,
+  reconcileChatMessages, reconcileReactions, startLabChatSession,
+  type ChatMessage, type ChatServerEvent, type ChatSession, type ChatReaction, type ChatEmoji,
 } from '@havana/shared';
+import { loadNativeLocalChat, saveNativeLocalChat } from './chatStorage';
 
 export default function App() {
   const [apiState, setApiState] = useState('conectando…');
@@ -19,6 +20,10 @@ export default function App() {
   const [error, setError] = useState('');
   const [connection, setConnection] = useState('desconectado');
   const [joining, setJoining] = useState(false);
+  const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
+  const [reactions, setReactions] = useState<ChatReaction[]>([]);
+  const [onlineCount, setOnlineCount] = useState(0);
+  const [typing, setTyping] = useState('');
   const socket = useRef<WebSocket | null>(null);
   const scroll = useRef<React.ElementRef<typeof ScrollView> | null>(null);
   const activeSession = useRef<ChatSession | null>(null);
@@ -30,6 +35,17 @@ export default function App() {
   const syncLatest = useRef<() => void>(() => {});
   const outbox = useRef<Map<string, ChatMessage>>(new Map());
   const acknowledgementTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const typingLast = useRef(0);
+  const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const storageQueue = useRef<Promise<void>>(Promise.resolve());
+
+  function persistLocal() {
+    const value = activeSession.current ? {
+      session: activeSession.current,
+      outbox: [...outbox.current.values()].map(m => ({...m,pending:true,deliveryStatus:'queued' as const})),
+    } : null;
+    storageQueue.current = storageQueue.current.catch(() => {}).then(() => saveNativeLocalChat(value)).catch(() => {});
+  }
 
   function clearAck(id: string) {
     const timer = acknowledgementTimers.current.get(id);
@@ -41,6 +57,7 @@ export default function App() {
     if (!message.pending && message.senderId === activeSession.current?.actorId) {
       outbox.current.delete(message.clientMessageId);
       clearAck(message.clientMessageId);
+      persistLocal();
     }
   }
 
@@ -48,6 +65,7 @@ export default function App() {
     const message = outbox.current.get(id);
     if (!message) return;
     outbox.current.set(id, { ...message, deliveryStatus: state, failed: state === 'error' });
+    persistLocal();
     setMessages(existing => existing.map(m =>
       m.clientMessageId === id && m.senderId === message.senderId && m.pending
         ? { ...m, deliveryStatus: state, failed: state === 'error' }
@@ -73,7 +91,7 @@ export default function App() {
     if (!item || item.deliveryStatus !== 'queued') return;
     {
       try {
-        ws.send(JSON.stringify({ type: 'chat.send', clientMessageId: item.clientMessageId, text: item.text }));
+        ws.send(JSON.stringify({ type: 'chat.send', clientMessageId: item.clientMessageId, text: item.text, replyToSeq: item.replyToSeq || null }));
         markOutgoing(item.clientMessageId, 'sending');
         clearAck(item.clientMessageId);
         const id = item.clientMessageId;
@@ -101,10 +119,11 @@ export default function App() {
   }
 
   function syncMessages(next: ChatSession) {
-    void getChatMessages(next)
-      .then(history => {
+    void getChatSnapshot(next)
+      .then(({ messages:history, reactions:historyReactions }) => {
         if (!disposed.current && activeSession.current?.actorId === next.actorId) {
           history.forEach(confirmMessage);
+          setReactions(historyReactions);
           setMessages(before => reconcileChatMessages(before, history));
           flushOutbox();
         }
@@ -123,6 +142,7 @@ export default function App() {
   function connect(next: ChatSession) {
     if (disposed.current) return;
     activeSession.current = next;
+    persistLocal();
     if (Date.parse(next.expiresAt) <= Date.now()) {
       clearRetryTimer();
       for (const timer of acknowledgementTimers.current.values()) clearTimeout(timer);
@@ -130,6 +150,7 @@ export default function App() {
       socket.current?.close();
       socket.current = null;
       activeSession.current = null;
+      persistLocal();
       setSession(null);
       setConnection('desconectado');
       setError('Sesión de laboratorio caducada; vuelve a entrar con tu clave.');
@@ -192,7 +213,19 @@ export default function App() {
       if (disposed.current || socket.current !== ws) return;
       try {
         const item = JSON.parse(String(event.data)) as ChatServerEvent;
-        if (item.type === 'chat.message') {
+        if (item.type === 'chat.ready') {
+          setOnlineCount(item.users?.length || 1);
+        } else if (item.type === 'chat.presence') {
+          setOnlineCount(item.users.length);
+        } else if (item.type === 'chat.typing') {
+          if (item.actorId !== next.actorId) {
+            setTyping(item.active ? item.senderName + ' está escribiendo…' : '');
+            if (typingTimer.current) clearTimeout(typingTimer.current);
+            if (item.active) typingTimer.current = setTimeout(() => setTyping(''), 4300);
+          }
+        } else if (item.type === 'chat.reaction') {
+          setReactions(before => reconcileReactions(before, item));
+        } else if (item.type === 'chat.message') {
           confirmMessage(item.message);
           setMessages(before => reconcileChatMessages(before, [item.message]));
           flushOutbox();
@@ -227,6 +260,16 @@ export default function App() {
 
   useEffect(() => {
     disposed.current = false;
+    void loadNativeLocalChat().then(saved => {
+      if (disposed.current || activeSession.current || !saved?.session ||
+          Date.parse(saved.session.expiresAt) <= Date.now()) return;
+      activeSession.current = saved.session;
+      outbox.current = new Map(saved.outbox.map(m => [m.clientMessageId,{...m,pending:true,deliveryStatus:'queued' as const}]));
+      setMessages([...outbox.current.values()]);
+      setSession(saved.session);
+      setName(saved.session.displayName);
+      connectLatest.current(saved.session);
+    }).catch(() => {});
     void fetchBackendHealth()
       .then(value => { if (!disposed.current) setApiState(value.ok ? 'conectada' : 'error'); })
       .catch(() => { if (!disposed.current) setApiState('error'); });
@@ -257,6 +300,7 @@ export default function App() {
       clearRetryTimer();
       socket.current?.close();
       socket.current = null;
+      if (typingTimer.current) clearTimeout(typingTimer.current);
     };
   }, []);
 
@@ -270,12 +314,27 @@ export default function App() {
       setMessages([]);
       setSession(next);
       activeSession.current = next;
+      persistLocal();
       retryAttempts.current = 0;
       connect(next);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'No se pudo entrar');
     } finally {
       setJoining(false);
+    }
+  }
+
+  function react(seq: number, emoji: ChatEmoji) {
+    if (seq > 0 && socket.current?.readyState === WebSocket.OPEN) {
+      socket.current.send(JSON.stringify({type:'chat.react',messageSeq:seq,emoji}));
+    }
+  }
+  function typeText(value: string) {
+    setDraft(value);
+    const now = Date.now();
+    if (now - typingLast.current > 1700 && socket.current?.readyState === WebSocket.OPEN) {
+      typingLast.current = now;
+      socket.current.send(JSON.stringify({type:'chat.typing',active:!!value.trim()}));
     }
   }
 
@@ -289,9 +348,11 @@ export default function App() {
     const clientMessageId = newClientMessageId();
     const item: ChatMessage = {
       seq: 0, clientMessageId, senderId: session.actorId, senderName: session.displayName,
-      text, sentAt: new Date().toISOString(), pending: true, deliveryStatus: 'queued',
+      text, sentAt: new Date().toISOString(), pending: true, deliveryStatus: 'queued', replyToSeq: replyTo?.seq || null,
     };
     outbox.current.set(clientMessageId, item);
+    persistLocal();
+    setReplyTo(null);
     setMessages(before => reconcileChatMessages(before, [item]));
     setDraft('');
     flushOutbox();
@@ -335,7 +396,7 @@ export default function App() {
           <>
             <View style={styles.room}>
               <Text style={styles.roomTitle}>Conversación de laboratorio</Text>
-              <Text style={styles.roomUser}>{session.displayName}</Text>
+              <Text style={styles.roomUser}>{typing || `${onlineCount} en línea · ${session.displayName}`}</Text>
             </View>
             <ScrollView
               ref={scroll} style={styles.messageList} contentContainerStyle={styles.messages}
@@ -352,7 +413,22 @@ export default function App() {
                     style={[styles.bubble, mine ? styles.mine : styles.theirs]}
                   >
                     {!mine && <Text style={styles.sender}>{message.senderName}</Text>}
+                    {message.replyToSeq ? (
+                      <Text style={[styles.replyLabel, mine && styles.mineMeta]}>↪ {messages.find(m => m.seq === message.replyToSeq)?.text.slice(0,55) || 'Mensaje anterior'}</Text>
+                    ) : null}
                     <Text style={[styles.bubbleText, mine && styles.mineText]}>{message.text}</Text>
+                    {message.seq > 0 ? (
+                      <View style={styles.actions}>
+                        <Pressable onPress={() => setReplyTo(message)} style={styles.actionButton}>
+                          <Text style={[styles.actionText,mine && styles.mineMeta]}>Responder</Text>
+                        </Pressable>
+                        {(['❤️','😂','👍'] as ChatEmoji[]).map(emoji => (
+                          <Pressable key={emoji} onPress={() => react(message.seq,emoji)} style={styles.actionButton}>
+                            <Text style={styles.actionText}>{emoji}{reactions.filter(r => r.messageSeq === message.seq && r.emoji === emoji).length || ''}</Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    ) : null}
                     <Text style={[styles.messageTime, mine && styles.mineMeta]}>
                       {new Date(message.sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       {mine ? ' · ' + messageDeliveryLabel(message) : ''}
@@ -367,10 +443,16 @@ export default function App() {
                 <Text style={styles.reconnectText}>Reintentar conexión</Text>
               </Pressable>
             ) : null}
+            {replyTo ? (
+              <View style={styles.replyPreview}>
+                <Text style={styles.replyPreviewText}>Respondiendo: {replyTo.text.slice(0,65)}</Text>
+                <Pressable onPress={() => setReplyTo(null)}><Text style={styles.replyCancel}>Cancelar</Text></Pressable>
+              </View>
+            ) : null}
             <View style={styles.composer}>
               <TextInput
                 accessibilityLabel="Escribir mensaje" style={styles.draft} value={draft}
-                onChangeText={setDraft} maxLength={2000} multiline
+                onChangeText={typeText} maxLength={2000} multiline
                 placeholder={connection === 'en vivo' ? 'Escribe un mensaje…' : 'Sin conexión: se enviará después…'} placeholderTextColor="#888"
               />
               <Pressable onPress={send} disabled={!draft.trim()} style={styles.sendButton}>
@@ -424,4 +506,11 @@ const styles = StyleSheet.create({
   reconnect: { padding: 11, alignItems: 'center', borderTopWidth: 1, borderColor: '#d6cab9' },
   reconnectText: { fontWeight: '700', color: '#8a5a3c' },
   errorBanner: { color: '#a8322f', fontSize: 12, paddingHorizontal: 20, paddingVertical: 4 },
+  replyLabel: {fontSize:12,color:'#686b66',marginBottom:5},
+  actions: { flexDirection:'row',alignItems:'center',gap:5,marginTop:6 },
+  actionButton: {paddingVertical:5,paddingHorizontal:3},
+  actionText: {fontSize:11,color:'#8d8b81'},
+  replyPreview: {flexDirection:'row',justifyContent:'space-between',paddingHorizontal:18,paddingVertical:8,borderTopWidth:1,borderColor:'#d9cebd'},
+  replyPreviewText: {fontSize:12,color:'#565247',flex:1},
+  replyCancel: {fontSize:12,color:'#8a5a3c',fontWeight:'700'},
 });
