@@ -247,10 +247,10 @@ export default {
     if (url.pathname === '/health') {
       let row = null, database = 'error';
       try { row = await env.DB.prepare('SELECT value FROM system_meta WHERE key = ?').bind('schema_version').first(); database = 'ok'; } catch {}
-      return respond({ ok: database === 'ok', app: 'havana-nice-v2', environment: env.HAVANA_ENV || 'development', database, schemaVersion: row?.value ?? null, realtime: 'configured', media: mediaReadiness(env).enabled ? 'google-drive-v2' : 'independent-drive-oauth-pending', chat: 'chat-1-text' }, database === 'ok' ? 200 : 503, origin);
+      return respond({ ok: database === 'ok', app: 'havana-nice-v2', environment: env.HAVANA_ENV || 'development', database, schemaVersion: row?.value ?? null, realtime: 'configured', media: mediaReadiness(env).enabled ? 'google-drive-v2' : 'havana-cloud-private-bridge-pending', chat: 'text-realtime-replies-reactions-search-edit-read-lab' }, database === 'ok' ? 200 : 503, origin);
     }
     if (url.pathname.startsWith('/api/chat/media/')) {
-      const session = await verifySession(env, (request.headers.get('authorization') || '').replace(/^Bearer\\s+/i, ''));
+      const session = await verifySession(env, (request.headers.get('authorization') || '').replace(/^Bearer\s+/i, ''));
       if (!session) return respond({ error: 'Unauthorized' }, 401, origin);
       return handleChatMedia(request, env, session, url, origin, respond);
     }
