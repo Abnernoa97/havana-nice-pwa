@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  fetchBackendHealth, getChatMessages, getChatSnapshot, messageDeliveryLabel, newClientMessageId,
+  fetchBackendHealth, getChatSnapshot, getOlderChatMessages, searchChatMessages, lastReadByOther, messageDeliveryLabel, newClientMessageId,
   openChatSocket, reconcileChatMessages, startLabChatSession,
   type BackendHealth, type ChatMessage, type ChatServerEvent, type ChatSession,
-  reconcileReactions, type ChatReaction, type ChatEmoji,
+  reconcileReactions, reconcileUpdatedMessage, type ChatReaction, type ChatEmoji, type ChatReadReceipt,
 } from '@havana/shared';
 import { loadLocalChat, saveLocalChat } from './local';
 
@@ -21,6 +21,13 @@ export default function App() {
   const [reactions, setReactions] = useState<ChatReaction[]>([]);
   const [onlineUsers, setOnlineUsers] = useState(0);
   const [typing, setTyping] = useState('');
+  const [receipts, setReceipts] = useState<ChatReadReceipt[]>([]);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<ChatMessage[] | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [editing, setEditing] = useState<ChatMessage | null>(null);
   const socket = useRef<WebSocket | null>(null);
   const activeSession = useRef<ChatSession | null>(null);
   const outbox = useRef<Map<string, ChatMessage>>(new Map());
@@ -41,6 +48,37 @@ export default function App() {
       outbox: [...outbox.current.values()].map(m => ({...m, deliveryStatus:'queued' as const, pending:true})),
     } : null;
     storageQueue.current = storageQueue.current.catch(() => {}).then(() => saveLocalChat(value)).catch(() => {});
+  }
+  function sendReadReceipt(seq: number) {
+    if (seq > 0 && document.visibilityState === 'visible' && socket.current?.readyState === WebSocket.OPEN) {
+      socket.current.send(JSON.stringify({type:'chat.read',seq}));
+    }
+  }
+  async function loadOlder() {
+    if (!session || !hasMore || loadingOlder || !messages.length) return;
+    const oldest = Math.min(...messages.filter(m=>m.seq>0).map(m=>m.seq));
+    if (!Number.isFinite(oldest)) return;
+    setLoadingOlder(true);
+    try {
+      const data=await getOlderChatMessages(session,oldest);
+      setMessages(prev=>reconcileChatMessages(data.messages,prev));
+      setHasMore(data.hasMore);
+      setReactions(prev=>[...data.reactions.filter(x=>!prev.some(y=>y.messageSeq===x.messageSeq&&y.actorId===x.actorId&&y.emoji===x.emoji)),...prev]);
+    } catch(e) { setError(e instanceof Error?e.message:'No se pudo cargar más mensajes'); }
+    finally { setLoadingOlder(false); }
+  }
+  async function runSearch() {
+    if(!session || searchQuery.trim().length < 2) {setSearchResults(null);return;}
+    setSearching(true);
+    try {setSearchResults(await searchChatMessages(session,searchQuery.trim()));}
+    catch(e){setError(e instanceof Error?e.message:'Error de búsqueda');}
+    finally {setSearching(false);}
+  }
+  function updateOwn(message: ChatMessage, deleting = false) {
+    if(message.senderId!==session?.actorId || message.seq<1 || message.deletedAt || connection!=='en vivo') return;
+    if (Date.now()-Date.parse(message.sentAt)>15*60*1000) {setError('Solo puedes editar durante 15 minutos');return;}
+    if(!deleting){setEditing(message);setDraft(message.text);setReplyTo(null);return;}
+    if(socket.current?.readyState===WebSocket.OPEN)socket.current.send(JSON.stringify({type:'chat.delete',seq:message.seq}));
   }
   function clearAck(id: string) {
     const t = ackTimers.current.get(id);
@@ -96,11 +134,14 @@ export default function App() {
     }
   }
   function refresh(next: ChatSession) {
-    void getChatSnapshot(next).then(({messages:history,reactions:reactionHistory}) => {
+    void getChatSnapshot(next).then(({messages:history,reactions:reactionHistory,receipts:readHistory,hasMore:more}) => {
       if (disposed.current || activeSession.current?.actorId !== next.actorId) return;
       history.forEach(confirm);
       setReactions(reactionHistory);
+      setReceipts(readHistory);
+      setHasMore(more);
       setMessages(before => reconcileChatMessages(before, history));
+      sendReadReceipt(Math.max(0,...history.map(m=>m.seq)));
       flushOutbox();
     }).catch(e => {
       if (!disposed.current) setError(e instanceof Error ? e.message : 'Error al sincronizar');
@@ -166,11 +207,20 @@ export default function App() {
             if (typingTimer.current) clearTimeout(typingTimer.current);
             if (value.active) typingTimer.current = setTimeout(() => setTyping(''), 4200);
           }
+        } else if (value.type === 'chat.updated') {
+          setMessages(before=>reconcileUpdatedMessage(before,value.message));
+        } else if (value.type === 'chat.read') {
+          setReceipts(before=>[
+            ...before.filter(r=>r.actorId!==value.actorId),
+            {actorId:value.actorId,displayName:value.displayName,seq:Math.max(
+              value.seq,before.find(r=>r.actorId===value.actorId)?.seq||0)},
+          ]);
         } else if (value.type === 'chat.reaction') {
           setReactions(before => reconcileReactions(before, value));
         } else if (value.type === 'chat.message') {
           confirm(value.message);
           setMessages(before => reconcileChatMessages(before, [value.message]));
+          sendReadReceipt(value.message.seq);
           flushOutbox();
         } else if (value.type === 'chat.error') {
           setError(value.error);
@@ -254,6 +304,9 @@ export default function App() {
       const next = await startLabChatSession(name.trim(), code.trim());
       setCode('');
       setMessages([]);
+      setReceipts([]);
+      setSearchResults(null);
+      setHasMore(false);
       outbox.current.clear();
       setSession(next);
       activeSession.current = next;
@@ -268,6 +321,13 @@ export default function App() {
   }
   function send() {
     const text = draft.trim();
+    if(editing) {
+      if (socket.current?.readyState===WebSocket.OPEN && text && text!==editing.text) {
+        socket.current.send(JSON.stringify({type:'chat.edit',seq:editing.seq,text}));
+      }
+      setEditing(null);setDraft('');
+      return;
+    }
     if (!session || !text) return;
     if (outbox.current.size >= 100) {
       setError('La cola está llena. Reintenta cuando tengas conexión.');
@@ -339,20 +399,34 @@ export default function App() {
             <span>Conversación de laboratorio</span>
             <span className="room-user">{typing || `${onlineUsers} en línea · ${session.displayName}`}</span>
           </div>
+          <div className="chat-search">
+            <input aria-label="Buscar en el chat" placeholder="Buscar mensajes…" value={searchQuery}
+              onChange={e=>{setSearchQuery(e.target.value);if(!e.target.value.trim())setSearchResults(null);}}
+              onKeyDown={e=>{if(e.key==='Enter')void runSearch();}}/>
+            <button type="button" disabled={searching||searchQuery.trim().length<2} onClick={()=>void runSearch()}>{searching?'…':'Buscar'}</button>
+            {searchResults&&<button type="button" onClick={()=>{setSearchResults(null);setSearchQuery('');}}>Cerrar</button>}
+          </div>
           <section className="chat-messages" aria-label="Mensajes">
+            {searchResults===null&&hasMore&&<button type="button" className="load-older" disabled={loadingOlder}
+              onClick={()=>void loadOlder()}>{loadingOlder?'Cargando…':'Cargar mensajes anteriores'}</button>}
+            {searchResults!==null&&<p className="search-count">{searchResults.length} resultado(s) en historial</p>}
             {messages.length === 0 && <p className="empty-chat">¡Hola! Escribe el primer mensaje.</p>}
-            {messages.map(message => {
+            {(searchResults??messages).map(message => {
               const mine = message.senderId === session.actorId;
               return <article className={mine ? 'bubble mine' : 'bubble theirs'} key={message.senderId + ':' + message.clientMessageId}>
                 {!mine && <span className="sender">{message.senderName}</span>}
-                {message.replyToSeq && <div className="reply-original">Responde al mensaje #{message.replyToSeq}</div>}
-                <div>{message.text}</div>
+                {message.replyToSeq && <div className="reply-original">↪ {messages.find(m=>m.seq===message.replyToSeq)?.text.slice(0,55)||`Mensaje #${message.replyToSeq}`}</div>}
+                <div>{message.deletedAt?'Mensaje eliminado':message.text}</div>
                 <span className="message-meta">
                   {new Date(message.sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  {mine ? ' · ' + messageDeliveryLabel(message) : ''}
+                  {message.editedAt&&!message.deletedAt?' · editado':''}{mine ? ' · ' + messageDeliveryLabel(message) : ''}{mine&&!message.pending&&lastReadByOther(receipts,session.actorId)>=message.seq?' · leído':''}
                 </span>
-                {message.seq > 0 && <div className="bubble-tools">
+                {message.seq > 0 && !message.deletedAt && <div className="bubble-tools">
                   <button type="button" onClick={() => setReplyTo(message)}>Responder</button>
+                  {mine && connection==='en vivo' && Date.now()-Date.parse(message.sentAt)<15*60*1000 && <>
+                    <button type="button" onClick={()=>updateOwn(message)}>Editar</button>
+                    <button type="button" onClick={()=>{if(window.confirm('¿Eliminar este mensaje?'))updateOwn(message,true);}}>Eliminar</button>
+                  </>}
                   {(['❤️','😂','👍'] as ChatEmoji[]).map(emoji => <button type="button" key={emoji} onClick={() => react(message.seq, emoji)}>{emoji} {reactions.filter(r => r.messageSeq === message.seq && r.emoji === emoji).length || ''}</button>)}
                 </div>}
                 {mine && message.pending && message.deliveryStatus === 'error' && (
@@ -366,10 +440,11 @@ export default function App() {
           </section>
           {error && <div className="inline-error" role="alert">{error}</div>}
           {connection !== 'en vivo' && <button className="reconnect" onClick={() => reconnect(session)}>Reintentar conexión</button>}
-          {replyTo && <div className="reply-preview">Respondiendo a: {replyTo.text.slice(0,65)} <button type="button" onClick={() => setReplyTo(null)}>Cancelar</button></div>}
+          {editing && <div className="reply-preview">Editando mensaje <button type="button" onClick={()=>{setEditing(null);setDraft('');}}>Cancelar</button></div>}
+          {replyTo && !editing && <div className="reply-preview">Respondiendo a: {replyTo.text.slice(0,65)} <button type="button" onClick={() => setReplyTo(null)}>Cancelar</button></div>}
           <form className="chat-composer" onSubmit={event => { event.preventDefault(); send(); }}>
             <input aria-label="Escribir mensaje" value={draft} maxLength={2000} onChange={event => typeText(event.target.value)} placeholder={connection === 'en vivo' ? 'Escribe un mensaje…' : 'Sin conexión: se enviará después…'} />
-            <button aria-label="Enviar" disabled={!draft.trim()} type="submit">Enviar</button>
+            <button aria-label="Enviar" disabled={!draft.trim()} type="submit">{editing?'Guardar':'Enviar'}</button>
           </form>
         </>
       )}
