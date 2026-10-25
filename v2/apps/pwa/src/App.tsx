@@ -101,6 +101,7 @@ export default function App() {
     activeSession.current = next;
     clearRetry();
     const old = socket.current;
+    if (old) pausePending();
     socket.current = null;
     old?.close();
     setConnection('conectando…');
@@ -109,6 +110,7 @@ export default function App() {
     function retry() {
       if (disposed.current || socket.current !== ws || retryTimer.current ||
           document.visibilityState !== 'visible' || !navigator.onLine) return;
+      pausePending();
       retryCount.current++;
       const delay = Math.min(20000, 1000 * 2 ** Math.min(5, retryCount.current - 1));
       setConnection('reconectando…');
