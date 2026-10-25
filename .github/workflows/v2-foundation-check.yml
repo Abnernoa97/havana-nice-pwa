@@ -81,6 +81,20 @@ jobs:
             --data '{"displayName":"CI validation","accessCode":"not-a-valid-code"}')
           test "$STATUS" = "401"
 
+      - name: Verify native Android WebSocket origin is permitted
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE="https://havana-nice-v2-dev.soloaplicaciones97.workers.dev"
+          OWN_ORIGIN="$BASE"
+          HTTP="$(curl --silent --show-error --output /tmp/v2-native-ws.json --write-out '%{http_code}' \
+            "$BASE/ws" -H "Origin: $OWN_ORIGIN" -H 'Authorization: Bearer fake-native-session')"
+          test "$HTTP" = 401
+          grep -q Unauthorized /tmp/v2-native-ws.json
+          HTTP="$(curl --silent --show-error --output /tmp/v2-external-ws.json --write-out '%{http_code}' \
+            "$BASE/ws" -H "Origin: https://untrusted.example")"
+          test "$HTTP" = 403
+
       - name: Verify live iPhone PWA
         shell: bash
         run: |
