@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  KeyboardAvoidingView, Platform, Pressable, SafeAreaView, ScrollView,
+  AppState, KeyboardAvoidingView, Platform, Pressable, SafeAreaView, ScrollView,
   StatusBar, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import {
@@ -21,27 +21,77 @@ export default function App() {
   const [joining, setJoining] = useState(false);
   const socket = useRef<WebSocket | null>(null);
   const scroll = useRef<React.ElementRef<typeof ScrollView> | null>(null);
+  const activeSession = useRef<ChatSession | null>(null);
+  const appLifecycle = useRef(AppState.currentState);
+  const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const retryAttempts = useRef(0);
+  const disposed = useRef(false);
+  const connectLatest = useRef<(next: ChatSession) => void>(() => {});
+  const syncLatest = useRef<() => void>(() => {});
 
-  useEffect(() => {
-    void fetchBackendHealth()
-      .then(value => setApiState(value.ok ? 'conectada' : 'error'))
-      .catch(() => setApiState('error'));
-    return () => socket.current?.close();
-  }, []);
+  function clearRetryTimer() {
+    if (retryTimer.current) clearTimeout(retryTimer.current);
+    retryTimer.current = null;
+  }
 
-  // React Native (Android) can attach Authorization during its native OkHttp
-  // WebSocket handshake. Avoid putting its token in Sec-WebSocket-Protocol:
-  // that flow is intended only for the browser PWA.
+  function syncMessages(next: ChatSession) {
+    void getChatMessages(next)
+      .then(history => {
+        if (!disposed.current && activeSession.current?.actorId === next.actorId) {
+          setMessages(before => reconcileChatMessages(before, history));
+        }
+      })
+      .catch(reason => {
+        if (!disposed.current && activeSession.current?.actorId === next.actorId) {
+          setError(reason instanceof Error ? reason.message : 'No se pudo actualizar el historial');
+        }
+      });
+  }
+
+  // React Native's Android WebSocket supports Authorization at handshake time.
+  // Do not put secrets in the URL or Sec-WebSocket-Protocol.
   function connect(next: ChatSession) {
-    socket.current?.close();
+    if (disposed.current) return;
+    activeSession.current = next;
+    if (Date.parse(next.expiresAt) <= Date.now()) {
+      clearRetryTimer();
+      socket.current?.close();
+      socket.current = null;
+      activeSession.current = null;
+      setSession(null);
+      setConnection('desconectado');
+      setError('Sesión de laboratorio caducada; vuelve a entrar con tu clave.');
+      return;
+    }
+    clearRetryTimer();
+    const previous = socket.current;
+    socket.current = null; // previous close events cannot race with a new connection
+    previous?.close();
     setConnection('conectando…');
     setError('');
+
     type NativeWebSocketConstructor = new (
       url: string,
       protocols: string[],
       options: { headers: Record<string, string> },
     ) => WebSocket;
     const NativeWebSocket = WebSocket as unknown as NativeWebSocketConstructor;
+
+    function retry() {
+      if (disposed.current || appLifecycle.current !== 'active' || socket.current !== ws ||
+        !activeSession.current || retryTimer.current) return;
+      retryAttempts.current += 1;
+      const delay = Math.min(20000, 1000 * 2 ** Math.min(retryAttempts.current - 1, 5));
+      setConnection('reconectando…');
+      retryTimer.current = setTimeout(() => {
+        retryTimer.current = null;
+        const sessionToRetry = activeSession.current;
+        if (sessionToRetry && appLifecycle.current === 'active') {
+          connectLatest.current(sessionToRetry);
+        }
+      }, delay);
+    }
+
     let ws: WebSocket;
     try {
       ws = new NativeWebSocket(
@@ -51,20 +101,21 @@ export default function App() {
       );
     } catch {
       setConnection('sin conexión');
-      setError('No se pudo iniciar la conexión nativa. Pulsa Reconectar.');
+      // Constructor errors are exceptional; avoid an indefinite retry loop.
+      setError('No se pudo iniciar la conexión. Comprueba la red y pulsa Reconectar.');
       return;
     }
     socket.current = ws;
     ws.onopen = () => {
-      if (socket.current !== ws) return;
+      if (disposed.current || socket.current !== ws) return;
+      retryAttempts.current = 0;
+      clearRetryTimer();
       setConnection('en vivo');
       setError('');
-      void getChatMessages(next)
-        .then(history => setMessages(before => reconcileChatMessages(before, history)))
-        .catch(reason => setError(reason instanceof Error ? reason.message : 'No se pudo cargar el historial'));
+      syncMessages(next); // also recovers messages missed in background
     };
     ws.onmessage = event => {
-      if (socket.current !== ws) return;
+      if (disposed.current || socket.current !== ws) return;
       try {
         const item = JSON.parse(String(event.data)) as ChatServerEvent;
         if (item.type === 'chat.message') {
@@ -77,16 +128,59 @@ export default function App() {
       }
     };
     ws.onerror = () => {
-      if (socket.current !== ws) return;
-      setConnection('sin conexión');
-      setError('No fue posible establecer el WebSocket nativo. Pulsa Reconectar.');
+      if (disposed.current || socket.current !== ws) return;
+      retry();
     };
     ws.onclose = event => {
-      if (socket.current !== ws) return;
-      setConnection('desconectado');
-      setError(`Conexión cerrada (código ${event.code || 'desconocido'}).`);
+      if (disposed.current || socket.current !== ws) return;
+      if (appLifecycle.current === 'active') {
+        retry();
+      } else {
+        setConnection('pausado');
+      }
     };
   }
+
+  // Stable listeners are mounted once. Reconnect on Android foreground,
+  // with a short exponential backoff after unexpected network drops.
+  connectLatest.current = connect;
+  syncLatest.current = () => {
+    if (activeSession.current) syncMessages(activeSession.current);
+  };
+
+  useEffect(() => {
+    disposed.current = false;
+    void fetchBackendHealth()
+      .then(value => { if (!disposed.current) setApiState(value.ok ? 'conectada' : 'error'); })
+      .catch(() => { if (!disposed.current) setApiState('error'); });
+
+    const subscription = AppState.addEventListener('change', state => {
+      appLifecycle.current = state;
+      const currentSession = activeSession.current;
+      if (state === 'active' && currentSession) {
+        const ws = socket.current;
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+          connectLatest.current(currentSession);
+        } else {
+          syncLatest.current();
+        }
+      } else if (state === 'background') {
+        clearRetryTimer();
+        const old = socket.current;
+        socket.current = null;
+        old?.close();
+        if (currentSession) setConnection('pausado');
+      }
+    });
+
+    return () => {
+      disposed.current = true;
+      subscription.remove();
+      clearRetryTimer();
+      socket.current?.close();
+      socket.current = null;
+    };
+  }, []);
 
   async function join() {
     if (!name.trim() || !code.trim() || joining) return;
@@ -97,6 +191,8 @@ export default function App() {
       setCode('');
       setMessages([]);
       setSession(next);
+      activeSession.current = next;
+      retryAttempts.current = 0;
       connect(next);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'No se pudo entrar');
@@ -179,8 +275,8 @@ export default function App() {
             </ScrollView>
             {error ? <Text style={styles.errorBanner}>{error}</Text> : null}
             {connection !== 'en vivo' ? (
-              <Pressable onPress={() => connect(session)} style={styles.reconnect}>
-                <Text style={styles.reconnectText}>Reconectar</Text>
+              <Pressable onPress={() => { retryAttempts.current = 0; connect(session); }} style={styles.reconnect}>
+                <Text style={styles.reconnectText}>Reintentar conexión</Text>
               </Pressable>
             ) : null}
             <View style={styles.composer}>
