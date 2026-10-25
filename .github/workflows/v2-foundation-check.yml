@@ -40,6 +40,9 @@ jobs:
       - name: Typecheck all workspaces
         run: npm run typecheck
 
+      - name: Verify zero-billing Drive adapter safety
+        run: npm run test:media -w @havana/cloudflare
+
       - name: Build iPhone PWA
         run: npm run build:pwa
 
