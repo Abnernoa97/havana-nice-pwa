@@ -307,7 +307,7 @@ export default function App() {
 
         {!session ? (
           <View style={styles.login}>
-            <Text style={styles.overline}>CHAT 1 · TEXTO EN TIEMPO REAL</Text>
+            <Text style={styles.overline}>CHAT 2 · ESTADOS Y RECONEXIÓN</Text>
             <Text style={styles.loginTitle}>Conversemos.</Text>
             <Text style={styles.description}>Una conversación compartida entre Android y iPhone. Laboratorio privado.</Text>
             <Text style={styles.label}>Tu nombre</Text>
@@ -367,7 +367,7 @@ export default function App() {
               <TextInput
                 accessibilityLabel="Escribir mensaje" style={styles.draft} value={draft}
                 onChangeText={setDraft} maxLength={2000} multiline
-                placeholder="Escribe un mensaje…" placeholderTextColor="#888"
+                placeholder={connection === 'en vivo' ? 'Escribe un mensaje…' : 'Sin conexión: se enviará después…'} placeholderTextColor="#888"
               />
               <Pressable onPress={send} disabled={!draft.trim()} style={styles.sendButton}>
                 <Text style={styles.sendText}>Enviar</Text>
