@@ -95,6 +95,8 @@ export interface ChatMessage {
   failed?: boolean;
   deliveryStatus?: 'queued' | 'sending' | 'error' | 'sent';
   replyToSeq?: number | null;
+  editedAt?: string | null;
+  deletedAt?: string | null;
 }
 
 export type ChatServerEvent =
@@ -103,12 +105,38 @@ export type ChatServerEvent =
   | { type: 'chat.error'; error: string }
   | { type: 'chat.presence'; users: ChatOnlineUser[] }
   | { type: 'chat.typing'; actorId: string; senderName: string; active: boolean; expiresAt: number }
-  | { type: 'chat.reaction'; messageSeq: number; actorId: string; emoji: ChatEmoji; active: boolean };
+  | { type: 'chat.reaction'; messageSeq: number; actorId: string; emoji: ChatEmoji; active: boolean }
+  | { type:'chat.updated'; message: ChatMessage }
+  | { type:'chat.read'; actorId:string; displayName:string; seq:number };
 
 export type ChatEmoji = '❤️' | '😂' | '👍';
 export interface ChatOnlineUser { actorId: string; displayName: string }
 export interface ChatReaction { messageSeq: number; actorId: string; emoji: ChatEmoji }
-export interface ChatSnapshot { messages: ChatMessage[]; reactions: ChatReaction[]; hasMore: boolean }
+export interface ChatReadReceipt { actorId: string;displayName:string;seq:number }
+export interface ChatSnapshot { messages: ChatMessage[]; reactions: ChatReaction[]; receipts:ChatReadReceipt[]; hasMore: boolean }
+
+export function reconcileUpdatedMessage(before: ChatMessage[], updated:ChatMessage):ChatMessage[] {
+  return before.map(item => item.seq === updated.seq && updated.seq > 0 ? {...item,...updated,pending:false} : item);
+}
+export function lastReadByOther(reads:ChatReadReceipt[],ownActor:string):number {
+  return Math.max(0,...reads.filter(r=>r.actorId!==ownActor).map(r=>r.seq));
+}
+export async function getOlderChatMessages(session:ChatSession,beforeSeq:number,base=HAVANA_V2_DEV_API_BASE_URL):Promise<ChatSnapshot>{
+  const result=await fetch(`${base}/api/chat/messages?beforeSeq=${encodeURIComponent(String(beforeSeq))}`,{
+    headers:{Authorization:`Bearer ${session.token}`},
+  });
+  const data=await result.json() as ChatSnapshot & {error?:string};
+  if(!result.ok)throw new Error(data.error||'No se pudo cargar más mensajes');
+  return {...data,messages:data.messages||[],reactions:data.reactions||[],receipts:data.receipts||[]};
+}
+export async function searchChatMessages(session:ChatSession,query:string,base=HAVANA_V2_DEV_API_BASE_URL):Promise<ChatMessage[]>{
+  const result=await fetch(`${base}/api/chat/messages?search=${encodeURIComponent(query)}`,{
+    headers:{Authorization:`Bearer ${session.token}`},
+  });
+  const data=await result.json() as ChatSnapshot & {error?:string};
+  if(!result.ok)throw new Error(data.error||'No se pudo buscar');
+  return data.messages||[];
+}
 
 export function reconcileReactions(before: ChatReaction[], event: {messageSeq: number;actorId: string;emoji: ChatEmoji;active: boolean}): ChatReaction[] {
   const kept = before.filter(x => !(x.messageSeq === event.messageSeq && x.actorId === event.actorId && x.emoji === event.emoji));
@@ -119,7 +147,7 @@ export async function getChatSnapshot(session: ChatSession, apiBaseUrl = HAVANA_
   const response = await fetch(`${apiBaseUrl}/api/chat/messages`, { headers: { Authorization: `Bearer ${session.token}` } });
   const data = await response.json() as ChatSnapshot & {error?: string};
   if (!response.ok) throw new Error(data.error || 'Cannot load chat snapshot');
-  return { messages: data.messages || [], reactions: data.reactions || [], hasMore: !!data.hasMore };
+  return { messages: data.messages || [], reactions: data.reactions || [], receipts:data.receipts||[], hasMore: !!data.hasMore };
 }
 
 export async function startLabChatSession(
