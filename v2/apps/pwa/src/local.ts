@@ -3,6 +3,7 @@ import type { ChatMessage, ChatSession } from '@havana/shared';
 export interface LocalChatState {
   session: ChatSession;
   outbox: ChatMessage[];
+  draft?: string;
 }
 const DB = 'havana-nice-v2-lab';
 const STORE = 'chat';
