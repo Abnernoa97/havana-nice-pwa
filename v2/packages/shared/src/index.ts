@@ -98,7 +98,7 @@ export interface ChatMessage {
 }
 
 export type ChatServerEvent =
-  | { type: 'chat.ready'; at: string }
+  | { type: 'chat.ready'; at: string; users?: ChatOnlineUser[] }
   | { type: 'chat.message'; message: ChatMessage }
   | { type: 'chat.error'; error: string }
   | { type: 'chat.presence'; users: ChatOnlineUser[] }
