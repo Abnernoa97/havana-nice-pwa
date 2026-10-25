@@ -36,6 +36,7 @@ export default function App() {
   const retryCount = useRef(0);
   const disposed = useRef(false);
   const bottom = useRef<HTMLDivElement | null>(null);
+  const scrollOlderOnce=useRef(false);
   const typingLast = useRef(0);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const storageQueue = useRef<Promise<void>>(Promise.resolve());
@@ -64,6 +65,7 @@ export default function App() {
     const oldest = Math.min(...messages.filter(m=>m.seq>0).map(m=>m.seq));
     if (!Number.isFinite(oldest)) return;
     setLoadingOlder(true);
+    scrollOlderOnce.current=true;
     try {
       const data=await getOlderChatMessages(session,oldest);
       setMessages(prev=>reconcileChatMessages(data.messages,prev));
@@ -313,6 +315,7 @@ export default function App() {
 
 
   useEffect(() => {
+    if(scrollOlderOnce.current){scrollOlderOnce.current=false;return;}
     bottom.current?.scrollIntoView({ block: 'end', behavior: 'smooth' });
   }, [messages.length]);
 
