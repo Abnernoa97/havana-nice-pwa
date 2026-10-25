@@ -476,30 +476,26 @@ export default function App() {
             <div ref={bottom} />
           </section>
           {menuMessage&&<div className="message-menu-overlay" onClick={()=>setMenuMessage(null)}>
-            <div className="message-menu" role="dialog" aria-label="Opciones del mensaje"
+            <div className="whatsapp-context" role="dialog" aria-label="Acciones del mensaje"
               onClick={e=>e.stopPropagation()}>
-              <p className="message-menu-preview">{menuMessage.text.slice(0,100)}</p>
-              <div className="message-menu-emoji">
-                {(['❤️','😂','👍'] as ChatEmoji[]).map(emoji=>
-                  <button type="button" key={emoji} onClick={()=>{react(menuMessage.seq,emoji);setMenuMessage(null);}}>
+              <div className="whatsapp-reactions">
+                {(['👍','❤️','😂','😮','😢','🙏'] as ChatEmoji[]).map(emoji=>
+                  <button type="button" key={emoji} aria-label={emoji} onClick={()=>{react(menuMessage.seq,emoji);setMenuMessage(null);}}>
                     {emoji}
                   </button>)}
+                <button type="button" aria-label="Cerrar reacciones" onClick={()=>setMenuMessage(null)}>＋</button>
               </div>
-              <button type="button" className="message-menu-action" onClick={()=>{
-                const m=menuMessage;setMenuMessage(null);replyToMessage(m);
-              }}>↪ Responder</button>
-              {menuMessage.senderId===session.actorId&&!menuMessage.pending&&connection==='en vivo'&&
-                Date.now()-Date.parse(menuMessage.sentAt)<15*60*1000&&
-                <button type="button" className="message-menu-action" onClick={()=>{
-                  const m=menuMessage;setMenuMessage(null);updateOwn(m);
-                }}>Editar</button>}
-              {menuMessage.senderId===session.actorId&&!menuMessage.pending&&connection==='en vivo'&&
-                Date.now()-Date.parse(menuMessage.sentAt)<48*60*60*1000&&
-                <button type="button" className="message-menu-action dangerous" onClick={()=>{
-                  const m=menuMessage;setMenuMessage(null);
-                  if(window.confirm('¿Eliminar este mensaje para todos?'))updateOwn(m,true);
-                }}>Eliminar para todos</button>}
-              <button type="button" className="message-menu-dismiss" onClick={()=>setMenuMessage(null)}>Cancelar</button>
+              <div className="whatsapp-actions">
+                {menuMessage.senderId===session.actorId&&!menuMessage.pending&&connection==='en vivo'&&
+                  Date.now()-Date.parse(menuMessage.sentAt)<48*60*60*1000&&
+                  <button type="button" className="whatsapp-delete" onClick={()=>{
+                    const m=menuMessage;setMenuMessage(null);
+                    if(window.confirm('¿Borrar este mensaje para todos?'))updateOwn(m,true);
+                  }}>Borrar</button>}
+                {menuMessage.senderId===session.actorId&&!menuMessage.pending&&connection==='en vivo'&&
+                  Date.now()-Date.parse(menuMessage.sentAt)<15*60*1000&&
+                  <button type="button" onClick={()=>{const m=menuMessage;setMenuMessage(null);updateOwn(m);}}>Editar</button>}
+              </div>
             </div>
           </div>}
           {error && <div className="inline-error" role="alert">{error}</div>}
