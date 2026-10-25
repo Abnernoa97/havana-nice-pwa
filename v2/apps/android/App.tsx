@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Alert, AppState, KeyboardAvoidingView, Platform, Pressable, SafeAreaView, ScrollView,
+  Alert, AppState, KeyboardAvoidingView, Modal, Platform, Pressable, SafeAreaView, ScrollView,
   StatusBar, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import {
@@ -9,6 +9,7 @@ import {
   type ChatMessage, type ChatServerEvent, type ChatSession, type ChatReaction, type ChatEmoji, type ChatReadReceipt,
 } from '@havana/shared';
 import { loadNativeLocalChat, saveNativeLocalChat } from './chatStorage';
+import SwipeableBubble from './SwipeableBubble';
 
 export default function App() {
   const [apiState, setApiState] = useState('conectando…');
@@ -31,6 +32,7 @@ export default function App() {
   const [results,setResults] = useState<ChatMessage[] | null>(null);
   const [searching,setSearching] = useState(false);
   const [editing,setEditing] = useState<ChatMessage | null>(null);
+  const [menuMessage,setMenuMessage] = useState<ChatMessage | null>(null);
   const socket = useRef<WebSocket | null>(null);
   const scroll = useRef<React.ElementRef<typeof ScrollView> | null>(null);
   const autoScroll = useRef(true);
@@ -86,11 +88,23 @@ export default function App() {
     catch(e){setError(e instanceof Error?e.message:'No se pudo buscar');}
     finally{setSearching(false);}
   }
+  function replyToMessage(message:ChatMessage) {
+    if(message.seq<1 || message.deletedAt)return;
+    setMenuMessage(null);
+    setEditing(null);
+    setReplyTo(message);
+  }
+  function showMessageMenu(message:ChatMessage) {
+    if(!message.deletedAt)setMenuMessage(message);
+  }
   function manageOwn(message:ChatMessage,deleting=false){
     if(!session||message.senderId!==session.actorId||message.seq<1||
       message.deletedAt||connection!=='en vivo')return;
-    if(Date.now()-Date.parse(message.sentAt)>900000){setError('El plazo de edición de 15 minutos terminó');return;}
+    if(Date.now()-Date.parse(message.sentAt)>(deleting?48*60*60*1000:900000)){
+      setError(deleting?'El plazo para eliminar terminó':'El plazo de edición de 15 minutos terminó');return;
+    }
     if(!deleting){setReplyTo(null);setEditing(message);setDraft(message.text);return;}
+    setError('');
     socket.current?.send(JSON.stringify({type:'chat.delete',seq:message.seq}));
   }
   function clearAck(id: string) {
@@ -275,6 +289,8 @@ export default function App() {
           }
         } else if (item.type === 'chat.updated') {
           setMessages(before=>reconcileUpdatedMessage(before,item.message));
+          if(item.message.deletedAt)setReactions(before=>before.filter(r=>r.messageSeq!==item.message.seq));
+          setError('');
         } else if (item.type === 'chat.read') {
           setReceipts(before=>[...before.filter(x=>x.actorId!==item.actorId),
             {actorId:item.actorId,displayName:item.displayName,seq:Math.max(item.seq,
@@ -503,49 +519,75 @@ export default function App() {
               {(results??messages).map(message => {
                 const mine = message.senderId === session.actorId;
                 return (
-                  <Pressable
+                  <SwipeableBubble
                     key={message.senderId + ':' + message.clientMessageId}
-                    onPress={() => { if (mine && message.pending && message.deliveryStatus === 'error') retryOutgoing(message.clientMessageId); }}
                     style={[styles.bubble, mine ? styles.mine : styles.theirs]}
+                    onReply={() => replyToMessage(message)}
+                    onLongPress={() => showMessageMenu(message)}
+                    onPress={() => {if(mine && message.pending && message.deliveryStatus==='error')retryOutgoing(message.clientMessageId);}}
                   >
                     {!mine && <Text style={styles.sender}>{message.senderName}</Text>}
                     {message.replyToSeq ? (
-                      <Text style={[styles.replyLabel, mine && styles.mineMeta]}>↪ {messages.find(m => m.seq === message.replyToSeq)?.text.slice(0,55) || 'Mensaje anterior'}</Text>
+                      <Text style={[styles.replyLabel,mine && styles.mineMeta]}>
+                        ↪ {messages.find(m=>m.seq===message.replyToSeq)?.text.slice(0,70)||'Mensaje anterior'}
+                      </Text>
                     ) : null}
-                    <Text style={[styles.bubbleText, mine && styles.mineText]}>{message.deletedAt?'Mensaje eliminado':message.text}</Text>
-                    {message.seq > 0 && !message.deletedAt ? (
-                      <View style={styles.actions}>
-                        <Pressable onPress={() => setReplyTo(message)} style={styles.actionButton}>
-                          <Text style={[styles.actionText,mine && styles.mineMeta]}>Responder</Text>
-                        </Pressable>
-                        {mine && connection==='en vivo' && Date.now()-Date.parse(message.sentAt)<900000 ? (
-                          <>
-                            <Pressable style={styles.actionButton} onPress={()=>manageOwn(message)}>
-                              <Text style={[styles.actionText,mine&&styles.mineMeta]}>Editar</Text>
-                            </Pressable>
-                            <Pressable style={styles.actionButton} onPress={()=>
-                              Alert.alert('Eliminar mensaje','¿Quieres eliminar este mensaje para todos?',[
-                                {text:'Cancelar',style:'cancel'},{text:'Eliminar',style:'destructive',onPress:()=>manageOwn(message,true)},
-                              ])}>
-                              <Text style={[styles.actionText,mine&&styles.mineMeta]}>Eliminar</Text>
-                            </Pressable>
-                          </>
-                        ):null}
-                        {(['❤️','😂','👍'] as ChatEmoji[]).map(emoji => (
-                          <Pressable key={emoji} onPress={() => react(message.seq,emoji)} style={styles.actionButton}>
-                            <Text style={styles.actionText}>{emoji}{reactions.filter(r => r.messageSeq === message.seq && r.emoji === emoji).length || ''}</Text>
-                          </Pressable>
+                    <Text style={[styles.bubbleText,mine && styles.mineText,message.deletedAt && styles.deletedText]}>
+                      {message.deletedAt?'Mensaje eliminado':message.text}
+                    </Text>
+                    {message.seq>0 && !message.deletedAt && reactions.some(r=>r.messageSeq===message.seq) ? (
+                      <View style={styles.reactionBadges}>
+                        {(['❤️','😂','👍'] as ChatEmoji[]).filter(emoji=>reactions.some(r=>r.messageSeq===message.seq&&r.emoji===emoji)).map(emoji=>(
+                          <Text key={emoji} style={styles.reactionBadge}>
+                            {emoji}{reactions.filter(r=>r.messageSeq===message.seq&&r.emoji===emoji).length}
+                          </Text>
                         ))}
                       </View>
-                    ) : null}
-                    <Text style={[styles.messageTime, mine && styles.mineMeta]}>
-                      {new Date(message.sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      {message.editedAt&&!message.deletedAt?' · editado':''}{mine?' · '+messageDeliveryLabel(message):''}{mine&&!message.pending&&lastReadByOther(receipts,session.actorId)>=message.seq?' · leído':''}
+                    ):null}
+                    <Text style={[styles.messageTime,mine && styles.mineMeta]}>
+                      {new Date(message.sentAt).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}
+                      {message.editedAt&&!message.deletedAt?' · editado':''}
+                      {mine?' · '+messageDeliveryLabel(message):''}
+                      {mine&&!message.pending&&lastReadByOther(receipts,session.actorId)>=message.seq?' · leído':''}
                     </Text>
-                  </Pressable>
+                  </SwipeableBubble>
                 );
               })}
             </ScrollView>
+            <Modal animationType="fade" transparent visible={!!menuMessage}
+              onRequestClose={()=>setMenuMessage(null)}>
+              <Pressable style={styles.menuBackdrop} onPress={()=>setMenuMessage(null)}>
+                {menuMessage ? <Pressable style={styles.menuSheet} onPress={()=>{}}>
+                  <Text style={styles.menuTitle} numberOfLines={2}>{menuMessage.text}</Text>
+                  <View style={styles.menuEmojiRow}>
+                    {(['❤️','😂','👍'] as ChatEmoji[]).map(emoji=>(
+                      <Pressable key={emoji} style={styles.menuEmoji} onPress={()=>{
+                        react(menuMessage.seq,emoji);setMenuMessage(null);
+                      }}><Text style={styles.menuEmojiText}>{emoji}</Text></Pressable>
+                    ))}
+                  </View>
+                  <Pressable style={styles.menuOption} onPress={()=>{
+                    const m=menuMessage;setMenuMessage(null);replyToMessage(m);
+                  }}><Text style={styles.menuOptionText}>↪  Responder</Text></Pressable>
+                  {menuMessage.senderId===session.actorId && !menuMessage.pending &&
+                    Date.now()-Date.parse(menuMessage.sentAt)<900000 ? (
+                    <Pressable style={styles.menuOption} onPress={()=>{
+                      const m=menuMessage;setMenuMessage(null);manageOwn(m);
+                    }}><Text style={styles.menuOptionText}>✎  Editar</Text></Pressable>
+                  ):null}
+                  {menuMessage.senderId===session.actorId && !menuMessage.pending &&
+                    Date.now()-Date.parse(menuMessage.sentAt)<48*60*60*1000 ? (
+                    <Pressable style={styles.menuOption} onPress={()=>{
+                      const m=menuMessage;setMenuMessage(null);
+                      Alert.alert('Eliminar mensaje','¿Eliminar para todos los participantes?',[
+                        {text:'Cancelar',style:'cancel'},
+                        {text:'Eliminar para todos',style:'destructive',onPress:()=>manageOwn(m,true)},
+                      ]);
+                    }}><Text style={styles.deleteMenuText}>Eliminar para todos</Text></Pressable>
+                  ):null}
+                </Pressable>:null}
+              </Pressable>
+            </Modal>
             {error ? <Text style={styles.errorBanner}>{error}</Text> : null}
             {connection !== 'en vivo' ? (
               <Pressable onPress={() => { retryAttempts.current = 0; connect(session); }} style={styles.reconnect}>
@@ -628,6 +670,18 @@ const styles = StyleSheet.create({
   reconnect: { padding: 11, alignItems: 'center', borderTopWidth: 1, borderColor: '#d6cab9' },
   reconnectText: { fontWeight: '700', color: '#8a5a3c' },
   errorBanner: { color: '#a8322f', fontSize: 12, paddingHorizontal: 20, paddingVertical: 4 },
+  deletedText:{fontStyle:'italic',opacity:.72},
+  reactionBadges:{flexDirection:'row',gap:4,alignSelf:'flex-end',marginTop:5},
+  reactionBadge:{fontSize:11,color:'#403c34',backgroundColor:'#e8e5dc',paddingHorizontal:5,paddingVertical:1,borderRadius:9,overflow:'hidden'},
+  menuBackdrop:{flex:1,backgroundColor:'rgba(0,0,0,.35)',justifyContent:'flex-end'},
+  menuSheet:{backgroundColor:'#fffaf4',borderTopLeftRadius:23,borderTopRightRadius:23,padding:19,paddingBottom:46},
+  menuTitle:{fontSize:14,color:'#6b655c',marginBottom:17},
+  menuEmojiRow:{flexDirection:'row',justifyContent:'space-around',marginBottom:12},
+  menuEmoji:{paddingHorizontal:16,paddingVertical:12},
+  menuEmojiText:{fontSize:27},
+  menuOption:{paddingVertical:14,borderBottomWidth:1,borderBottomColor:'#e9e1d6'},
+  menuOptionText:{fontSize:16,color:'#262621'},
+  deleteMenuText:{fontSize:16,color:'#a13b39'},
   replyLabel: {fontSize:12,color:'#686b66',marginBottom:5},
   actions: { flexDirection:'row',alignItems:'center',gap:5,marginTop:6 },
   actionButton: {paddingVertical:5,paddingHorizontal:3},
