@@ -13,23 +13,36 @@ permissions:
   contents: write
 
 jobs:
-  publish-v2-chat1-apk:
+  publish-v2-native-fix:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     env:
       GH_TOKEN: ${{ github.token }}
-      APK_RUN_ID: '40072538159'
+      APK_RUN_ID: '40171655288'
+      EXPECTED_COMMIT: 'a2cc074ec62a9863be3cc268c4246ef0ec6215c4'
       APK_ARTIFACT: 'HAVANA-NICE-V2-FOUNDATION-STANDALONE-APK'
-      APK_SHA256: '69233faeaa40399cfeb880369877494fdf8ddbfc53ffecb333fa1bee79e8eee1'
       DEST_BRANCH: 'havana-nice-v2-apk-downloads'
-      APK_NAME: 'HAVANA-NICE-V2-CHAT1-ANDROID.apk'
+      APK_NAME: 'HAVANA-NICE-V2-CHAT1-ANDROID-NATIVE-FIX.apk'
 
     steps:
       - uses: actions/checkout@v5
-        with:
-          persist-credentials: true
 
-      - name: Fetch previously validated Chat 1 APK
+      - name: Verify APK originated from successful fix build
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 100); do
+            STATUS="$(gh run view "$APK_RUN_ID" --repo "$GITHUB_REPOSITORY" --json status --jq .status)"
+            if [ "$STATUS" = completed ]; then break; fi
+            sleep 10
+          done
+          test "$STATUS" = completed
+          CONCLUSION="$(gh run view "$APK_RUN_ID" --repo "$GITHUB_REPOSITORY" --json conclusion --jq .conclusion)"
+          COMMIT="$(gh run view "$APK_RUN_ID" --repo "$GITHUB_REPOSITORY" --json headSha --jq .headSha)"
+          test "$CONCLUSION" = success
+          test "$COMMIT" = "$EXPECTED_COMMIT"
+
+      - name: Fetch and verify independently built standalone APK
         shell: bash
         run: |
           set -euo pipefail
@@ -37,38 +50,36 @@ jobs:
           gh run download "$APK_RUN_ID" --repo "$GITHUB_REPOSITORY" \
             --name "$APK_ARTIFACT" --dir /tmp/havana-v2-apk
           mv /tmp/havana-v2-apk/HAVANA-NICE-V2-FOUNDATION-STANDALONE.apk "/tmp/havana-v2-apk/$APK_NAME"
-          printf '%s  %s\n' "$APK_SHA256" "/tmp/havana-v2-apk/$APK_NAME" | sha256sum --check
+          test "$(stat -c%s "/tmp/havana-v2-apk/$APK_NAME")" -gt 40000000
+          unzip -Z1 "/tmp/havana-v2-apk/$APK_NAME" | grep -Fxq 'assets/index.android.bundle'
+          sha256sum "/tmp/havana-v2-apk/$APK_NAME"
 
-      - name: Publish binary ONLY on dedicated V2 downloads branch
+      - name: Publish ONLY in dedicated V2 APK branch
         shell: bash
         run: |
           set -euo pipefail
-          if git ls-remote --exit-code --heads origin "$DEST_BRANCH" >/dev/null; then
-            echo "Dedicated branch already exists; refusing to overwrite it" >&2
-            exit 1
-          fi
           git config user.name "havana-nice-v2-automation"
           git config user.email "actions@users.noreply.github.com"
-          git switch --orphan "$DEST_BRANCH"
-          cp "/tmp/havana-v2-apk/$APK_NAME" "./$APK_NAME"
-          printf '%s  %s\n' "$APK_SHA256" "$APK_NAME" > SHA256SUMS.txt
-          printf '%s\n' 'HAVANA NICE V2 - isolated Chat 1 Android APK (lab only).' 'Contains no backend secrets. No production application files are stored on this branch.' > README.txt
-          git add "$APK_NAME" SHA256SUMS.txt README.txt
-          git commit -m "Distribute verified HAVANA NICE V2 Chat 1 Android APK"
+          git fetch origin "$DEST_BRANCH"
+          git switch -C "$DEST_BRANCH" FETCH_HEAD
+          cp "/tmp/havana-v2-apk/$APK_NAME" "$APK_NAME"
+          sha256sum "$APK_NAME" >> SHA256SUMS.txt
+          git add "$APK_NAME" SHA256SUMS.txt
+          git commit -m "Publish isolated Android native WebSocket and navigation bar fix"
           git -c http.postBuffer=524288000 push origin "HEAD:refs/heads/$DEST_BRANCH"
 
-      - name: Check link availability
+      - name: Confirm stable direct APK link responds
         shell: bash
         run: |
           set -euo pipefail
           URL="https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$DEST_BRANCH/$APK_NAME"
-          for attempt in 1 2 3 4 5; do
-            STATUS=$(curl -L -s -o /dev/null -w '%{http_code}' -I "$URL")
+          for attempt in $(seq 1 10); do
+            STATUS="$(curl -L -s -o /dev/null -w '%{http_code}' -I "$URL")"
             if [ "$STATUS" = 200 ]; then
               echo "DIRECT_APK_URL=$URL"
               exit 0
             fi
-            sleep 3
+            sleep 5
           done
-          echo "APK committed, but raw delivery verification still pending" >&2
+          echo "Direct APK URL did not return HTTP 200" >&2
           exit 1
