@@ -18,11 +18,11 @@ jobs:
     timeout-minutes: 25
     env:
       GH_TOKEN: ${{ github.token }}
-      APK_RUN_ID: '40171655288'
-      EXPECTED_COMMIT: 'a2cc074ec62a9863be3cc268c4246ef0ec6215c4'
+      APK_RUN_ID: '40206188419'
+      EXPECTED_COMMIT: '0aed585baccac831cdaa24f06f94805a996c6ccb'
       APK_ARTIFACT: 'HAVANA-NICE-V2-FOUNDATION-STANDALONE-APK'
       DEST_BRANCH: 'havana-nice-v2-apk-downloads'
-      APK_NAME: 'HAVANA-NICE-V2-CHAT1-ANDROID-NATIVE-FIX.apk'
+      APK_NAME: 'HAVANA-NICE-V2-CHAT1-AUTO-RECONNECT.apk'
 
     steps:
       - uses: actions/checkout@v5
@@ -65,7 +65,7 @@ jobs:
           cp "/tmp/havana-v2-apk/$APK_NAME" "$APK_NAME"
           sha256sum "$APK_NAME" >> SHA256SUMS.txt
           git add "$APK_NAME" SHA256SUMS.txt
-          git commit -m "Publish isolated Android native WebSocket and navigation bar fix"
+          git commit -m "Publish isolated Android automatic chat reconnection update"
           git -c http.postBuffer=524288000 push origin "HEAD:refs/heads/$DEST_BRANCH"
 
       - name: Confirm stable direct APK link responds
