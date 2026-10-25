@@ -84,6 +84,20 @@ jobs:
             --data '{"displayName":"CI validation","accessCode":"not-a-valid-code"}')
           test "$STATUS" = "401"
 
+      - name: Verify live private media endpoint is closed without independent Google OAuth
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE="https://havana-nice-v2-dev.soloaplicaciones97.workers.dev"
+          STATUS="$(curl --silent --show-error --output /tmp/hnv2-media-private.json --write-out '%{http_code}' "$BASE/api/chat/media/status")"
+          test "$STATUS" = "401"
+          grep -q 'Unauthorized' /tmp/hnv2-media-private.json
+          STATUS="$(curl --silent --show-error --output /tmp/hnv2-media-upload.json --write-out '%{http_code}' \
+            -X POST "$BASE/api/chat/media/upload" -H 'Content-Type: image/jpeg' \
+            --data-binary 'not-a-photo')"
+          test "$STATUS" = "401"
+          curl --fail --silent --show-error "$BASE/health" | grep -q 'independent-drive-oauth-pending'
+
       - name: Verify native Android WebSocket origin is permitted
         shell: bash
         run: |
