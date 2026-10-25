@@ -43,3 +43,10 @@ h1 span { font-weight:400; }
 .inline-error { color:#a43329; font-size:12px; padding:5px 20px; }
 
 .retry-message { margin-top:8px; border:1px solid currentColor; padding:6px 9px; background:transparent; border-radius:12px; color:inherit; font-size:11px; font-weight:700; }
+
+.reply-original {font-size:12px;opacity:.65;border-left:2px solid currentColor;padding:5px 9px;margin-bottom:7px;max-width:100%}
+.bubble-tools {display:flex;align-items:center;gap:3px;margin-top:8px;flex-wrap:wrap}
+.bubble-tools button {font-size:11px;line-height:1.5;border:0;background:transparent;color:inherit;padding:3px 6px;opacity:.76}
+.reply-preview {display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 16px;font-size:12px;border-top:1px solid #d9cebd;color:#585248}
+.reply-preview button {border:0;background:transparent;color:#8a5a3c;font-weight:700}
+.room-user {max-width:50%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;text-align:right}
