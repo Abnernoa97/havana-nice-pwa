@@ -41,3 +41,5 @@ h1 span { font-weight:400; }
 .chat-composer button { border:0; background:#252621; color:#fff; border-radius:22px; padding:13px 15px; font-size:14px; font-weight:700; }
 .reconnect { margin:8px 15px; border:1px solid #bca995; border-radius:9px; padding:10px; background:transparent; }
 .inline-error { color:#a43329; font-size:12px; padding:5px 20px; }
+
+.retry-message { margin-top:8px; border:1px solid currentColor; padding:6px 9px; background:transparent; border-radius:12px; color:inherit; font-size:11px; font-weight:700; }
