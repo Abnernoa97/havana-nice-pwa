@@ -1300,8 +1300,32 @@ El estado vigente siempre es el HEAD de `havana-nice-v2-foundation`. No fijar es
 - La anterior ruta de V2 `src/drive-media.js` es un prototipo apagado bajo ausencia de OAuth exclusivo; debe adaptarse o sustituirse para delegar en HAVANA CLOUD tras terminar el bridge. No activar esa ruta con credenciales copiadas ni declarar envío multimedia operativo.
 - Service Bindings no añaden cargo por llamada en Workers Standard según documentación Cloudflare, pero siguen aplicando límites/CPU del plan gratuito. Regla $0 MXN sin servicios pagos ni exceso automático.
 
+## 2026-10-25 — Actualización unificada del CHAT V2 (paquete para prueba física)
+**Solicitud:** el usuario quiere una sola actualización grande, sin instalar por cada función; avisó que va a desinstalar la app mientras viaja. **Advertencia de datos:** la desinstalación borra SQLite local, borradores, credenciales locales y mensajes todavía sin confirmación. Los mensajes confirmados en D1 quedan guardados.
+**Rama única:** `havana-nice-v2-foundation`, sin tocar `main`, la aplicación oficial ni el Worker/archivos de HAVANA CLOUD.
+
+### Funciones completas en código (laboratorio, requieren pruebas físicas)
+- CHAT 1–5 existentes: textos, WebSocket bidireccional, cola offline en SQLite Android/IndexedDB iPhone, reconexión, estados, respuestas, reacciones, presencia y typing. Guardar también el borrador local tras cierre (no sobrevive desinstalación).
+- Nuevo paquete: **historial paginado**, `GET /api/chat/messages?beforeSeq=<seq>` y búsqueda autenticada `?search=<texto>` limitada a 60 resultados; Android y PWA tienen UI para buscar, cargar anteriores y cerrar búsqueda.
+- **Editar y eliminar mensajes propios:** comandos `chat.edit` y `chat.delete` por WebSocket, validados por actor en servidor y con límite de 15 minutos. Edición conserva `edited_at`. Eliminación **lógica**/tombstone `deleted_at` preserva orden/referencias, elimina reacciones y excluye texto borrado de búsqueda. `chat.updated` notifica ambos clientes. Android exige confirmación explícita.
+- **Confirmaciones de lectura:** comando `chat.read` con secuencia máxima persistida y evento `chat.read`, tabla `chat_read_receipts` por actor. La UI muestra «leído» únicamente cuando otro actor reportó lectura; **no es prueba de notificación push ni entrega al móvil bloqueado**.
+- Cliente compartido: tipos `ChatMessage` extendidos (editedAt,deletedAt) y contratos de paginación, búsqueda, receipts, reconciliación de edits; Android/PWA mismo modelo lógico.
+- **Migración aislada 0006:** `edited_at`, `deleted_at` y `chat_read_receipts` aplicada/confirmada en D1 `havana-nice-v2-dev`. No hubo modificación de mensajes existentes, y se mantuvieron todas las tablas de chat/fotos anteriores.
+- Backend de laboratorio `havana-nice-v2-dev` actualizado `f0aa367e2f194598b1b6affe9fc5ab81`. Conserva `DB` y `CHAT_ROOMS`, y media sigue bloqueada. Se corrigió regex de Bearer para rutas media gated y texto de estado del bridge privado HAVANA CLOUD.
+- V2 PWA sigue desplegándose exclusivamente en `havana-nice-v2-dev.pages.dev`; compilación firmada Android desde CI reproducible. Prueba real de los nuevos eventos entre dos teléfonos todavía pendiente.
+- APK única prevista: `HAVANA-NICE-V2-CHAT-FULL-UPDATE-20261025.apk`, workflow Gradle `40216499229` para commit `3fab36a086b23452127027e5ba63cd79e24793cc`; publicación directa mediante `40216605891`, pendiente de confirmación final. Nunca inventar un enlace antes de que esté públicamente HTTP 200.
+
+### Lo que **NO** se puede marcar como terminado
+- CHAT 6 fotos/audio/video: aún **no** se permite transferir multimedia; puente HAVANA CLOUD–V2 existe solo como diagnóstico en rama experimental, está apagado y no desplegado en Cloud producción. Para integrarlo hacen falta subida/lectura privada segura, exclusión de la galería CLOUD, cuotas, garantías de no facturación, pruebas.
+- Push Android/iPhone bloqueados: requieren configuración/consentimiento de FCM/APNs/Web Push; no afirmar que funcionan al bloquear/cerrar el teléfono. El plan 0 MXN prohíbe contratar niveles pagados.
+- No hay todavía control completo de identidad permanente, múltiples conversaciones privadas o grupos por usuario: sigue siendo un chat de laboratorio con clave y sesiones de 12 horas. No afirmar equivalencia a WhatsApp.
+- No cerrar el paquete sin instalación física y pruebas de envío cruzado, búsqueda, editar/eliminar, lectura, reconexión, offline tras cierre y paginación en ambos clientes.
+
+### Distribución obligatoria
+Entregar siempre el APK verificado mediante **[Descarga directa alternativa](https://raw.githubusercontent.com/Abnernoa97/havana-nice-pwa/havana-nice-v2-apk-downloads/HAVANA-NICE-V2-CHAT-FULL-UPDATE-20261025.apk)**, nunca solo con botón o sandbox. Solo compartirlo al usuario después de SUCCESS, SHA-256 y HTTP 200 del workflow. Mantener el APK anterior en rama de descargas como rollback.
+
 ## En curso
-FASE 0 cerrada, CHAT 1 aprobado; paquete CHAT 2/3/4/5 visualmente validado con pruebas de robustez pendientes. CHAT 6 AHORA delegará exclusivamente la autorización Google existente de HAVANA CLOUD mediante un puente privado Worker-a-Worker; etapa de laboratorio `havana-nice-v2-cloud-bridge-lab` creada y apagada por defecto. Adaptador V2 previo de OAuth exclusivo no debe habilitarse. Aún NO hay fotos funcionales y no se ha modificado producción, `main` ni la nube actual.
+FASE 0 cerrada y CHAT 1 aprobado. CHAT 2–5 visualmente validados anteriormente. Se entregará un único paquete de Chat para pruebas físicas con historial paginado, búsqueda, ediciones/eliminación autorizada, receipts de lectura y persistencia de borradores, además de todas las funciones anteriores. Backend D1+Worker V2 actualizado y CI/bundle en verificación; nuevo APK y publicación directa pendientes. CHAT 6 y push permanecen apagados por falta de integración segura con HAVANA CLOUD y autorización externa. Producción y ramas main sin cambios.
 
 ## Siguiente paso exacto
 1. Marcar paquete CHAT 2/3/4/5 como validado visualmente en los dos clientes; NO cerrar pruebas de mensajes offline, respuestas funcionales, typing y sesiones caducadas sin evidencia.
