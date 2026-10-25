@@ -1350,7 +1350,7 @@ CHAT 1 — TEXTO BÁSICO aprobado para continuidad. CHAT 2 — ESTADOS Y RECONEX
 - API: Worker.
 - Datos: D1.
 - Realtime Chat: Durable Objects + WebSockets.
-- Fotos: Google Drive usado por HAVANA CLOUD como capacidad existente preferida, **solo mediante V2 aislada y OAuth propio**, pendiente de viabilidad y autorización; alternativa D1 Free pequeña. SIN R2, sin checkout y sin tocar la nube actual.
+- Fotos: capacidad gratuita de Google Drive ya autorizada por HAVANA CLOUD; V2 accede únicamente mediante un puente privado Worker-a-Worker, con permisos y carpeta de Chat aislados, jamás usando OAuth propio duplicado ni copiando tokens. Bridge experimental todavía inactivo; SIN R2, checkout, costos o alteración de la nube actual.
 - Videos y audios: buscar alternativa estrictamente 0 MXN, o no desplegar el módulo si implica posible facturación.
 - Android push: FCM.
 - iPhone push: Web Push.
