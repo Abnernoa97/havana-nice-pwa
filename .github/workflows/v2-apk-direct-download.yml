@@ -6,6 +6,7 @@ on:
       - havana-nice-v2-foundation
     paths:
       - '.github/workflows/v2-apk-direct-download.yml'
+      - '.github/workflows/v2-android-apk.yml'
   workflow_dispatch:
 
 permissions:
