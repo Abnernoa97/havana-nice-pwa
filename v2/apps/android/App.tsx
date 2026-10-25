@@ -559,7 +559,7 @@ export default function App() {
               <Pressable style={styles.whatsappBackdrop} onPress={()=>setMenuMessage(null)}>
                 {menuMessage ? <Pressable style={styles.whatsappContext} onPress={()=>{}}>
                   <View style={styles.whatsappEmojiBar}>
-                    {(['👍','❤️','😂','😮','😢','🙏'] as ChatEmoji[]).map(emoji=>(
+                    {(['👍','❤️','😂'] as ChatEmoji[]).map(emoji=>(
                       <Pressable key={emoji} style={styles.whatsappEmoji} onPress={()=>{
                         react(menuMessage.seq,emoji);setMenuMessage(null);
                       }}><Text style={styles.whatsappEmojiText}>{emoji}</Text></Pressable>
