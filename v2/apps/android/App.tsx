@@ -4,7 +4,7 @@ import {
   StatusBar, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import {
-  HAVANA_V2_DEV_API_BASE_URL, fetchBackendHealth, getChatMessages, newClientMessageId,
+  HAVANA_V2_DEV_API_BASE_URL, fetchBackendHealth, getChatMessages, messageDeliveryLabel, newClientMessageId,
   reconcileChatMessages, startLabChatSession,
   type ChatMessage, type ChatServerEvent, type ChatSession,
 } from '@havana/shared';
@@ -28,6 +28,69 @@ export default function App() {
   const disposed = useRef(false);
   const connectLatest = useRef<(next: ChatSession) => void>(() => {});
   const syncLatest = useRef<() => void>(() => {});
+  const outbox = useRef<Map<string, ChatMessage>>(new Map());
+  const acknowledgementTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  function clearAck(id: string) {
+    const timer = acknowledgementTimers.current.get(id);
+    if (timer) clearTimeout(timer);
+    acknowledgementTimers.current.delete(id);
+  }
+
+  function confirmMessage(message: ChatMessage) {
+    if (!message.pending && message.senderId === activeSession.current?.actorId) {
+      outbox.current.delete(message.clientMessageId);
+      clearAck(message.clientMessageId);
+    }
+  }
+
+  function markOutgoing(id: string, state: 'queued' | 'sending' | 'error') {
+    const message = outbox.current.get(id);
+    if (!message) return;
+    outbox.current.set(id, { ...message, deliveryStatus: state, failed: state === 'error' });
+    setMessages(existing => existing.map(m =>
+      m.clientMessageId === id && m.senderId === message.senderId && m.pending
+        ? { ...m, deliveryStatus: state, failed: state === 'error' }
+        : m
+    ));
+  }
+
+  function pauseOutgoing() {
+    for (const timer of acknowledgementTimers.current.values()) clearTimeout(timer);
+    acknowledgementTimers.current.clear();
+    for (const id of outbox.current.keys()) markOutgoing(id, 'queued');
+  }
+
+  // Each retry retains the original clientMessageId. D1 UNIQUE(sender_id, id)
+  // prevents duplicates if the server stored a message before connection loss.
+  function flushOutbox(includeUncertain = false) {
+    const ws = socket.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    const pending = [...outbox.current.values()].sort((a, b) => a.sentAt.localeCompare(b.sentAt));
+    for (const item of pending) {
+      if (!includeUncertain && item.deliveryStatus !== 'queued') continue;
+      try {
+        ws.send(JSON.stringify({ type: 'chat.send', clientMessageId: item.clientMessageId, text: item.text }));
+        markOutgoing(item.clientMessageId, 'sending');
+        clearAck(item.clientMessageId);
+        const id = item.clientMessageId;
+        acknowledgementTimers.current.set(id, setTimeout(() => {
+          acknowledgementTimers.current.delete(id);
+          markOutgoing(id, 'error');
+        }, 12000));
+      } catch {
+        markOutgoing(item.clientMessageId, 'error');
+      }
+    }
+  }
+
+  function retryOutgoing(id: string) {
+    if (!outbox.current.has(id)) return;
+    clearAck(id);
+    markOutgoing(id, 'queued');
+    flushOutbox();
+  }
+
 
   function clearRetryTimer() {
     if (retryTimer.current) clearTimeout(retryTimer.current);
@@ -38,7 +101,9 @@ export default function App() {
     void getChatMessages(next)
       .then(history => {
         if (!disposed.current && activeSession.current?.actorId === next.actorId) {
+          history.forEach(confirmMessage);
           setMessages(before => reconcileChatMessages(before, history));
+          flushOutbox();
         }
       })
       .catch(reason => {
@@ -55,6 +120,8 @@ export default function App() {
     activeSession.current = next;
     if (Date.parse(next.expiresAt) <= Date.now()) {
       clearRetryTimer();
+      for (const timer of acknowledgementTimers.current.values()) clearTimeout(timer);
+      acknowledgementTimers.current.clear();
       socket.current?.close();
       socket.current = null;
       activeSession.current = null;
@@ -119,6 +186,7 @@ export default function App() {
       try {
         const item = JSON.parse(String(event.data)) as ChatServerEvent;
         if (item.type === 'chat.message') {
+          confirmMessage(item.message);
           setMessages(before => reconcileChatMessages(before, [item.message]));
         } else if (item.type === 'chat.error') {
           setError(item.error);
@@ -133,6 +201,7 @@ export default function App() {
     };
     ws.onclose = event => {
       if (disposed.current || socket.current !== ws) return;
+      pauseOutgoing();
       if (appLifecycle.current === 'active') {
         retry();
       } else {
@@ -166,6 +235,7 @@ export default function App() {
         }
       } else if (state === 'background') {
         clearRetryTimer();
+        pauseOutgoing();
         const old = socket.current;
         socket.current = null;
         old?.close();
@@ -203,14 +273,20 @@ export default function App() {
 
   function send() {
     const text = draft.trim();
-    if (!session || !text || !socket.current || socket.current.readyState !== WebSocket.OPEN) return;
+    if (!session || !text) return;
+    if (outbox.current.size >= 100) {
+      setError('La cola de mensajes está llena. Reintenta cuando vuelva Internet.');
+      return;
+    }
     const clientMessageId = newClientMessageId();
-    setMessages(before => reconcileChatMessages(before, [{
+    const item: ChatMessage = {
       seq: 0, clientMessageId, senderId: session.actorId, senderName: session.displayName,
-      text, sentAt: new Date().toISOString(), pending: true,
-    }]));
-    socket.current.send(JSON.stringify({ type: 'chat.send', clientMessageId, text }));
+      text, sentAt: new Date().toISOString(), pending: true, deliveryStatus: 'queued',
+    };
+    outbox.current.set(clientMessageId, item);
+    setMessages(before => reconcileChatMessages(before, [item]));
     setDraft('');
+    flushOutbox();
   }
 
   return (
@@ -262,14 +338,18 @@ export default function App() {
               {messages.map(message => {
                 const mine = message.senderId === session.actorId;
                 return (
-                  <View key={message.senderId + ':' + message.clientMessageId} style={[styles.bubble, mine ? styles.mine : styles.theirs]}>
+                  <Pressable
+                    key={message.senderId + ':' + message.clientMessageId}
+                    onPress={() => { if (mine && message.pending && message.deliveryStatus === 'error') retryOutgoing(message.clientMessageId); }}
+                    style={[styles.bubble, mine ? styles.mine : styles.theirs]}
+                  >
                     {!mine && <Text style={styles.sender}>{message.senderName}</Text>}
                     <Text style={[styles.bubbleText, mine && styles.mineText]}>{message.text}</Text>
                     <Text style={[styles.messageTime, mine && styles.mineMeta]}>
                       {new Date(message.sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      {message.pending ? ' · enviando' : ''}
+                      {mine ? ' · ' + messageDeliveryLabel(message) : ''}
                     </Text>
-                  </View>
+                  </Pressable>
                 );
               })}
             </ScrollView>
@@ -285,7 +365,7 @@ export default function App() {
                 onChangeText={setDraft} maxLength={2000} multiline
                 placeholder="Escribe un mensaje…" placeholderTextColor="#888"
               />
-              <Pressable onPress={send} disabled={!draft.trim() || connection !== 'en vivo'} style={styles.sendButton}>
+              <Pressable onPress={send} disabled={!draft.trim()} style={styles.sendButton}>
                 <Text style={styles.sendText}>Enviar</Text>
               </Pressable>
             </View>
