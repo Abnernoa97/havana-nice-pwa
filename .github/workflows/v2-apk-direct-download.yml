@@ -18,8 +18,8 @@ jobs:
     timeout-minutes: 25
     env:
       GH_TOKEN: ${{ github.token }}
-      APK_RUN_ID: '40216499229'
-      EXPECTED_COMMIT: '3fab36a086b23452127027e5ba63cd79e24793cc'
+      APK_RUN_ID: '40216856225'
+      EXPECTED_COMMIT: 'ce1dd644db0db611effee81a8a6dad482893c028'
       APK_ARTIFACT: 'HAVANA-NICE-V2-FOUNDATION-STANDALONE-APK'
       DEST_BRANCH: 'havana-nice-v2-apk-downloads'
       APK_NAME: 'HAVANA-NICE-V2-CHAT-FULL-UPDATE-20261025.apk'
