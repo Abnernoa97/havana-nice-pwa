@@ -1324,8 +1324,14 @@ El estado vigente siempre es el HEAD de `havana-nice-v2-foundation`. No fijar es
 ### Distribución obligatoria
 Entregar siempre el APK verificado mediante **[Descarga directa alternativa](https://raw.githubusercontent.com/Abnernoa97/havana-nice-pwa/havana-nice-v2-apk-downloads/HAVANA-NICE-V2-CHAT-FULL-UPDATE-20261025.apk)**, nunca solo con botón o sandbox. Solo compartirlo al usuario después de SUCCESS, SHA-256 y HTTP 200 del workflow. Mantener el APK anterior en rama de descargas como rollback.
 
+## Validación física — PWA → Android (2026-10-25, 11:45 hora de capturas)
+- El usuario compartió capturas de dos clientes de la versión `HAVANA-NICE-V2-CHAT-FULL-UPDATE-20261025.apk`/PWA: el mensaje exacto de prueba `Ggg` figura **enviado** a las 11:45 a. m. en PWA (burbuja propia, estado enviado) y aparece también en **Android nativo** como burbuja remitida por `iPhone` a las 11:45 a. m. Ambos muestran `en vivo` y el historial y contadores de reacciones coinciden. Esto confirma físicamente PWA → Android y persistencia/recepción visibles.
+- La captura Android presenta indicador `2 en línea` y la de PWA `1 en línea`, pero los relojes y el estado de conexión pueden corresponder a momentos distintos; no inferir defecto en presencia sin prueba simultánea.
+- Controles de búsqueda, responder, editar, eliminar y reacciones visibles. No confundir visibilidad con verificación funcional completa: faltan pruebas específicas de búsqueda, editar/borrar sincronizados, `leído` real con ambos clientes, cola tras cierre forzoso y sentido Android → PWA en esta versión.
+- No se necesita modificar la APK ni crear otra versión solamente por esta confirmación. Mantener pendiente CHAT 6 media y push.
+
 ## En curso
-FASE 0 cerrada; CHAT 1 aprobado y CHAT 2–5 visualmente validados anteriormente. Paquete consolidado de Chat 2026-10-25 compilado y PUBLICADO, listo para prueba física Android ↔ PWA. Incluye historial paginado, búsqueda, edición/eliminación propia, receipts de lectura y cola local, además de funciones anteriores. Backend V2/D1/DO desplegado. APK y enlace directo verificados HTTP 200 y SHA-256. CHAT 6 fotos y push continúan DESACTIVADOS; HAVANA CLOUD sin cambios. Producción y ramas main intactos.
+FASE 0 cerrada; CHAT 1 aprobado y CHAT 2–5 visualmente validados anteriormente. Paquete consolidado de Chat 2026-10-25 compilado y PUBLICADO; validación física PWA → Android confirmada por capturas del usuario (mensaje «Ggg», 11:45); resta QA funcional de búsqueda, edición/eliminación, lectura y resiliencia. Incluye historial paginado, búsqueda, edición/eliminación propia, receipts de lectura y cola local, además de funciones anteriores. Backend V2/D1/DO desplegado. APK y enlace directo verificados HTTP 200 y SHA-256. CHAT 6 fotos y push continúan DESACTIVADOS; HAVANA CLOUD sin cambios. Producción y ramas main intactos.
 
 ## Siguiente paso exacto
 1. Marcar paquete CHAT 2/3/4/5 como validado visualmente en los dos clientes; NO cerrar pruebas de mensajes offline, respuestas funcionales, typing y sesiones caducadas sin evidencia.
