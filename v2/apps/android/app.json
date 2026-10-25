@@ -6,7 +6,8 @@
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "android": {
-      "package": "com.havananice.v2"
+      "package": "com.havananice.v2",
+      "softwareKeyboardLayoutMode": "resize"
     },
     "extra": {
       "environment": "development"
