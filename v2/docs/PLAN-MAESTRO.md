@@ -1226,6 +1226,16 @@ El estado vigente siempre es el HEAD de `havana-nice-v2-foundation`. No fijar es
 - Para CHAT 2, los estados `enviado` significan confirmación de persistencia/eco del servidor, NO lectura ni recepción por el destinatario (reservado para fases posteriores). Los mensajes creados offline deben conservar el mismo `clientMessageId` cuando se transmitan. Entrega de esta fase necesita prueba física.
 - Mantener la entrega Android mediante enlace Markdown exacto **[Descarga directa alternativa]** directamente al APK publicado en la rama aislada `havana-nice-v2-apk-downloads`, con verificación HTTP 200 y SHA-256.
 
+## CHAT 2 — Primera implementación Android y PWA (2026-10-25)
+- El usuario confirmó físicamente que CHAT 1 ya quedó («Ya quedó, con que seguimos») y aprobó continuar.
+- Se implementó en la rama aislada `havana-nice-v2-foundation` la lógica de cola de mensajes **en la sesión activa** tanto Android nativo como PWA. El usuario puede redactar y pulsar Enviar sin red; el mensaje muestra `en cola`, cambia a `enviando` cuando el socket está disponible y a `enviado` únicamente cuando llega el eco/ACK persistido en D1. Si falta confirmación tras 12 s, estado `error` y reintento con el mismo `clientMessageId`. No afirmar confirmación de lectura del destinatario.
+- Se estableció envío FIFO: el siguiente mensaje pendiente se manda solo tras recibir el ACK del anterior. Reconciliación compartida en `v2/packages/shared/src/index.ts`, sin insertar múltiples filas para el mismo par sender+clientMessageId.
+- Android: preserva en memoria la cola a través de salir/volver (AppState) y reintenta al restablecer WebSocket; botón Enviar disponible incluso desconectado, permite tocar un globo en error para reintentar. PWA: misma cola en sesión, reconexión al regresar a primer plano, eventos online/offline, backoff y botón de reintento por mensaje.
+- **Límite actual de laboratorio**: cola en memoria durante la sesión y proceso activos; NO se promete conservación de borradores en cola si Android o Safari matan el proceso, o al caducar la sesión de 12 horas. Esta persistencia local durable debe añadirse y probarse antes de marcar CHAT 2 totalmente CERRADO.
+- CI de la nueva lógica Android/PWA en run `40208067427` — SUCCESS (typecheck, export Android, build PWA, API/DO/seguridad). Cloudflare Pages desplegó la PWA sobre commit `fd8ab16d80a4fd960f864b287721bbb80bdb5398` en despliegue `12240ed3-0b8f-4ffd-9f2c-4fd2af1f1a0b`, activo.
+- Android release `40208063556` y distribución directa `40208110701` iniciados (pendiente verificar resultado). No tocar Worker, D1, producción, main ni proyectos ajenos para esta etapa; no son necesarios cambios de backend para los primeros estados.
+- Prueba física requerida: crear mensajes sin red, recuperar conexión Android↔PWA, confirmar `enviado`, que aparezcan una sola vez, conservar orden y reconectar tras cerrar/abrir interfaz.
+
 ## En curso
 FASE 0 CERRADA. CHAT 1 — APROBADO PARA CONTINUIDAD por confirmación del usuario el 2026-10-25 («Ya quedó»): mensajes cruzados y retorno a primer plano sin reconexión manual. CHAT 2 — ESTADOS Y RECONEXIÓN EN DESARROLLO. Pruebas de estrés de 20 mensajes, redes y escenarios sin conexión siguen exigidas antes de cerrar CHAT 2.
 
