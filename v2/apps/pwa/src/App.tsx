@@ -58,9 +58,12 @@ export default function App() {
   function flushOutbox() {
     const ws = socket.current;
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
-    const batch = [...outbox.current.values()].filter(item => item.deliveryStatus === 'queued')
-      .sort((a, b) => a.sentAt.localeCompare(b.sentAt));
-    for (const item of batch) {
+    const batch = [...outbox.current.values()].sort((a, b) => a.sentAt.localeCompare(b.sentAt));
+    // Send one at a time to preserve creation order even with slow D1 ACKs.
+    if (batch.some(item => item.deliveryStatus === 'sending')) return;
+    const item = batch[0];
+    if (!item || item.deliveryStatus !== 'queued') return;
+    {
       try {
         ws.send(JSON.stringify({ type: 'chat.send', clientMessageId: item.clientMessageId, text: item.text }));
         markOutgoing(item.clientMessageId, 'sending');
@@ -136,6 +139,7 @@ export default function App() {
         if (value.type === 'chat.message') {
           confirm(value.message);
           setMessages(before => reconcileChatMessages(before, [value.message]));
+          flushOutbox();
         } else if (value.type === 'chat.error') {
           setError(value.error);
         }
