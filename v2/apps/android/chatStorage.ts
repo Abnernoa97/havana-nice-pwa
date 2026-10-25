@@ -6,6 +6,7 @@ import type { ChatMessage, ChatSession } from '@havana/shared';
 export interface NativeLocalChat {
   session: ChatSession;
   outbox: ChatMessage[];
+  draft?: string;
 }
 const KEY = 'havana-v2-chat-local-v1';
 
