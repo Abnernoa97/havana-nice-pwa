@@ -18,11 +18,11 @@ jobs:
     timeout-minutes: 25
     env:
       GH_TOKEN: ${{ github.token }}
-      APK_RUN_ID: '40209846766'
-      EXPECTED_COMMIT: '8742c0edbc0f4cffcc3cc0ba39ea7743b148d937'
+      APK_RUN_ID: '40216499229'
+      EXPECTED_COMMIT: '3fab36a086b23452127027e5ba63cd79e24793cc'
       APK_ARTIFACT: 'HAVANA-NICE-V2-FOUNDATION-STANDALONE-APK'
       DEST_BRANCH: 'havana-nice-v2-apk-downloads'
-      APK_NAME: 'HAVANA-NICE-V2-COMPLETE-CHAT-PACK.apk'
+      APK_NAME: 'HAVANA-NICE-V2-CHAT-FULL-UPDATE-20261025.apk'
 
     steps:
       - uses: actions/checkout@v5
@@ -65,7 +65,7 @@ jobs:
           cp "/tmp/havana-v2-apk/$APK_NAME" "$APK_NAME"
           sha256sum "$APK_NAME" >> SHA256SUMS.txt
           git add "$APK_NAME" SHA256SUMS.txt
-          git commit -m "Publish isolated Android bundled chat pack: persistent queue, replies, reactions and typing"
+          git commit -m "Publish isolated Android V2 full Chat pack: editable messages, history, search and read receipts"
           git -c http.postBuffer=524288000 push origin "HEAD:refs/heads/$DEST_BRANCH"
 
       - name: Confirm stable direct APK link responds
