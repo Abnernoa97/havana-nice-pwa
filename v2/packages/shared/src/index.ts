@@ -94,12 +94,33 @@ export interface ChatMessage {
   pending?: boolean;
   failed?: boolean;
   deliveryStatus?: 'queued' | 'sending' | 'error' | 'sent';
+  replyToSeq?: number | null;
 }
 
 export type ChatServerEvent =
   | { type: 'chat.ready'; at: string }
   | { type: 'chat.message'; message: ChatMessage }
-  | { type: 'chat.error'; error: string };
+  | { type: 'chat.error'; error: string }
+  | { type: 'chat.presence'; users: ChatOnlineUser[] }
+  | { type: 'chat.typing'; actorId: string; senderName: string; active: boolean; expiresAt: number }
+  | { type: 'chat.reaction'; messageSeq: number; actorId: string; emoji: ChatEmoji; active: boolean };
+
+export type ChatEmoji = '❤️' | '😂' | '👍';
+export interface ChatOnlineUser { actorId: string; displayName: string }
+export interface ChatReaction { messageSeq: number; actorId: string; emoji: ChatEmoji }
+export interface ChatSnapshot { messages: ChatMessage[]; reactions: ChatReaction[]; hasMore: boolean }
+
+export function reconcileReactions(before: ChatReaction[], event: {messageSeq: number;actorId: string;emoji: ChatEmoji;active: boolean}): ChatReaction[] {
+  const kept = before.filter(x => !(x.messageSeq === event.messageSeq && x.actorId === event.actorId && x.emoji === event.emoji));
+  return event.active ? [...kept, {messageSeq:event.messageSeq,actorId:event.actorId,emoji:event.emoji}] : kept;
+}
+
+export async function getChatSnapshot(session: ChatSession, apiBaseUrl = HAVANA_V2_DEV_API_BASE_URL): Promise<ChatSnapshot> {
+  const response = await fetch(`${apiBaseUrl}/api/chat/messages`, { headers: { Authorization: `Bearer ${session.token}` } });
+  const data = await response.json() as ChatSnapshot & {error?: string};
+  if (!response.ok) throw new Error(data.error || 'Cannot load chat snapshot');
+  return { messages: data.messages || [], reactions: data.reactions || [], hasMore: !!data.hasMore };
+}
 
 export async function startLabChatSession(
   displayName: string,
