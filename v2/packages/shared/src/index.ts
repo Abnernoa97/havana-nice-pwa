@@ -93,6 +93,7 @@ export interface ChatMessage {
   sentAt: string;
   pending?: boolean;
   failed?: boolean;
+  deliveryStatus?: 'queued' | 'sending' | 'error' | 'sent';
 }
 
 export type ChatServerEvent =
@@ -132,6 +133,13 @@ export async function getChatMessages(
 export function openChatSocket(session: ChatSession): WebSocket {
   const base = HAVANA_V2_DEV_API_BASE_URL.replace(/^http/, 'ws');
   return new WebSocket(`${base}/ws`, ['havana-v2', `session.${session.token}`]);
+}
+
+export function messageDeliveryLabel(message: ChatMessage): string {
+  if (!message.pending) return 'enviado';
+  if (message.deliveryStatus === 'error' || message.failed) return 'error · reintentar';
+  if (message.deliveryStatus === 'sending') return 'enviando…';
+  return 'en cola';
 }
 
 export function newClientMessageId(): string {
