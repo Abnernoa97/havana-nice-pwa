@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  AppState, KeyboardAvoidingView, Platform, Pressable, SafeAreaView, ScrollView,
+  Alert, AppState, KeyboardAvoidingView, Platform, Pressable, SafeAreaView, ScrollView,
   StatusBar, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import {
@@ -435,6 +435,7 @@ export default function App() {
     setReplyTo(null);
     setMessages(before => reconcileChatMessages(before, [item]));
     setDraft('');
+    autoScroll.current = true;
     flushOutbox();
   }
 
@@ -522,7 +523,10 @@ export default function App() {
                             <Pressable style={styles.actionButton} onPress={()=>manageOwn(message)}>
                               <Text style={[styles.actionText,mine&&styles.mineMeta]}>Editar</Text>
                             </Pressable>
-                            <Pressable style={styles.actionButton} onPress={()=>manageOwn(message,true)}>
+                            <Pressable style={styles.actionButton} onPress={()=>
+                              Alert.alert('Eliminar mensaje','¿Quieres eliminar este mensaje para todos?',[
+                                {text:'Cancelar',style:'cancel'},{text:'Eliminar',style:'destructive',onPress:()=>manageOwn(message,true)},
+                              ])}>
                               <Text style={[styles.actionText,mine&&styles.mineMeta]}>Eliminar</Text>
                             </Pressable>
                           </>
