@@ -46,11 +46,16 @@ export default function App() {
   const typingLast = useRef(0);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const storageQueue = useRef<Promise<void>>(Promise.resolve());
+  const latestDraft = useRef('');
+  const restoredStorage = useRef(false);
+  const draftTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function persistLocal() {
+    if (!restoredStorage.current) return;
     const value = activeSession.current ? {
       session: activeSession.current,
       outbox: [...outbox.current.values()].map(m => ({...m,pending:true,deliveryStatus:'queued' as const})),
+      draft: latestDraft.current,
     } : null;
     storageQueue.current = storageQueue.current.catch(() => {}).then(() => saveNativeLocalChat(value)).catch(() => {});
   }
@@ -265,6 +270,7 @@ export default function App() {
           if (item.actorId !== next.actorId) {
             setTyping(item.active ? item.senderName + ' está escribiendo…' : '');
             if (typingTimer.current) clearTimeout(typingTimer.current);
+      if (draftTimer.current) clearTimeout(draftTimer.current);
             if (item.active) typingTimer.current = setTimeout(() => setTyping(''), 4300);
           }
         } else if (item.type === 'chat.updated') {
@@ -312,15 +318,19 @@ export default function App() {
   useEffect(() => {
     disposed.current = false;
     void loadNativeLocalChat().then(saved => {
-      if (disposed.current || activeSession.current || !saved?.session ||
-          Date.parse(saved.session.expiresAt) <= Date.now()) return;
+      restoredStorage.current = true;
+      if (disposed.current) return;
+      if (activeSession.current) {persistLocal();return;}
+      if (!saved?.session || Date.parse(saved.session.expiresAt) <= Date.now()) return;
       activeSession.current = saved.session;
       outbox.current = new Map(saved.outbox.map(m => [m.clientMessageId,{...m,pending:true,deliveryStatus:'queued' as const}]));
       setMessages([...outbox.current.values()]);
       setSession(saved.session);
+      latestDraft.current = saved.draft || '';
+      setDraft(latestDraft.current);
       setName(saved.session.displayName);
       connectLatest.current(saved.session);
-    }).catch(() => {});
+    }).catch(() => {restoredStorage.current=true;});
     void fetchBackendHealth()
       .then(value => { if (!disposed.current) setApiState(value.ok ? 'conectada' : 'error'); })
       .catch(() => { if (!disposed.current) setApiState('error'); });
@@ -354,6 +364,15 @@ export default function App() {
       if (typingTimer.current) clearTimeout(typingTimer.current);
     };
   }, []);
+
+  useEffect(() => {
+    latestDraft.current = draft;
+    if(!restoredStorage.current || !activeSession.current)return;
+    if(draftTimer.current)clearTimeout(draftTimer.current);
+    draftTimer.current=setTimeout(()=>{draftTimer.current=null;persistLocal();},350);
+    return ()=>{if(draftTimer.current)clearTimeout(draftTimer.current);};
+  },[draft]);
+
 
   async function join() {
     if (!name.trim() || !code.trim() || joining) return;
