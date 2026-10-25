@@ -4,8 +4,8 @@ import {
   StatusBar, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import {
-  fetchBackendHealth, getChatMessages, newClientMessageId,
-  openChatSocket, reconcileChatMessages, startLabChatSession,
+  HAVANA_V2_DEV_API_BASE_URL, fetchBackendHealth, getChatMessages, newClientMessageId,
+  reconcileChatMessages, startLabChatSession,
   type ChatMessage, type ChatServerEvent, type ChatSession,
 } from '@havana/shared';
 
@@ -29,12 +29,34 @@ export default function App() {
     return () => socket.current?.close();
   }, []);
 
+  // React Native (Android) can attach Authorization during its native OkHttp
+  // WebSocket handshake. Avoid putting its token in Sec-WebSocket-Protocol:
+  // that flow is intended only for the browser PWA.
   function connect(next: ChatSession) {
     socket.current?.close();
     setConnection('conectando…');
-    const ws = openChatSocket(next);
+    setError('');
+    type NativeWebSocketConstructor = new (
+      url: string,
+      protocols: string[],
+      options: { headers: Record<string, string> },
+    ) => WebSocket;
+    const NativeWebSocket = WebSocket as unknown as NativeWebSocketConstructor;
+    let ws: WebSocket;
+    try {
+      ws = new NativeWebSocket(
+        `${HAVANA_V2_DEV_API_BASE_URL.replace(/^http/, 'ws')}/ws`,
+        ['havana-v2'],
+        { headers: { Authorization: `Bearer ${next.token}` } },
+      );
+    } catch {
+      setConnection('sin conexión');
+      setError('No se pudo iniciar la conexión nativa. Pulsa Reconectar.');
+      return;
+    }
     socket.current = ws;
     ws.onopen = () => {
+      if (socket.current !== ws) return;
       setConnection('en vivo');
       setError('');
       void getChatMessages(next)
@@ -42,6 +64,7 @@ export default function App() {
         .catch(reason => setError(reason instanceof Error ? reason.message : 'No se pudo cargar el historial'));
     };
     ws.onmessage = event => {
+      if (socket.current !== ws) return;
       try {
         const item = JSON.parse(String(event.data)) as ChatServerEvent;
         if (item.type === 'chat.message') {
@@ -53,8 +76,16 @@ export default function App() {
         setError('Evento no válido');
       }
     };
-    ws.onclose = () => setConnection('desconectado');
-    ws.onerror = () => setConnection('sin conexión');
+    ws.onerror = () => {
+      if (socket.current !== ws) return;
+      setConnection('sin conexión');
+      setError('No fue posible establecer el WebSocket nativo. Pulsa Reconectar.');
+    };
+    ws.onclose = event => {
+      if (socket.current !== ws) return;
+      setConnection('desconectado');
+      setError(`Conexión cerrada (código ${event.code || 'desconocido'}).`);
+    };
   }
 
   async function join() {
@@ -171,7 +202,9 @@ export default function App() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  screen: { flex: 1, backgroundColor: '#F3EDDF' },
+  // RN SafeAreaView does not include Android's bottom navigation safe area.
+  // Reserve room for three-button navigation even with Android 16 edge-to-edge.
+  screen: { flex: 1, backgroundColor: '#F3EDDF', paddingBottom: Platform.OS === 'android' ? 42 : 0 },
   header: { paddingHorizontal: 22, paddingTop: 24, paddingBottom: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#d6cab9' },
   brand: { fontSize: 11, fontWeight: '800', letterSpacing: 3 },
   title: { fontSize: 29, fontWeight: '700', marginTop: 7 },
