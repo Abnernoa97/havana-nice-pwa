@@ -96,7 +96,7 @@ jobs:
             -X POST "$BASE/api/chat/media/upload" -H 'Content-Type: image/jpeg' \
             --data-binary 'not-a-photo')"
           test "$STATUS" = "401"
-          curl --fail --silent --show-error "$BASE/health" | grep -q 'independent-drive-oauth-pending'
+          curl --fail --silent --show-error "$BASE/health" | grep -q 'havana-cloud-private-bridge-pending'
 
       - name: Verify native Android WebSocket origin is permitted
         shell: bash
