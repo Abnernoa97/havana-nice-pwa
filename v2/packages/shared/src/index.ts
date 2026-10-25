@@ -203,7 +203,9 @@ export function reconcileChatMessages(
   for (const message of [...before, ...incoming]) {
     const key = `${message.senderId}:${message.clientMessageId}`;
     const previous = map.get(key);
-    if (!previous || (previous.pending && !message.pending) || (!previous.seq && message.seq)) {
+    // Later server snapshots must override stale edits/deletions in local memory.
+    // Never allow a pending offline copy to overwrite a confirmed server row.
+    if (!previous || (!message.pending && message.seq > 0) || (previous.pending && !message.pending)) {
       map.set(key, message);
     }
   }
