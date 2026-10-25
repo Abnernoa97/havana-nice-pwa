@@ -556,34 +556,35 @@ export default function App() {
             </ScrollView>
             <Modal animationType="fade" transparent visible={!!menuMessage}
               onRequestClose={()=>setMenuMessage(null)}>
-              <Pressable style={styles.menuBackdrop} onPress={()=>setMenuMessage(null)}>
-                {menuMessage ? <Pressable style={styles.menuSheet} onPress={()=>{}}>
-                  <Text style={styles.menuTitle} numberOfLines={2}>{menuMessage.text}</Text>
-                  <View style={styles.menuEmojiRow}>
-                    {(['❤️','😂','👍'] as ChatEmoji[]).map(emoji=>(
-                      <Pressable key={emoji} style={styles.menuEmoji} onPress={()=>{
+              <Pressable style={styles.whatsappBackdrop} onPress={()=>setMenuMessage(null)}>
+                {menuMessage ? <Pressable style={styles.whatsappContext} onPress={()=>{}}>
+                  <View style={styles.whatsappEmojiBar}>
+                    {(['👍','❤️','😂','😮','😢','🙏'] as ChatEmoji[]).map(emoji=>(
+                      <Pressable key={emoji} style={styles.whatsappEmoji} onPress={()=>{
                         react(menuMessage.seq,emoji);setMenuMessage(null);
-                      }}><Text style={styles.menuEmojiText}>{emoji}</Text></Pressable>
+                      }}><Text style={styles.whatsappEmojiText}>{emoji}</Text></Pressable>
                     ))}
+                    <Pressable style={styles.whatsappPlus} onPress={()=>setMenuMessage(null)}>
+                      <Text style={styles.whatsappPlusText}>＋</Text>
+                    </Pressable>
                   </View>
-                  <Pressable style={styles.menuOption} onPress={()=>{
-                    const m=menuMessage;setMenuMessage(null);replyToMessage(m);
-                  }}><Text style={styles.menuOptionText}>↪  Responder</Text></Pressable>
-                  {menuMessage.senderId===session.actorId && !menuMessage.pending &&
-                    Date.now()-Date.parse(menuMessage.sentAt)<900000 ? (
-                    <Pressable style={styles.menuOption} onPress={()=>{
-                      const m=menuMessage;setMenuMessage(null);manageOwn(m);
-                    }}><Text style={styles.menuOptionText}>✎  Editar</Text></Pressable>
-                  ):null}
-                  {menuMessage.senderId===session.actorId && !menuMessage.pending &&
-                    Date.now()-Date.parse(menuMessage.sentAt)<48*60*60*1000 ? (
-                    <Pressable style={styles.menuOption} onPress={()=>{
-                      const m=menuMessage;setMenuMessage(null);
-                      Alert.alert('Eliminar mensaje','¿Eliminar para todos los participantes?',[
-                        {text:'Cancelar',style:'cancel'},
-                        {text:'Eliminar para todos',style:'destructive',onPress:()=>manageOwn(m,true)},
-                      ]);
-                    }}><Text style={styles.deleteMenuText}>Eliminar para todos</Text></Pressable>
+                  {menuMessage.senderId===session.actorId && !menuMessage.pending ? (
+                    <View style={styles.whatsappActionBar}>
+                      {Date.now()-Date.parse(menuMessage.sentAt)<48*60*60*1000 ? (
+                        <Pressable style={styles.whatsappAction} onPress={()=>{
+                          const m=menuMessage;setMenuMessage(null);
+                          Alert.alert('Borrar mensaje','¿Borrar este mensaje para todos?',[
+                            {text:'Cancelar',style:'cancel'},
+                            {text:'Borrar',style:'destructive',onPress:()=>manageOwn(m,true)},
+                          ]);
+                        }}><Text style={styles.whatsappDeleteText}>Borrar</Text></Pressable>
+                      ):null}
+                      {Date.now()-Date.parse(menuMessage.sentAt)<900000 ? (
+                        <Pressable style={styles.whatsappAction} onPress={()=>{
+                          const m=menuMessage;setMenuMessage(null);manageOwn(m);
+                        }}><Text style={styles.whatsappActionText}>Editar</Text></Pressable>
+                      ):null}
+                    </View>
                   ):null}
                 </Pressable>:null}
               </Pressable>
@@ -673,15 +674,17 @@ const styles = StyleSheet.create({
   deletedText:{fontStyle:'italic',opacity:.72},
   reactionBadges:{flexDirection:'row',gap:4,alignSelf:'flex-end',marginTop:5},
   reactionBadge:{fontSize:11,color:'#403c34',backgroundColor:'#e8e5dc',paddingHorizontal:5,paddingVertical:1,borderRadius:9,overflow:'hidden'},
-  menuBackdrop:{flex:1,backgroundColor:'rgba(0,0,0,.35)',justifyContent:'flex-end'},
-  menuSheet:{backgroundColor:'#fffaf4',borderTopLeftRadius:23,borderTopRightRadius:23,padding:19,paddingBottom:46},
-  menuTitle:{fontSize:14,color:'#6b655c',marginBottom:17},
-  menuEmojiRow:{flexDirection:'row',justifyContent:'space-around',marginBottom:12},
-  menuEmoji:{paddingHorizontal:16,paddingVertical:12},
-  menuEmojiText:{fontSize:27},
-  menuOption:{paddingVertical:14,borderBottomWidth:1,borderBottomColor:'#e9e1d6'},
-  menuOptionText:{fontSize:16,color:'#262621'},
-  deleteMenuText:{fontSize:16,color:'#a13b39'},
+  whatsappBackdrop:{flex:1,backgroundColor:'rgba(20,19,16,.16)',justifyContent:'center',paddingHorizontal:8},
+  whatsappContext:{width:'100%',alignItems:'stretch',gap:10},
+  whatsappEmojiBar:{flexDirection:'row',alignItems:'center',justifyContent:'space-around',backgroundColor:'#fff',borderRadius:40,paddingHorizontal:5,paddingVertical:7,elevation:8},
+  whatsappEmoji:{paddingHorizontal:3,paddingVertical:7},
+  whatsappEmojiText:{fontSize:27},
+  whatsappPlus:{width:38,height:38,borderRadius:19,backgroundColor:'#e8e8e8',alignItems:'center',justifyContent:'center'},
+  whatsappPlusText:{fontSize:25,color:'#555'},
+  whatsappActionBar:{alignSelf:'flex-end',flexDirection:'row',alignItems:'center',backgroundColor:'#fff',borderRadius:13,paddingHorizontal:5,elevation:8},
+  whatsappAction:{paddingHorizontal:17,paddingVertical:14},
+  whatsappActionText:{fontSize:16,fontWeight:'600',color:'#25251f'},
+  whatsappDeleteText:{fontSize:16,fontWeight:'600',color:'#b3261e'},
   replyLabel: {fontSize:12,color:'#686b66',marginBottom:5},
   actions: { flexDirection:'row',alignItems:'center',gap:5,marginTop:6 },
   actionButton: {paddingVertical:5,paddingHorizontal:3},
