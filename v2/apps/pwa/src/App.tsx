@@ -479,7 +479,7 @@ export default function App() {
             <div className="whatsapp-context" role="dialog" aria-label="Acciones del mensaje"
               onClick={e=>e.stopPropagation()}>
               <div className="whatsapp-reactions">
-                {(['👍','❤️','😂','😮','😢','🙏'] as ChatEmoji[]).map(emoji=>
+                {(['👍','❤️','😂'] as ChatEmoji[]).map(emoji=>
                   <button type="button" key={emoji} aria-label={emoji} onClick={()=>{react(menuMessage.seq,emoji);setMenuMessage(null);}}>
                     {emoji}
                   </button>)}
