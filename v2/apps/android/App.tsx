@@ -109,6 +109,8 @@ export default function App() {
       .catch(reason => {
         if (!disposed.current && activeSession.current?.actorId === next.actorId) {
           setError(reason instanceof Error ? reason.message : 'No se pudo actualizar el historial');
+          // A temporary history failure must not block queued outgoing messages.
+          flushOutbox();
         }
       });
   }
@@ -132,6 +134,7 @@ export default function App() {
     }
     clearRetryTimer();
     const previous = socket.current;
+    if (previous) pauseOutgoing();
     socket.current = null; // previous close events cannot race with a new connection
     previous?.close();
     setConnection('conectando…');
@@ -147,6 +150,7 @@ export default function App() {
     function retry() {
       if (disposed.current || appLifecycle.current !== 'active' || socket.current !== ws ||
         !activeSession.current || retryTimer.current) return;
+      pauseOutgoing();
       retryAttempts.current += 1;
       const delay = Math.min(20000, 1000 * 2 ** Math.min(retryAttempts.current - 1, 5));
       setConnection('reconectando…');
