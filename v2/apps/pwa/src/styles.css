@@ -62,11 +62,12 @@ h1 span { font-weight:400; }
 .bubble .deleted-message{font-style:italic;opacity:.7}
 .reaction-counts{display:flex;align-items:center;justify-content:flex-end;gap:4px;margin-top:5px}
 .reaction-counts span{font-size:11px;line-height:1.3;border-radius:9px;padding:2px 6px;background:#e6e2d8;color:#38372f}
-.message-menu-overlay{position:fixed;inset:0;z-index:1000;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.32)}
-.message-menu{width:min(100%,720px);padding:19px 20px calc(24px + env(safe-area-inset-bottom));background:#fffaf4;border-radius:23px 23px 0 0;box-shadow:0 -6px 28px #0002}
-.message-menu-preview{font-size:13px;color:#665f55;margin:0 0 13px;max-height:44px;overflow:hidden}
-.message-menu-emoji{display:flex;justify-content:space-around;margin:8px 0 15px}
-.message-menu-emoji button{font-size:27px;background:none;border:0;padding:9px 16px}
-.message-menu-action{display:block;width:100%;padding:14px 4px;border:0;border-bottom:1px solid #e9e1d6;background:transparent;text-align:left;font-size:16px;color:#292822}
-.message-menu-action.dangerous{color:#a13b39}
-.message-menu-dismiss{display:block;width:100%;background:transparent;border:0;font-size:14px;color:#776f65;padding:16px 0 5px}
+.message-menu-overlay{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;background:rgba(20,19,16,.16)}
+.whatsapp-context{width:min(calc(100% - 20px),690px);display:flex;flex-direction:column;gap:10px;align-items:stretch}
+.whatsapp-reactions{display:flex;align-items:center;justify-content:space-around;gap:2px;padding:7px 9px;background:#fff;border-radius:40px;box-shadow:0 4px 20px #0002}
+.whatsapp-reactions button{border:0;background:transparent;border-radius:50%;font-size:27px;line-height:1;padding:8px 5px;min-width:38px}
+.whatsapp-reactions button:last-child{background:#e8e8e8;font-size:24px;color:#555}
+.whatsapp-actions{align-self:flex-end;display:flex;align-items:center;gap:0;background:#fff;border-radius:14px;padding:0 8px;box-shadow:0 4px 20px #0002}
+.whatsapp-actions button{background:transparent;border:0;padding:14px 18px;font-size:16px;font-weight:600;color:#25251f}
+.whatsapp-actions .whatsapp-delete{color:#b3261e}
+@media(min-width:600px){.whatsapp-context{width:min(92%,480px)}}
