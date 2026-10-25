@@ -1220,8 +1220,14 @@ El estado vigente siempre es el HEAD de `havana-nice-v2-foundation`. No fijar es
 - **Preferencia de entrega PRIORITARIA Y PERMANENTE**: cada actualización de la app nativa Android debe incluir un enlace simple visible exactamente con el texto **"Descarga directa alternativa"** vinculado al APK externo `https://raw.githubusercontent.com/Abnernoa97/havana-nice-pwa/havana-nice-v2-apk-downloads/<archivo-actualizado>.apk`; este formato es el que el usuario abre para descargar e instalar directamente desde el chat. Puede añadirse un botón opcional pero NUNCA sustituye este enlace de texto. No entregar solo sandbox ni vínculos a páginas intermedias o ZIP de GitHub Actions. Verificar antes código HTTP 200 y SHA-256 del APK.
 - No modificar `main`, producción ni la PWA oficial. No adelantar CHAT 2 hasta verificar que la reconexión nativa automática funciona en teléfono real.
 
+## Confirmación de usuario y apertura de CHAT 2 (2026-10-25)
+- El usuario confirmó «Ya quedó, con que seguimos» tras recibir e instalar la APK `HAVANA-NICE-V2-CHAT1-AUTO-RECONNECT.apk`. Se considera aceptado el recorrido físico base de CHAT 1 y el retorno automático al chat, sin afirmar que ya se ejecutaron las pruebas de estrés pendientes.
+- Próxima vertical, **CHAT 2 — ESTADOS Y RECONEXIÓN**, conforme sección 10: `enviando`, `enviado`, `error`, reintento manual, cola offline, recuperación posterior, idempotencia, orden estable. Implementar tanto Android como iPhone PWA, reutilizar D1 y Durable Object; sin tocar producción.
+- Para CHAT 2, los estados `enviado` significan confirmación de persistencia/eco del servidor, NO lectura ni recepción por el destinatario (reservado para fases posteriores). Los mensajes creados offline deben conservar el mismo `clientMessageId` cuando se transmitan. Entrega de esta fase necesita prueba física.
+- Mantener la entrega Android mediante enlace Markdown exacto **[Descarga directa alternativa]** directamente al APK publicado en la rama aislada `havana-nice-v2-apk-downloads`, con verificación HTTP 200 y SHA-256.
+
 ## En curso
-FASE 0 CERRADA. CHAT 1 — TEXTO BÁSICO: comunicación Android ↔ PWA y composer correctos según usuario. Nueva incidencia física: socket Android no reconectaba al volver de segundo plano. Se agregó recuperación AppState y reintentos automáticos en V2 Android. CI pasó, release APK y descarga pendientes, y se requiere prueba física para aprobar reconexión. No iniciar CHAT 2.
+FASE 0 CERRADA. CHAT 1 — APROBADO PARA CONTINUIDAD por confirmación del usuario el 2026-10-25 («Ya quedó»): mensajes cruzados y retorno a primer plano sin reconexión manual. CHAT 2 — ESTADOS Y RECONEXIÓN EN DESARROLLO. Pruebas de estrés de 20 mensajes, redes y escenarios sin conexión siguen exigidas antes de cerrar CHAT 2.
 
 ## Siguiente paso exacto
 1. Con la APK CHAT 1 ya instalada y la PWA abierta, tocar **Reconectar** en ambas interfaces. No reinstalar; la corrección está en el Worker.
@@ -1233,7 +1239,7 @@ FASE 0 CERRADA. CHAT 1 — TEXTO BÁSICO: comunicación Android ↔ PWA y compos
 R2 se activa y crea antes de CHAT 6 — FOTOS, no antes.
 
 ## Primer módulo después de FASE 0
-CHAT 1 — TEXTO BÁSICO Android ↔ iPhone PWA (EN CURSO).
+CHAT 1 — TEXTO BÁSICO aprobado para continuidad. CHAT 2 — ESTADOS Y RECONEXIÓN EN CURSO.
 
 ---
 
