@@ -168,7 +168,7 @@ export class ChatRoom {
         'SELECT seq,sender_id,created_at,deleted_at FROM chat_messages WHERE seq=?'
       ).bind(input.seq).first();
       if (!own || own.sender_id !== senderId || own.deleted_at ||
-          Date.now() - Date.parse(own.created_at) > CHAT_EDIT_WINDOW_MS ||
+          Date.now() - Date.parse(own.created_at) > (input.type === 'chat.delete' ? 48 * 60 * 60 * 1000 : CHAT_EDIT_WINDOW_MS) ||
           !Number.isFinite(Date.parse(own.created_at))) {
         this.send(socket,{type:'chat.error',error:'No puedes modificar este mensaje'});return;
       }
@@ -181,8 +181,10 @@ export class ChatRoom {
           'UPDATE chat_messages SET body=?,edited_at=? WHERE seq=? AND sender_id=? AND deleted_at IS NULL'
         ).bind(input.text.trim(),now,input.seq,senderId).run();
       } else {
+        // chat_messages.body has CHECK(length(body) BETWEEN 1 AND 2000).
+        // Deletion must retain a nonempty tombstone, never write body=''.
         await this.env.DB.prepare(
-          "UPDATE chat_messages SET body='',deleted_at=? WHERE seq=? AND sender_id=? AND deleted_at IS NULL"
+          "UPDATE chat_messages SET body='[mensaje eliminado]',deleted_at=? WHERE seq=? AND sender_id=? AND deleted_at IS NULL"
         ).bind(now,input.seq,senderId).run();
         await this.env.DB.prepare('DELETE FROM chat_reactions WHERE message_seq=?').bind(input.seq).run();
       }
