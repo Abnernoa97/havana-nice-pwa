@@ -72,7 +72,7 @@ function websocketSessionToken(request) {
 }
 
 function mapMessage(row) {
-  return { seq: row.seq, clientMessageId: row.client_message_id, senderId: row.sender_id, senderName: row.sender_name, text: row.body, sentAt: row.created_at };
+  return { seq: row.seq, clientMessageId: row.client_message_id, senderId: row.sender_id, senderName: row.sender_name, text: row.body, sentAt: row.created_at, replyToSeq: row.reply_to_seq ?? null };
 }
 
 export class ChatRoom {
@@ -80,6 +80,8 @@ export class ChatRoom {
     this.state = state;
     this.env = env;
     this.sockets = new Set();
+    this.members = new Map();
+    this.typingSent = new Map();
   }
   async fetch(request) {
     if (new URL(request.url).pathname === '/health') return Response.json({ ok: true, durableObject: 'ChatRoom', environment: this.env.HAVANA_ENV || 'development' });
@@ -96,13 +98,20 @@ export class ChatRoom {
     const client = pair[0], server = pair[1];
     server.accept();
     this.sockets.add(server);
-    server.send(JSON.stringify({ type: 'chat.ready', at: new Date().toISOString() }));
+    this.members.set(server, {actorId, name});
+    server.send(JSON.stringify({ type: 'chat.ready', at: new Date().toISOString(), users: this.onlineUsers() }));
+    this.broadcast({ type: 'chat.presence', users: this.onlineUsers() });
     server.addEventListener('message', event => {
       this.state.waitUntil(this.onMessage(server, actorId, name, event.data).catch(() => {
         this.send(server, { type: 'chat.error', error: 'Delivery failed' });
       }));
     });
-    const cleanup = () => this.sockets.delete(server);
+    const cleanup = () => {
+      this.sockets.delete(server);
+      this.members.delete(server);
+      this.typingSent.delete(server);
+      this.broadcast({ type: 'chat.presence', users: this.onlineUsers() });
+    };
     server.addEventListener('close', cleanup);
     server.addEventListener('error', cleanup);
     // Client offered havana-v2; explicitly select it in 101 response.
@@ -118,20 +127,57 @@ export class ChatRoom {
   broadcast(data) {
     for (const socket of this.sockets) this.send(socket, data);
   }
+  onlineUsers() {
+    const users = new Map();
+    for (const member of this.members.values()) users.set(member.actorId, member.name);
+    return [...users.entries()].map(([actorId, displayName]) => ({actorId, displayName}));
+  }
   async onMessage(socket, senderId, senderName, raw) {
     if (typeof raw !== 'string' || raw.length > 10000) return this.send(socket, { type: 'chat.error', error: 'Invalid message' });
     let input;
     try { input = JSON.parse(raw); } catch { return this.send(socket, { type: 'chat.error', error: 'Invalid JSON' }); }
+    if (input.type === 'chat.typing') {
+      const now = Date.now();
+      if (typeof input.active !== 'boolean' || now - (this.typingSent.get(socket) || 0) < 750) return;
+      this.typingSent.set(socket, now);
+      const signal = {type: 'chat.typing', actorId: senderId, senderName, active: input.active, expiresAt: now + 4000};
+      for (const other of this.sockets) if (other !== socket) this.send(other, signal);
+      return;
+    }
+    if (input.type === 'chat.react') {
+      if (!Number.isSafeInteger(input.messageSeq) || input.messageSeq < 1 || !['❤️','😂','👍'].includes(input.emoji)) {
+        this.send(socket, {type:'chat.error',error:'Invalid reaction'}); return;
+      }
+      const exists = await this.env.DB.prepare('SELECT seq FROM chat_messages WHERE seq = ?').bind(input.messageSeq).first();
+      if (!exists) { this.send(socket,{type:'chat.error',error:'Message not found'}); return; }
+      const current = await this.env.DB.prepare('SELECT actor_id FROM chat_reactions WHERE message_seq=? AND actor_id=? AND emoji=?')
+        .bind(input.messageSeq,senderId,input.emoji).first();
+      if (current) {
+        await this.env.DB.prepare('DELETE FROM chat_reactions WHERE message_seq=? AND actor_id=? AND emoji=?')
+          .bind(input.messageSeq,senderId,input.emoji).run();
+      } else {
+        await this.env.DB.prepare('INSERT OR IGNORE INTO chat_reactions(message_seq,actor_id,emoji,created_at) VALUES (?,?,?,?)')
+          .bind(input.messageSeq,senderId,input.emoji,new Date().toISOString()).run();
+      }
+      this.broadcast({type:'chat.reaction',messageSeq:input.messageSeq,actorId:senderId,emoji:input.emoji,active:!current});
+      return;
+    }
     if (input.type !== 'chat.send' || typeof input.clientMessageId !== 'string' || !/^[A-Za-z0-9_-]{8,100}$/.test(input.clientMessageId) || typeof input.text !== 'string') {
       return this.send(socket, { type: 'chat.error', error: 'Invalid message format' });
     }
     const text = input.text.trim();
     if (!text || text.length > MAX_TEXT) return this.send(socket, { type: 'chat.error', error: 'Text length must be 1–2000' });
+    const reply = input.replyToSeq === null || input.replyToSeq === undefined ? null : input.replyToSeq;
+    if (reply !== null) {
+      if (!Number.isSafeInteger(reply) || reply < 1) { this.send(socket,{type:'chat.error',error:'Invalid reply'}); return; }
+      const original = await this.env.DB.prepare('SELECT seq FROM chat_messages WHERE seq=?').bind(reply).first();
+      if (!original) { this.send(socket,{type:'chat.error',error:'Original message not found'}); return; }
+    }
     const result = await this.env.DB.prepare(
-      'INSERT OR IGNORE INTO chat_messages (client_message_id, sender_id, sender_name, body, created_at) VALUES (?, ?, ?, ?, ?)'
-    ).bind(input.clientMessageId, senderId, senderName, text, new Date().toISOString()).run();
+      'INSERT OR IGNORE INTO chat_messages (client_message_id, sender_id, sender_name, body, created_at, reply_to_seq) VALUES (?, ?, ?, ?, ?, ?)'
+    ).bind(input.clientMessageId, senderId, senderName, text, new Date().toISOString(), reply).run();
     const row = await this.env.DB.prepare(
-      'SELECT seq, client_message_id, sender_id, sender_name, body, created_at FROM chat_messages WHERE sender_id = ? AND client_message_id = ?'
+      'SELECT seq, client_message_id, sender_id, sender_name, body, created_at, reply_to_seq FROM chat_messages WHERE sender_id = ? AND client_message_id = ?'
     ).bind(senderId, input.clientMessageId).first();
     if (!row) throw new Error('Persistence failure');
     const event = { type: 'chat.message', message: mapMessage(row) };
@@ -172,11 +218,19 @@ export default {
       const seq = after === null ? null : Number(after);
       if (seq !== null && (!Number.isSafeInteger(seq) || seq < 0)) return respond({ error: 'Invalid cursor' }, 400, origin);
       const query = seq === null
-        ? env.DB.prepare('SELECT seq, client_message_id, sender_id, sender_name, body, created_at FROM chat_messages ORDER BY seq DESC LIMIT ?').bind(MAX_HISTORY)
-        : env.DB.prepare('SELECT seq, client_message_id, sender_id, sender_name, body, created_at FROM chat_messages WHERE seq > ? ORDER BY seq ASC LIMIT ?').bind(seq, MAX_HISTORY);
+        ? env.DB.prepare('SELECT seq, client_message_id, sender_id, sender_name, body, created_at, reply_to_seq FROM chat_messages ORDER BY seq DESC LIMIT ?').bind(MAX_HISTORY)
+        : env.DB.prepare('SELECT seq, client_message_id, sender_id, sender_name, body, created_at, reply_to_seq FROM chat_messages WHERE seq > ? ORDER BY seq ASC LIMIT ?').bind(seq, MAX_HISTORY);
       const rows = (await query.all()).results || [];
       if (seq === null) rows.reverse();
-      return respond({ messages: rows.map(mapMessage), hasMore: rows.length === MAX_HISTORY }, 200, origin);
+      const messageSeqs = rows.map(row => row.seq);
+      let reactions = [];
+      if (messageSeqs.length) {
+        const placeholders = messageSeqs.map(() => '?').join(',');
+        const query = await env.DB.prepare('SELECT message_seq, actor_id, emoji FROM chat_reactions WHERE message_seq IN ('+placeholders+')')
+          .bind(...messageSeqs).all();
+        reactions = query.results || [];
+      }
+      return respond({ messages: rows.map(mapMessage), reactions: reactions.map(r => ({messageSeq:r.message_seq,actorId:r.actor_id,emoji:r.emoji})), hasMore: rows.length === MAX_HISTORY }, 200, origin);
     }
     if (url.pathname === '/ws') {
       const session = await verifySession(env, websocketSessionToken(request));
