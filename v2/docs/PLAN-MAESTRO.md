@@ -1,7 +1,7 @@
 # HAVANA NICE V2 — PLAN MAESTRO ÚNICO
 
-**Última actualización:** 2026-10-24  
-**Estado:** FASE 0 — CERRADA; CHAT 1 — TEXTO BÁSICO EN CURSO  
+**Última actualización:** 2026-10-25  
+**Estado:** FASE 0 y CHAT 1 aprobados; paquete CHAT 2/3/4/5 validado parcialmente en dispositivos; CHAT 6 fotos pendiente de activación R2  
 **Costo objetivo permanente:** 0 MXN  
 **Plataformas:** Android nativo + iPhone PWA premium  
 **Backend oficial:** Cloudflare  
@@ -1248,15 +1248,24 @@ El estado vigente siempre es el HEAD de `havana-nice-v2-foundation`. No fijar es
 - Validación real pendiente: reply y reacciones ambos sentidos, presencia/escritura, envío offline Android/PWA, cierre forzado/relanzar, expiración de sesión, retransmisión y ausencia de duplicados. No marcar todas las funciones oficialmente cerradas hasta que la prueba física las confirme.
 - Entregar una sola descarga mediante Markdown **[Descarga directa alternativa]** apuntando a `https://raw.githubusercontent.com/Abnernoa97/havana-nice-pwa/havana-nice-v2-apk-downloads/HAVANA-NICE-V2-COMPLETE-CHAT-PACK.apk` exclusivamente si publicación validada. No proporcionar sandbox como vía principal.
 
+## Evidencia física del paquete consolidado — 2026-10-25
+- El usuario respondió «Listo» y compartió dos capturas tras instalar el paquete unificado `HAVANA-NICE-V2-COMPLETE-CHAT-PACK.apk`.
+- La captura Android nativo muestra **«en vivo»**, varios globos del historial sincronizado, acciones visibles **Responder/❤️/😂/👍**, contadores de reacción (❤️1, 👍1), indicador **2 en línea** y composer correctamente ubicado por encima de la navegación Android.
+- La captura de PWA muestra **«en vivo»**, las mismas entradas del historial, las acciones de respuesta/reacción y los contadores sincronizados. Muestra **1 en línea**, pero las capturas tienen marcas de tiempo distintas (10:19 y 10:20); eso NO demuestra fallo de presencia.
+- Se considera **aceptado visualmente el paquete en ambos clientes**, NO equivale a haber probado la acción efectiva de responder ni el indicador de escritura, ni la supervivencia de mensajes en cola después de un cierre forzoso y reconexión; esos casos siguen abiertos y deben ser testeados antes del cierre formal de CHAT 2/3/4/5.
+- Siguiente vertical según Plan Maestro: **CHAT 6 — FOTOS**, que requiere R2 privado, metadatos de medios, thumbnails, control de acceso, progreso y reintentos Android/PWA.
+- Verificación R2 real mediante Cloudflare conectado: `GET /accounts/.../r2/buckets` devolvió **HTTP 403 / código 10042 «Please enable R2 through the Cloudflare Dashboard»**. La conexión ya dispone de permisos R2 read/write; reconectar no resuelve esta prohibición. Solo la activación inicial en el Dashboard oficial por parte del titular desbloquea el almacenamiento R2; NO se intentó bypass ni se cambió producción.
+- Hasta esa autorización, no marcar CHAT 6 listo ni afirmar que fotos se pueden subir. Se conserva el objetivo de paquete consolidado, evitando una APK por corrección menor.
+
 ## En curso
-FASE 0 cerrada, CHAT 1 aprobado. Paquete consolidado CHAT 2/3/4/5 listo para prueba física: backend Worker/D1 desplegados, PWA en Cloudflare Pages producción V2, CI `40209865949` SUCCESS, APK release autónomo publicado externamente con SHA-256 y HTTP 200 verificadas. Falta aprobar desde dispositivos físicos reacciones/replies/presencia y cola tras cierre. No declarar módulos completos ni avanzar multimedia/push sin R2/FCM/Web Push.
+FASE 0 cerrada, CHAT 1 aprobado. Paquete CHAT 2/3/4/5 comprobado visualmente en Android y PWA por el usuario el 2026-10-25 (ambos «en vivo», historial, reacciones sincronizadas y controles de respuesta). Pendientes pruebas operativas de responder/escribiendo/offline tras cierre, necesarias para cerrar módulos. CHAT 6 — FOTOS requiere activación inicial R2 en Dashboard (HTTP 403 / 10042); no tocar producción ni ofrecer multimedia hasta desbloqueo.
 
 ## Siguiente paso exacto
-1. Con la APK CHAT 1 ya instalada y la PWA abierta, tocar **Reconectar** en ambas interfaces. No reinstalar; la corrección está en el Worker.
-2. Abrir/actualizar PWA V2 en iPhone y entrar con nombres distintos y la misma clave temporal de laboratorio suministrada en el chat (NO escrita en código).
-3. Enviar Android → iPhone y luego iPhone → Android; comprobar que llegan al instante, sin refresh.
-4. Probar 20 mensajes, envío simultáneo, cierre/arranque, Wi-Fi/datos y ausencia de duplicados; registrar problemas.
-5. Solo cuando el usuario confirme todas las pruebas, marcar CHAT 1 CERRADO y comenzar CHAT 2 — ESTADOS / RECONEXIÓN.
+1. Marcar paquete CHAT 2/3/4/5 como validado visualmente en los dos clientes; NO cerrar pruebas de mensajes offline, respuestas funcionales, typing y sesiones caducadas sin evidencia.
+2. En el Dashboard oficial de Cloudflare, el titular debe activar R2 para la cuenta **Soloaplicaciones**; API R2 confirmó HTTP 403 / 10042 y exige activación inicial manual. No hay solución con permisos o reconexión del conector.
+3. Tras la activación, crear solo bucket privado de HAVANA NICE V2, enlazarlo únicamente a `havana-nice-v2-dev`, diseñar acceso autenticado y preparar CHAT 6 FOTOS Android + PWA.
+4. Validar fotos en ambos sentidos, varios archivos, red lenta, compresión, vista previa, reconexión y acceso privado antes de declarar CHAT 6 terminado.
+5. Entregar las próximas APK siempre con enlace Markdown exacto **[Descarga directa alternativa]** verificado HTTP 200, manteniendo `main` y producción intactos.
 
 R2 se activa y crea antes de CHAT 6 — FOTOS, no antes.
 
