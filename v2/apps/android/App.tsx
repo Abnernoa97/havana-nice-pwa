@@ -63,12 +63,15 @@ export default function App() {
 
   // Each retry retains the original clientMessageId. D1 UNIQUE(sender_id, id)
   // prevents duplicates if the server stored a message before connection loss.
-  function flushOutbox(includeUncertain = false) {
+  function flushOutbox() {
     const ws = socket.current;
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
     const pending = [...outbox.current.values()].sort((a, b) => a.sentAt.localeCompare(b.sentAt));
-    for (const item of pending) {
-      if (!includeUncertain && item.deliveryStatus !== 'queued') continue;
+    // Preserve sender order: wait for server ACK before transmitting next item.
+    if (pending.some(item => item.deliveryStatus === 'sending')) return;
+    const item = pending[0];
+    if (!item || item.deliveryStatus !== 'queued') return;
+    {
       try {
         ws.send(JSON.stringify({ type: 'chat.send', clientMessageId: item.clientMessageId, text: item.text }));
         markOutgoing(item.clientMessageId, 'sending');
@@ -192,6 +195,7 @@ export default function App() {
         if (item.type === 'chat.message') {
           confirmMessage(item.message);
           setMessages(before => reconcileChatMessages(before, [item.message]));
+          flushOutbox();
         } else if (item.type === 'chat.error') {
           setError(item.error);
         }
