@@ -4,9 +4,9 @@ import {
   StatusBar, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import {
-  HAVANA_V2_DEV_API_BASE_URL, fetchBackendHealth, getChatSnapshot, messageDeliveryLabel, newClientMessageId,
-  reconcileChatMessages, reconcileReactions, startLabChatSession,
-  type ChatMessage, type ChatServerEvent, type ChatSession, type ChatReaction, type ChatEmoji,
+  HAVANA_V2_DEV_API_BASE_URL, fetchBackendHealth, getChatSnapshot, getOlderChatMessages, searchChatMessages, lastReadByOther, messageDeliveryLabel, newClientMessageId,
+  reconcileChatMessages, reconcileReactions, reconcileUpdatedMessage, startLabChatSession,
+  type ChatMessage, type ChatServerEvent, type ChatSession, type ChatReaction, type ChatEmoji, type ChatReadReceipt,
 } from '@havana/shared';
 import { loadNativeLocalChat, saveNativeLocalChat } from './chatStorage';
 
@@ -24,8 +24,16 @@ export default function App() {
   const [reactions, setReactions] = useState<ChatReaction[]>([]);
   const [onlineCount, setOnlineCount] = useState(0);
   const [typing, setTyping] = useState('');
+  const [receipts,setReceipts] = useState<ChatReadReceipt[]>([]);
+  const [hasMore,setHasMore] = useState(false);
+  const [loadingOlder,setLoadingOlder] = useState(false);
+  const [searchText,setSearchText] = useState('');
+  const [results,setResults] = useState<ChatMessage[] | null>(null);
+  const [searching,setSearching] = useState(false);
+  const [editing,setEditing] = useState<ChatMessage | null>(null);
   const socket = useRef<WebSocket | null>(null);
   const scroll = useRef<React.ElementRef<typeof ScrollView> | null>(null);
+  const autoScroll = useRef(true);
   const activeSession = useRef<ChatSession | null>(null);
   const appLifecycle = useRef(AppState.currentState);
   const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -47,6 +55,39 @@ export default function App() {
     storageQueue.current = storageQueue.current.catch(() => {}).then(() => saveNativeLocalChat(value)).catch(() => {});
   }
 
+  function sendReadReceipt(seq:number) {
+    if(seq>0 && appLifecycle.current==='active' && socket.current?.readyState===WebSocket.OPEN) {
+      socket.current.send(JSON.stringify({type:'chat.read',seq}));
+    }
+  }
+  async function loadOlder() {
+    if(!session || loadingOlder || !hasMore) return;
+    const seqs=messages.filter(m=>m.seq>0).map(m=>m.seq);
+    if(!seqs.length)return;
+    setLoadingOlder(true);
+    autoScroll.current=false;
+    try {
+      const data=await getOlderChatMessages(session,Math.min(...seqs));
+      setHasMore(data.hasMore);
+      setMessages(before=>reconcileChatMessages(data.messages,before));
+      setReactions(before=>[...data.reactions.filter(x=>!before.some(y=>y.messageSeq===x.messageSeq&&y.actorId===x.actorId&&y.emoji===x.emoji)),...before]);
+    } catch(e){setError(e instanceof Error?e.message:'No se pudo cargar el historial');}
+    finally {setLoadingOlder(false);}
+  }
+  async function searchHistory(){
+    if(!session||searchText.trim().length<2){setResults(null);return;}
+    setSearching(true);
+    try{setResults(await searchChatMessages(session,searchText.trim()));}
+    catch(e){setError(e instanceof Error?e.message:'No se pudo buscar');}
+    finally{setSearching(false);}
+  }
+  function manageOwn(message:ChatMessage,deleting=false){
+    if(!session||message.senderId!==session.actorId||message.seq<1||
+      message.deletedAt||connection!=='en vivo')return;
+    if(Date.now()-Date.parse(message.sentAt)>900000){setError('El plazo de edición de 15 minutos terminó');return;}
+    if(!deleting){setReplyTo(null);setEditing(message);setDraft(message.text);return;}
+    socket.current?.send(JSON.stringify({type:'chat.delete',seq:message.seq}));
+  }
   function clearAck(id: string) {
     const timer = acknowledgementTimers.current.get(id);
     if (timer) clearTimeout(timer);
@@ -120,11 +161,14 @@ export default function App() {
 
   function syncMessages(next: ChatSession) {
     void getChatSnapshot(next)
-      .then(({ messages:history, reactions:historyReactions }) => {
+      .then(({ messages:history, reactions:historyReactions, receipts:readHistory,hasMore:more }) => {
         if (!disposed.current && activeSession.current?.actorId === next.actorId) {
           history.forEach(confirmMessage);
           setReactions(historyReactions);
+          setReceipts(readHistory);
+          setHasMore(more);
           setMessages(before => reconcileChatMessages(before, history));
+          sendReadReceipt(Math.max(0,...history.map(m=>m.seq)));
           flushOutbox();
         }
       })
@@ -223,11 +267,18 @@ export default function App() {
             if (typingTimer.current) clearTimeout(typingTimer.current);
             if (item.active) typingTimer.current = setTimeout(() => setTyping(''), 4300);
           }
+        } else if (item.type === 'chat.updated') {
+          setMessages(before=>reconcileUpdatedMessage(before,item.message));
+        } else if (item.type === 'chat.read') {
+          setReceipts(before=>[...before.filter(x=>x.actorId!==item.actorId),
+            {actorId:item.actorId,displayName:item.displayName,seq:Math.max(item.seq,
+              before.find(x=>x.actorId===item.actorId)?.seq||0)}]);
         } else if (item.type === 'chat.reaction') {
           setReactions(before => reconcileReactions(before, item));
         } else if (item.type === 'chat.message') {
           confirmMessage(item.message);
           setMessages(before => reconcileChatMessages(before, [item.message]));
+          sendReadReceipt(item.message.seq);
           flushOutbox();
         } else if (item.type === 'chat.error') {
           setError(item.error);
@@ -312,6 +363,9 @@ export default function App() {
       const next = await startLabChatSession(name.trim(), code.trim());
       setCode('');
       setMessages([]);
+      setReceipts([]);
+      setResults(null);
+      setHasMore(false);
       setSession(next);
       activeSession.current = next;
       persistLocal();
@@ -340,6 +394,13 @@ export default function App() {
 
   function send() {
     const text = draft.trim();
+    if(editing) {
+      if(socket.current?.readyState===WebSocket.OPEN && text && text!==editing.text) {
+        socket.current.send(JSON.stringify({type:'chat.edit',seq:editing.seq,text}));
+      }
+      setEditing(null);setDraft('');
+      return;
+    }
     if (!session || !text) return;
     if (outbox.current.size >= 100) {
       setError('La cola de mensajes está llena. Reintenta cuando vuelva Internet.');
@@ -398,13 +459,28 @@ export default function App() {
               <Text style={styles.roomTitle}>Conversación de laboratorio</Text>
               <Text style={styles.roomUser}>{typing || `${onlineCount} en línea · ${session.displayName}`}</Text>
             </View>
+            <View style={styles.searchRow}>
+              <TextInput accessibilityLabel="Buscar mensajes" style={styles.searchInput}
+                value={searchText} onChangeText={value=>{setSearchText(value);if(!value.trim())setResults(null);}}
+                placeholder="Buscar mensajes…" onSubmitEditing={()=>void searchHistory()} returnKeyType="search"
+                placeholderTextColor="#8a8174" />
+              <Pressable onPress={()=>void searchHistory()} disabled={searching||searchText.trim().length<2}>
+                <Text style={styles.searchAction}>{searching?'…':'Buscar'}</Text>
+              </Pressable>
+              {results!==null ? <Pressable onPress={()=>{setResults(null);setSearchText('');}}>
+                <Text style={styles.searchAction}>Cerrar</Text>
+              </Pressable> : null}
+            </View>
             <ScrollView
               ref={scroll} style={styles.messageList} contentContainerStyle={styles.messages}
               keyboardShouldPersistTaps="handled"
-              onContentSizeChange={() => scroll.current?.scrollToEnd({ animated: true })}
+              onContentSizeChange={() => {if(autoScroll.current)scroll.current?.scrollToEnd({animated:true});}}
             >
+              {results===null&&hasMore ? <Pressable style={styles.loadMore} disabled={loadingOlder}
+                onPress={()=>void loadOlder()}><Text style={styles.loadMoreText}>{loadingOlder?'Cargando…':'Cargar mensajes anteriores'}</Text></Pressable>:null}
+              {results!==null?<Text style={styles.searchCount}>{results.length} resultado(s)</Text>:null}
               {!messages.length ? <Text style={styles.empty}>¡Hola! Envía el primer mensaje. Aparecerá en los dos dispositivos.</Text> : null}
-              {messages.map(message => {
+              {(results??messages).map(message => {
                 const mine = message.senderId === session.actorId;
                 return (
                   <Pressable
@@ -416,12 +492,22 @@ export default function App() {
                     {message.replyToSeq ? (
                       <Text style={[styles.replyLabel, mine && styles.mineMeta]}>↪ {messages.find(m => m.seq === message.replyToSeq)?.text.slice(0,55) || 'Mensaje anterior'}</Text>
                     ) : null}
-                    <Text style={[styles.bubbleText, mine && styles.mineText]}>{message.text}</Text>
-                    {message.seq > 0 ? (
+                    <Text style={[styles.bubbleText, mine && styles.mineText]}>{message.deletedAt?'Mensaje eliminado':message.text}</Text>
+                    {message.seq > 0 && !message.deletedAt ? (
                       <View style={styles.actions}>
                         <Pressable onPress={() => setReplyTo(message)} style={styles.actionButton}>
                           <Text style={[styles.actionText,mine && styles.mineMeta]}>Responder</Text>
                         </Pressable>
+                        {mine && connection==='en vivo' && Date.now()-Date.parse(message.sentAt)<900000 ? (
+                          <>
+                            <Pressable style={styles.actionButton} onPress={()=>manageOwn(message)}>
+                              <Text style={[styles.actionText,mine&&styles.mineMeta]}>Editar</Text>
+                            </Pressable>
+                            <Pressable style={styles.actionButton} onPress={()=>manageOwn(message,true)}>
+                              <Text style={[styles.actionText,mine&&styles.mineMeta]}>Eliminar</Text>
+                            </Pressable>
+                          </>
+                        ):null}
                         {(['❤️','😂','👍'] as ChatEmoji[]).map(emoji => (
                           <Pressable key={emoji} onPress={() => react(message.seq,emoji)} style={styles.actionButton}>
                             <Text style={styles.actionText}>{emoji}{reactions.filter(r => r.messageSeq === message.seq && r.emoji === emoji).length || ''}</Text>
@@ -431,7 +517,7 @@ export default function App() {
                     ) : null}
                     <Text style={[styles.messageTime, mine && styles.mineMeta]}>
                       {new Date(message.sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      {mine ? ' · ' + messageDeliveryLabel(message) : ''}
+                      {message.editedAt&&!message.deletedAt?' · editado':''}{mine?' · '+messageDeliveryLabel(message):''}{mine&&!message.pending&&lastReadByOther(receipts,session.actorId)>=message.seq?' · leído':''}
                     </Text>
                   </Pressable>
                 );
@@ -443,7 +529,13 @@ export default function App() {
                 <Text style={styles.reconnectText}>Reintentar conexión</Text>
               </Pressable>
             ) : null}
-            {replyTo ? (
+            {editing ? <View style={styles.replyPreview}>
+              <Text style={styles.replyPreviewText}>Editando mensaje</Text>
+              <Pressable onPress={()=>{setEditing(null);setDraft('');}}>
+                <Text style={styles.replyCancel}>Cancelar</Text>
+              </Pressable>
+            </View>:null}
+            {replyTo && !editing ? (
               <View style={styles.replyPreview}>
                 <Text style={styles.replyPreviewText}>Respondiendo: {replyTo.text.slice(0,65)}</Text>
                 <Pressable onPress={() => setReplyTo(null)}><Text style={styles.replyCancel}>Cancelar</Text></Pressable>
@@ -456,7 +548,7 @@ export default function App() {
                 placeholder={connection === 'en vivo' ? 'Escribe un mensaje…' : 'Sin conexión: se enviará después…'} placeholderTextColor="#888"
               />
               <Pressable onPress={send} disabled={!draft.trim()} style={styles.sendButton}>
-                <Text style={styles.sendText}>Enviar</Text>
+                <Text style={styles.sendText}>{editing?'Guardar':'Enviar'}</Text>
               </Pressable>
             </View>
           </>
@@ -488,6 +580,13 @@ const styles = StyleSheet.create({
   room: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 22, paddingVertical: 14 },
   roomTitle: { fontSize: 13, fontWeight: '700' },
   roomUser: { fontSize: 13, color: '#69675e' },
+  searchRow: {flexDirection:'row',alignItems:'center',gap:9,paddingHorizontal:18,paddingVertical:6},
+  searchInput: {flex:1,borderWidth:1,borderColor:'#d6cbbc',borderRadius:16,paddingHorizontal:12,
+    paddingVertical:5,color:'#23231d',fontSize:13,backgroundColor:'#fffaf4',height:36},
+  searchAction:{fontSize:12,fontWeight:'700',color:'#79563f'},
+  loadMore:{alignSelf:'center',padding:10,marginBottom:10},
+  loadMoreText:{fontSize:12,fontWeight:'700',color:'#815d48'},
+  searchCount:{fontSize:12,color:'#68655e',textAlign:'center',paddingBottom:9},
   messageList: { flex: 1 },
   messages: { paddingHorizontal: 18, paddingTop: 20, paddingBottom: 18, flexGrow: 1 },
   empty: { color: '#746d60', fontSize: 14, textAlign: 'center', marginTop: 65, lineHeight: 21 },
