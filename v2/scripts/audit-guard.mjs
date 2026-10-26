@@ -62,6 +62,18 @@ present(android,/behavior=\{Platform\.OS === 'ios' \? 'padding' : 'height'\}/,
   'Native Android Chat must avoid IME with explicit height behavior');
 present(android,/keyboardVerticalOffset=\{0\}/,
   'Native Chat keyboard offset must be predictable');
+present(android,/Keyboard.addListener\('keyboardDidShow'/,
+  'Android Chat must react to IME visibility');
+present(android,/keyboardOpen && styles.screenKeyboard/,
+  'Android Chat must clear nav padding while the keyboard is open');
+absent(android,/<Text style=\{styles.roomTitle\}>HAVANA NICE · Chat<\/Text>/,
+  'Native Chat must not show the duplicated room banner');
+present(android,/\{searchOpen \? <View style=\{styles.searchRow\}>/,
+  'Native Chat search must be collapsible');
+absent(pwa,/<div className="room-title">/,
+  'PWA Chat must not show the duplicated room banner');
+present(pwa,/\{searchOpen&&<div className="chat-search">/,
+  'PWA Chat search must be collapsible');
 present(android,/Responder/,'Native contextual menu must provide a reply action');
 absent(android,/whatsappPlus|whatsappPlusText/,'Remove inert extra-reaction button on Android');
 present(webBubble,/getBoundingClientRect\(\)/,'PWA Chat must measure held message');
