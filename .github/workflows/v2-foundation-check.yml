@@ -59,6 +59,9 @@ jobs:
       - name: Prevent private API caching in iPhone PWA
         run: npm run test:sw -w @havana/pwa
 
+      - name: Check isolated Administrator PWA security
+        run: npm run test:admin -w @havana/pwa
+
       - name: Build iPhone PWA
         run: npm run build:pwa
 

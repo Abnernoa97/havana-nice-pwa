@@ -25,6 +25,8 @@ self.addEventListener('fetch', event => {
 
   const path = url.pathname;
   const navigation = req.mode === 'navigate';
+  // Admin HTML is strictly network-only; never serve cached Chat HTML instead.
+  if (navigation && path === '/admin.html') return;
   const staticAsset = path.startsWith('/assets/') || path.startsWith('/icons/') ||
     path === '/manifest.webmanifest';
   if (!navigation && !staticAsset) return;
