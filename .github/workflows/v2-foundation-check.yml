@@ -34,6 +34,9 @@ jobs:
       - name: Validate V2 foundation structure
         run: node scripts/check-structure.mjs
 
+      - name: Prevent V2 technical debt regressions
+        run: npm run audit:guard
+
       - name: Install exact dependencies
         run: npm ci
 
