@@ -18,7 +18,8 @@ test('admin never bundles secrets or produces fake privileged API calls',()=>{
 });
 test('admin HTML uses network-only navigation and does not register worker',()=>{
  assert.match(read('../public/sw.js'),/navigation && path === '\/admin\.html'\) return/);
- assert.doesNotMatch(main,/serviceWorker\.register/);
+ assert.match(main,/serviceWorker\.register\('\/sw\.js'/);
+ assert.match(read('../public/sw.js'),/navigation && path === '\/admin\.html'\) return/);
 });
 
 test('the one Administrator is independently installable on Android and iPhone',()=>{
