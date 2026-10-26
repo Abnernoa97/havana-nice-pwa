@@ -13,7 +13,8 @@ CREATE TABLE IF NOT EXISTS chat_device_requests (
   created_at INTEGER NOT NULL,
   expires_at INTEGER NOT NULL,
   decided_at INTEGER,
-  redeemed_at INTEGER
+  redeemed_at INTEGER,
+  redemption_nonce TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_chat_device_requests_actor_created ON chat_device_requests(actor_id,created_at);
 CREATE INDEX IF NOT EXISTS idx_chat_device_requests_status ON chat_device_requests(status,expires_at);

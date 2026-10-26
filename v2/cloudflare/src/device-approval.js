@@ -112,13 +112,14 @@ export async function handleDeviceApprovalApi(request,env,url,origin,respond,nor
     const member=await env.DB.prepare('SELECT active FROM chat_members WHERE actor_id=?').bind(row.actor_id).first();
     if(!member||member.active!==1)return errorReply(respond,origin,'Miembro no autorizado',403);
     const token=randomCredential(32), tokenHash=await tokenDigest(token);
+    const redemptionNonce=randomCredential(16);
     // D1 batch executes in a transaction; claim once and issue only for that claim.
     const results=await env.DB.batch([
-      env.DB.prepare("UPDATE chat_device_requests SET redeemed_at=? WHERE request_id=? AND request_secret_hash=? AND status='approved' AND redeemed_at IS NULL AND expires_at>?")
-        .bind(now,data.requestId,requestHash,now),
+      env.DB.prepare("UPDATE chat_device_requests SET redeemed_at=?,redemption_nonce=? WHERE request_id=? AND request_secret_hash=? AND status='approved' AND redeemed_at IS NULL AND expires_at>?")
+        .bind(now,redemptionNonce,data.requestId,requestHash,now),
       env.DB.prepare(
-        'INSERT INTO chat_sessions(token_hash,actor_id,display_name,expires_at,enrollment_id) SELECT ?,actor_id,display_name,?,request_id FROM chat_device_requests WHERE request_id=? AND redeemed_at=? AND status=\'approved\''
-      ).bind(tokenHash,now+SESSION_LIFETIME,data.requestId,now),
+        'INSERT INTO chat_sessions(token_hash,actor_id,display_name,expires_at,enrollment_id) SELECT ?,actor_id,display_name,?,request_id FROM chat_device_requests WHERE request_id=? AND redemption_nonce=? AND status=\'approved\''
+      ).bind(tokenHash,now+SESSION_LIFETIME,data.requestId,redemptionNonce),
     ]);
     if(Number(results[0]?.meta?.changes)!==1 || Number(results[1]?.meta?.changes)!==1)
       return errorReply(respond,origin,'La solicitud ya fue utilizada',409);

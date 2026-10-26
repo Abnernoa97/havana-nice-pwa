@@ -36,6 +36,8 @@ const migration=read('cloudflare/migrations/0009_chat_device_approvals.sql');
 present(approvals,/V2_DEVICE_APPROVAL_MODE === 'enforce'/,'S01 approvals must require explicit enablement');
 present(approvals,/V2_DEVICE_ADMIN_SECRET/,'S01 admin secret must never be hard-coded');
 present(approvals,/request_secret_hash/,'S01 must hash approval proof before D1 write');
+present(approvals,/redemptionNonce/,'S01 redeem token must be issued only for one atomic claim');
+present(migration,/redemption_nonce/,'S01 migration supports unique redemption claims');
 present(approvals,/verifyAdminRequest/,'S01 admin endpoints require independent authentication');
 present(migration,/ALTER TABLE chat_sessions ADD COLUMN enrollment_id/,'S01 migration must preserve existing sessions');
 absent(read('cloudflare/wrangler.jsonc'),/V2_DEVICE_APPROVAL_MODE/,'S01 gate may not be enabled before rollout');

@@ -7,7 +7,8 @@
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "typecheck": "tsc --noEmit",
-    "test:media": "node --test tests/media-drive.test.mjs"
+    "test:media": "node --test tests/media-drive.test.mjs",
+    "test:security": "node --test tests/device-approval.test.mjs"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20261023.1",
