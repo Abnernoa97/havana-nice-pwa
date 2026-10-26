@@ -2,12 +2,13 @@
   "expo": {
     "name": "HAVANA NICE V2",
     "slug": "havana-nice-v2",
-    "version": "0.0.1",
+    "version": "0.0.2",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "android": {
       "package": "com.havananice.v2",
-      "softwareKeyboardLayoutMode": "resize"
+      "softwareKeyboardLayoutMode": "resize",
+      "versionCode": 2
     },
     "extra": {
       "environment": "development"

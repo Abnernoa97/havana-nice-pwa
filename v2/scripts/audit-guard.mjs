@@ -49,6 +49,17 @@ present(androidWorkflow,/retention-days:\s*1\b/,'Keep Android build artifacts fo
 absent(androidWorkflow,/retention-days:\s*30\b/,'No 30-day APK artifacts');
 absent(distributor,/RUN_ID=\d{8,}/,'Distributor must not publish a pinned stale APK');
 present(distributor,/--commit "\$SHA"/,'Distributor must match exact Android source commit');
+const androidConfig=JSON.parse(read('apps/android/app.json'));
+assert.equal(androidConfig.expo.android.package,'com.havananice.v2',
+  'H01: never change Android package ID');
+assert.ok(Number.isInteger(androidConfig.expo.android.versionCode) && androidConfig.expo.android.versionCode >= 2,
+  'H01: release APK needs explicit Android versionCode');
+present(distributor,/previous_signer/,'H01: verify previous signing certificate before release');
+present(distributor,/test "\\$current_signer" = "\\$previous_signer"/,
+  'H01: block distribution if signature changes');
+present(distributor,/test "\\$current_code" -gt "\\$previous_code"/,
+  'H01: block non-monotonic Android versionCode');
+present(distributor,/sha256sum -c -/,'H01: verify hash of preceding released APK');
 
 // C01: both interfaces anchor the long-press menu to a real bubble; do not
 // allow the old centered overlay or inert '+' to regress on Android/iPhone.
