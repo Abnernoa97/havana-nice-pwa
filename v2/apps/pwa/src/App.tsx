@@ -26,6 +26,7 @@ export default function App() {
   const [hasMore, setHasMore] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchOpen,setSearchOpen] = useState(false);
   const [searchResults, setSearchResults] = useState<ChatMessage[] | null>(null);
   const [searching, setSearching] = useState(false);
   const [editing, setEditing] = useState<ChatMessage | null>(null);
@@ -466,9 +467,15 @@ export default function App() {
           <span className="brand">HAVANA NICE</span>
           <h1>Chat <span>V2</span></h1>
         </div>
-        <div className="header-status">
-          <span className={connection === 'en vivo' ? 'online-dot' : 'offline-dot'} />
-          {session ? connection : health?.ok ? 'API conectada' : 'Laboratorio'}
+        <div className="header-actions">
+          <div className="header-status">
+            <span className={connection === 'en vivo' ? 'online-dot' : 'offline-dot'} />
+            {session ? (typing || `${connection} · ${onlineUsers} en línea`) : health?.ok ? 'API conectada' : 'Laboratorio'}
+          </div>
+          {session&&<button className="search-toggle" type="button" aria-label="Buscar mensajes"
+            aria-expanded={searchOpen} onClick={()=>{
+              setSearchOpen(open=>!open);setSearchResults(null);setSearchQuery('');
+            }}>{searchOpen?'Cerrar':'Buscar'}</button>}
         </div>
       </header>
 
@@ -487,17 +494,13 @@ export default function App() {
         </section>
       ) : (
         <>
-          <div className="room-title">
-            <span>HAVANA NICE · Chat</span>
-            <span className="room-user">{typing || `${onlineUsers} en línea · ${session.displayName}`}</span>
-          </div>
-          <div className="chat-search">
+          {searchOpen&&<div className="chat-search">
             <input aria-label="Buscar en el chat" placeholder="Buscar mensajes…" value={searchQuery}
               onChange={e=>{setSearchQuery(e.target.value);if(!e.target.value.trim())setSearchResults(null);}}
               onKeyDown={e=>{if(e.key==='Enter')void runSearch();}}/>
             <button type="button" disabled={searching||searchQuery.trim().length<2} onClick={()=>void runSearch()}>{searching?'…':'Buscar'}</button>
             {searchResults&&<button type="button" onClick={()=>{setSearchResults(null);setSearchQuery('');}}>Cerrar</button>}
-          </div>
+          </div>}
           <section className="chat-messages" aria-label="Mensajes">
             {searchResults===null&&hasMore&&<button type="button" className="load-older" disabled={loadingOlder}
               onClick={()=>void loadOlder()}>{loadingOlder?'Cargando…':'Cargar mensajes anteriores'}</button>}
