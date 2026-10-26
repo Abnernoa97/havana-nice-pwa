@@ -29,6 +29,18 @@ for(const [value,label] of [[worker,'Worker'],[android,'Android'],[pwa,'PWA']]) 
 present(worker,/JOIN chat_members/,'Worker must validate the enabled member on session reuse');
 present(worker,/active=1/,'Worker must deny revoked names');
 present(worker,/chat\.revoked/,'Worker must notify active sessions when access is revoked');
+// Device approvals are staged behind an opt-in. Never switch on enrollment
+// until 0009 migration, admin secret and both native/web clients are ready.
+const approvals=read('cloudflare/src/device-approval.js');
+const migration=read('cloudflare/migrations/0009_chat_device_approvals.sql');
+present(approvals,/V2_DEVICE_APPROVAL_MODE === 'enforce'/,'S01 approvals must require explicit enablement');
+present(approvals,/V2_DEVICE_ADMIN_SECRET/,'S01 admin secret must never be hard-coded');
+present(approvals,/request_secret_hash/,'S01 must hash approval proof before D1 write');
+present(approvals,/verifyAdminRequest/,'S01 admin endpoints require independent authentication');
+present(migration,/ALTER TABLE chat_sessions ADD COLUMN enrollment_id/,'S01 migration must preserve existing sessions');
+absent(read('cloudflare/wrangler.jsonc'),/V2_DEVICE_APPROVAL_MODE/,'S01 gate may not be enabled before rollout');
+present(worker,/deviceGateEnabled\(env\)/,'Worker must gate new enrollment without breaking existing clients');
+present(worker,/device-revoked/,'S02 needs active WebSocket disconnect on per-device revoke');
 present(android,/restoreNamedChatSession/,'Android must restore only authorized remembered sessions');
 present(pwa,/restoreNamedChatSession/,'PWA must restore only authorized remembered sessions');
 

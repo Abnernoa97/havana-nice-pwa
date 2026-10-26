@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { handleChatMedia, mediaReadiness } from './drive-media.js';
+import { deviceGateEnabled, handleDeviceApprovalApi } from './device-approval.js';
 // HAVANA NICE V2 isolated Worker. Only D1-authorized musician names may enroll.
 // Random durable device credentials are issued once and validated against D1 on every request.
 const encoder = new TextEncoder();
@@ -52,11 +53,13 @@ async function verifySession(env, token) {
   if (typeof token !== 'string' || !/^[A-Za-z0-9_-]{40,100}$/.test(token)) return null;
   try {
     const row = await env.DB.prepare(
-      'SELECT s.actor_id, m.display_name, s.expires_at FROM chat_sessions s ' +
-      'JOIN chat_members m ON m.actor_id=s.actor_id AND m.active=1 WHERE s.token_hash=?'
+      'SELECT s.actor_id, m.display_name, s.expires_at' +
+      (deviceGateEnabled(env)?', s.enrollment_id':'') +
+      ' FROM chat_sessions s JOIN chat_members m ON m.actor_id=s.actor_id AND m.active=1 WHERE s.token_hash=?' +
+      (deviceGateEnabled(env)?" AND (s.enrollment_id IS NULL OR EXISTS (SELECT 1 FROM chat_device_requests d WHERE d.request_id=s.enrollment_id AND d.status='approved'))":'')
     ).bind(await sha256(token)).first();
     if (!row || !Number.isFinite(row.expires_at) || row.expires_at <= Date.now()) return null;
-    return { actorId: row.actor_id, displayName: row.display_name, exp: row.expires_at };
+    return { actorId: row.actor_id, displayName: row.display_name, exp: row.expires_at, enrollmentId:row.enrollment_id??null };
   } catch { return null; }
 }
 // Never accept the session from an URL query string (would leak into access logs).
@@ -86,6 +89,20 @@ export class ChatRoom {
   }
   async fetch(request) {
     if (new URL(request.url).pathname === '/health') return Response.json({ ok: true, durableObject: 'ChatRoom', environment: this.env.HAVANA_ENV || 'development' });
+    if (new URL(request.url).pathname === '/device-revoked' && request.method === 'POST') {
+      let data=null;
+      try {data=await request.json();}catch{}
+      if (!/^[A-Za-z0-9_-]{20,40}$/.test(data?.enrollmentId||'')) return respond({error:'Invalid enrollment'},400);
+      for (const [socket,member] of this.members.entries()) {
+        if(member.enrollmentId===data.enrollmentId) {
+          this.send(socket,{type:'chat.revoked',error:'Dispositivo revocado por administrador'});
+          socket.close(4003,'Device revoked');
+          this.sockets.delete(socket);this.members.delete(socket);this.typingSent.delete(socket);
+        }
+      }
+      this.broadcast({type:'chat.presence',users:this.onlineUsers()});
+      return respond({ok:true},200);
+    }
     if ((request.headers.get('upgrade') || '').toLowerCase() !== 'websocket') return respond({ error: 'WebSocket required' }, 426);
     // Authenticated in both Worker and DO, without rebuilding the upgrade Request:
     // cloning the original WebSocket handshake can break protocol upgrade.
@@ -100,7 +117,7 @@ export class ChatRoom {
     const client = pair[0], server = pair[1];
     server.accept();
     this.sockets.add(server);
-    this.members.set(server, {actorId, name, enrollmentToken});
+    this.members.set(server, {actorId, name, enrollmentToken, enrollmentId:session.enrollmentId??null});
     server.send(JSON.stringify({ type: 'chat.ready', at: new Date().toISOString(), users: this.onlineUsers() }));
     this.broadcast({ type: 'chat.presence', users: this.onlineUsers() });
     server.addEventListener('message', event => {
@@ -267,7 +284,11 @@ export default {
       return handleChatMedia(request, env, session, url, origin, respond);
     }
     if (url.pathname === '/realtime/health') return env.CHAT_ROOMS.get(env.CHAT_ROOMS.idFromName('foundation-health')).fetch('https://internal/health');
+    if (url.pathname.startsWith('/api/chat/device/') || url.pathname.startsWith('/api/chat/admin/device-requests')) {
+      return handleDeviceApprovalApi(request,env,url,origin,respond,normalizeMusicianName,ROOM);
+    }
     if (url.pathname === '/api/chat/session' && request.method === 'POST') {
+      if (deviceGateEnabled(env)) return respond({ error: 'Este dispositivo necesita autorización. Actualiza HAVANA NICE V2 para solicitar acceso.' }, 403, origin);
       let payload;
       try { payload = await request.json(); } catch { return respond({ error: 'Solicitud inválida' }, 400, origin); }
       const username = normalizeMusicianName(payload?.displayName);
