@@ -87,6 +87,31 @@ jobs:
           STATUS=$(curl --silent --show-error -o /tmp/v2-chat-session-unauthorized.json -w '%{http_code}' "$BASE/api/chat/session")
           test "$STATUS" = "401"
 
+      - name: Validate named sign-in, restored access, and device sign-out
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE="https://havana-nice-v2-dev.soloaplicaciones97.workers.dev"
+          STATUS="$(curl --silent --show-error --output /tmp/hn-v2-name-login.json --write-out '%{http_code}' \
+            -H 'Content-Type: application/json' -X POST "$BASE/api/chat/session" \
+            --data '{"displayName":"oRlY"}')"
+          test "$STATUS" = "200"
+          TOKEN="$(node -e "const s=require('/tmp/hn-v2-name-login.json');if(!s.token||s.actorId!=='member:orly'||s.displayName!=='Orly')process.exit(1);process.stdout.write(s.token)")"
+          test "${#TOKEN}" -ge 40
+          trap 'curl --silent --show-error --output /dev/null -X DELETE "$BASE/api/chat/session" -H "Authorization: Bearer $TOKEN" || true' EXIT
+          STATUS="$(curl --silent --show-error --output /tmp/hn-v2-name-restore.json --write-out '%{http_code}' \
+            "$BASE/api/chat/session" -H "Authorization: Bearer $TOKEN")"
+          test "$STATUS" = "200"
+          STATUS="$(curl --silent --show-error --output /tmp/hn-v2-name-history.json --write-out '%{http_code}' \
+            "$BASE/api/chat/messages" -H "Authorization: Bearer $TOKEN")"
+          test "$STATUS" = "200"
+          STATUS="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
+            -X DELETE "$BASE/api/chat/session" -H "Authorization: Bearer $TOKEN")"
+          test "$STATUS" = "200"
+          STATUS="$(curl --silent --show-error --output /tmp/hn-v2-revoked.json --write-out '%{http_code}' \
+            "$BASE/api/chat/session" -H "Authorization: Bearer $TOKEN")"
+          test "$STATUS" = "401"
+
       - name: Verify live private media endpoint is closed without independent Google OAuth
         shell: bash
         run: |
