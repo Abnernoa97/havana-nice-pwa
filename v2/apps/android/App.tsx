@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import {
   HAVANA_V2_DEV_API_BASE_URL, fetchBackendHealth, getChatSnapshot, getOlderChatMessages, searchChatMessages, lastReadByOther, messageDeliveryLabel, newClientMessageId,
-  reconcileChatMessages, reconcileReactions, reconcileUpdatedMessage, startLabChatSession,
+  reconcileChatMessages, reconcileReactions, reconcileUpdatedMessage, startNamedChatSession, restoreNamedChatSession,
   type ChatMessage, type ChatServerEvent, type ChatSession, type ChatReaction, type ChatEmoji, type ChatReadReceipt,
 } from '@havana/shared';
 import { loadNativeLocalChat, saveNativeLocalChat } from './chatStorage';
@@ -13,9 +13,9 @@ import SwipeableBubble from './SwipeableBubble';
 
 export default function App() {
   const [apiState, setApiState] = useState('conectando…');
-  const [name, setName] = useState('Android');
-  const [code, setCode] = useState('');
+  const [name, setName] = useState('');
   const [session, setSession] = useState<ChatSession | null>(null);
+  const [restoringAccess,setRestoringAccess] = useState(true);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState('');
   const [error, setError] = useState('');
@@ -216,7 +216,7 @@ export default function App() {
       persistLocal();
       setSession(null);
       setConnection('desconectado');
-      setError('Sesión de laboratorio caducada; vuelve a entrar con tu clave.');
+      setError('Tu acceso no está disponible. Escribe tu nombre para solicitar la entrada.');
       return;
     }
     clearRetryTimer();
@@ -302,6 +302,16 @@ export default function App() {
           setMessages(before => reconcileChatMessages(before, [item.message]));
           sendReadReceipt(item.message.seq);
           flushOutbox();
+        } else if (item.type === 'chat.revoked') {
+          socket.current = null;
+          ws.close();
+          clearRetryTimer();
+          activeSession.current = null;
+          outbox.current.clear();
+          setSession(null);
+          setConnection('desconectado');
+          setError('El administrador retiró tu acceso.');
+          void saveNativeLocalChat(null);
         } else if (item.type === 'chat.error') {
           setError(item.error);
         }
@@ -333,20 +343,29 @@ export default function App() {
 
   useEffect(() => {
     disposed.current = false;
-    void loadNativeLocalChat().then(saved => {
-      restoredStorage.current = true;
+    void loadNativeLocalChat().then(async saved => {
       if (disposed.current) return;
-      if (activeSession.current) {persistLocal();return;}
+      if (activeSession.current) {restoredStorage.current=true;persistLocal();return;}
       if (!saved?.session || Date.parse(saved.session.expiresAt) <= Date.now()) return;
-      activeSession.current = saved.session;
+      let approved:ChatSession | null = saved.session;
+      try {approved = await restoreNamedChatSession(saved.session);}
+      catch {approved = saved.session;} // Offline: retain local identity and retry once online
+      if (disposed.current) return;
+      if (!approved) {
+        await saveNativeLocalChat(null);
+        setName('');
+        setError('Acceso no autorizado. Consulta al administrador.');
+        return;
+      }
+      activeSession.current = approved;
       outbox.current = new Map(saved.outbox.map(m => [m.clientMessageId,{...m,pending:true,deliveryStatus:'queued' as const}]));
       setMessages([...outbox.current.values()]);
-      setSession(saved.session);
+      setSession(approved);
       latestDraft.current = saved.draft || '';
       setDraft(latestDraft.current);
-      setName(saved.session.displayName);
-      connectLatest.current(saved.session);
-    }).catch(() => {restoredStorage.current=true;});
+      setName(approved.displayName);
+      connectLatest.current(approved);
+    }).catch(() => {}).finally(() => {restoredStorage.current=true;setRestoringAccess(false);});
     void fetchBackendHealth()
       .then(value => { if (!disposed.current) setApiState(value.ok ? 'conectada' : 'error'); })
       .catch(() => { if (!disposed.current) setApiState('error'); });
@@ -391,12 +410,11 @@ export default function App() {
 
 
   async function join() {
-    if (!name.trim() || !code.trim() || joining) return;
+    if (!name.trim() || joining) return;
     setJoining(true);
     setError('');
     try {
-      const next = await startLabChatSession(name.trim(), code.trim());
-      setCode('');
+      const next = await startNamedChatSession(name.trim());
       setMessages([]);
       setReceipts([]);
       setResults(null);
@@ -467,32 +485,26 @@ export default function App() {
           <Text style={styles.connection}>{session ? connection : `API ${apiState}`}</Text>
         </View>
 
-        {!session ? (
+        {restoringAccess ? <View style={styles.login}><Text style={styles.description}>Abriendo HAVANA NICE…</Text></View> : !session ? (
           <View style={styles.login}>
-            <Text style={styles.overline}>CHAT 2 · ESTADOS Y RECONEXIÓN</Text>
-            <Text style={styles.loginTitle}>Conversemos.</Text>
-            <Text style={styles.description}>Una conversación compartida entre Android y iPhone. Laboratorio privado.</Text>
+            <Text style={styles.overline}>ACCESO HAVANA NICE</Text>
+            <Text style={styles.loginTitle}>Bienvenido.</Text>
+            <Text style={styles.description}>Escribe tu nombre autorizado la primera vez. En este teléfono se recordará tu acceso.</Text>
             <Text style={styles.label}>Tu nombre</Text>
             <TextInput
               accessibilityLabel="Tu nombre" style={styles.input} value={name}
-              onChangeText={setName} maxLength={28} autoCapitalize="words"
+              onChangeText={setName} maxLength={28} autoCapitalize="none" autoCorrect={false} placeholder="Tu nombre"
             />
-            <Text style={styles.label}>Clave de laboratorio</Text>
-            <TextInput
-              accessibilityLabel="Clave de laboratorio" style={styles.input} value={code}
-              onChangeText={setCode} secureTextEntry autoCapitalize="none" autoCorrect={false}
-              placeholder="Clave privada" placeholderTextColor="#888"
-            />
-            <Pressable onPress={() => void join()} disabled={joining || !name.trim() || !code.trim()} style={styles.joinButton}>
+            <Pressable onPress={() => void join()} disabled={joining || !name.trim()} style={styles.joinButton}>
               <Text style={styles.joinText}>{joining ? 'Conectando…' : 'Entrar al chat'}</Text>
             </Pressable>
             {error ? <Text style={styles.error}>{error}</Text> : null}
-            <Text style={styles.footer}>FASE 0 ✓ · Fundación completada</Text>
+            <Text style={styles.footer}>Si no estás autorizado, consulta al administrador.</Text>
           </View>
         ) : (
           <>
             <View style={styles.room}>
-              <Text style={styles.roomTitle}>Conversación de laboratorio</Text>
+              <Text style={styles.roomTitle}>HAVANA NICE · Chat</Text>
               <Text style={styles.roomUser}>{typing || `${onlineCount} en línea · ${session.displayName}`}</Text>
             </View>
             <View style={styles.searchRow}>
