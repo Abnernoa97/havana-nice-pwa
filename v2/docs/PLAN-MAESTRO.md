@@ -26,7 +26,7 @@
 
 ## B. PRIORIDAD ACTUAL — Chat completo y estable — 0/5
 
-- [ ] **C01 · Menú de interacción estilo WhatsApp.** **EN REVISIÓN:** pulsación prolongada, emojis junto a burbuja, acciones Editar/Borrar, menú bien posicionado; quitar o resolver el botón `+` que solo cierra el menú. Probar Android nativo e iPhone PWA.
+- [ ] **C01 · Menú de interacción estilo WhatsApp.** **CÓDIGO IMPLEMENTADO / QA FÍSICA PENDIENTE:** pulsación prolongada, menú anclado a la burbuja con límites de pantalla, ❤️ 😂 👍, **Responder** y Editar/Borrar cuando estén autorizados. Se retiró el botón `+` sin función. Se corrigió una llave CSS que restringía estilos del Chat iPhone a pantallas de menos de 380 px. Refactor exclusivo del Chat RN Android y Chat PWA iPhone, sin cambios de Worker, D1 o sesiones. CI de fuente `40362440346` **SUCCESS** (audit guard, typecheck, pruebas, build PWA y export Android). Falta APK firmada publicada y prueba física visual Android/iPhone, menú sobre mensajes en extremos de pantalla, emoji, Responder, Editar/Borrar y cierre de overlay. **NO tachar hasta confirmación física.**
 - [ ] **C02 · Borrar y editar mensajes.** **EN REVISIÓN:** tombstone y permisos de servidor implementados; comprobar borrado propio, plazos, sincronización instantánea, replies a borrados y ausencia de acciones indebidas en ambos dispositivos.
 - [ ] **C03 · Deslizar para responder.** **EN REVISIÓN:** gesto derecho implementado en los dos clientes; probar respuesta, preview, teclado, conflicto con scroll vertical y llegada al otro dispositivo.
 - [ ] **C04 · Reconexión y offline.** **EN REVISIÓN:** reconexión y colas implementadas; probar pantalla bloqueada, salir/regresar, cierre forzoso, modo avión, alternar Wi-Fi/datos, guardar borrador, FIFO sin duplicados.
@@ -607,6 +607,14 @@ Cada trabajo:
 6. Actualizar una versión sin perder sesión, cola, historial ni formato de datos.
 7. Obtener confirmación física de Android/iPhone cuando sea indispensable.
 8. Consolidar los resultados **editando este mismo documento**, sin notas contradictorias, “planes alternos”, listas paralelas de decisiones ni anexos duplicados.
+
+## Trabajo reciente de C01 (26/10/2026)
+
+- Menú centrado: reemplazado por medición de posición real del globo en Android (`measureInWindow` en `SwipeableBubble.tsx`) y del elemento DOM de iPhone (`getBoundingClientRect` en `SwipeMessage.tsx`).
+- Menú contextual muestra solo reacciones soportadas actualmente por backend y acciones reales. Eliminado el botón visual `+` que no enviaba ninguna operación; respuesta contextual disponible para mensajes propios/ajenos; Editar/Borrar visibles solo si autor y plazo/estado lo permiten.
+- CSS corregido: el bloque `@media(max-width:380px)` estaba mal cerrado y encerraba reglas generales. La corrección aplica menú/gestos también a pantallas anchas.
+- `audit:guard` actualizado para exigir posicionamiento contextual en ambos clientes y no reintroducir el botón sin función. Acepta tanto la descripción “R2 descartado” como “R2 desactivado”, evitando el falso fallo de CI.
+- **Comprobado:** GitHub Foundation CI `40362440346` verde en revisión de código `d81267fe1219e271f15f31c2f40e3da42d410d5b`; compilación release Android y distribución directa posteriores por comprobar. **Pendiente humano:** revisar en vivo sobre teléfono Android y Safari iPhone. No se desinstala APK ni se modifica `main`.
 
 ## Punto de continuación actual
 
