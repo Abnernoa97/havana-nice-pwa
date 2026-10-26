@@ -513,7 +513,12 @@ export default function App() {
   return (
     <SafeAreaView style={styles.screen}>
       <StatusBar barStyle="dark-content" />
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      {/* Android 16 edge-to-edge can draw the composer behind the IME even with
+            adjustResize. Height mode keeps the native chat input and Enviar
+            visible above the keyboard without changing the PWA or storage. */}
+      <KeyboardAvoidingView style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={0}>
         <View style={styles.header}>
           <View>
             <Text style={styles.brand}>HAVANA NICE</Text>
