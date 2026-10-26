@@ -52,6 +52,21 @@ export default function App() {
   const restoredStorage = useRef(false);
   const draftTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  function revokeCurrentAccess() {
+    const previous = socket.current;
+    socket.current = null;
+    previous?.close();
+    clearRetryTimer();
+    activeSession.current = null;
+    outbox.current.clear();
+    setMessages([]);
+    setSession(null);
+    setName('');
+    setConnection('desconectado');
+    setError('Acceso revocado. Consulta al administrador.');
+    void saveNativeLocalChat(null);
+  }
+
   function persistLocal() {
     if (!restoredStorage.current) return;
     const value = activeSession.current ? {
@@ -303,15 +318,7 @@ export default function App() {
           sendReadReceipt(item.message.seq);
           flushOutbox();
         } else if (item.type === 'chat.revoked') {
-          socket.current = null;
-          ws.close();
-          clearRetryTimer();
-          activeSession.current = null;
-          outbox.current.clear();
-          setSession(null);
-          setConnection('desconectado');
-          setError('El administrador retiró tu acceso.');
-          void saveNativeLocalChat(null);
+          revokeCurrentAccess();
         } else if (item.type === 'chat.error') {
           setError(item.error);
         }
@@ -374,12 +381,17 @@ export default function App() {
       appLifecycle.current = state;
       const currentSession = activeSession.current;
       if (state === 'active' && currentSession) {
-        const ws = socket.current;
-        if (!ws || ws.readyState !== WebSocket.OPEN) {
-          connectLatest.current(currentSession);
-        } else {
-          syncLatest.current();
-        }
+        void restoreNamedChatSession(currentSession).then(valid => {
+          if (disposed.current || activeSession.current?.token !== currentSession.token) return;
+          if (!valid) {revokeCurrentAccess();return;}
+          const ws = socket.current;
+          if (!ws || ws.readyState !== WebSocket.OPEN) connectLatest.current(valid);
+          else syncLatest.current();
+        }).catch(() => {
+          // Without a network connection, preserve the existing local session.
+          if (activeSession.current?.token === currentSession.token)
+            connectLatest.current(currentSession);
+        });
       } else if (state === 'background') {
         clearRetryTimer();
         pauseOutgoing();
