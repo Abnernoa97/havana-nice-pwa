@@ -1,11 +1,9 @@
 // @ts-nocheck
 import { handleChatMedia, mediaReadiness } from './drive-media.js';
-// HAVANA NICE V2 isolated development Worker — Chat 1 laboratory.
-// Runtime JS syntax is intentional: Cloudflare's connected API can deploy this
-// module directly. The permanent typed auth module will replace lab access.
+// HAVANA NICE V2 isolated Worker. Only D1-authorized musician names may enroll.
+// Random durable device credentials are issued once and validated against D1 on every request.
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
-const CODE_LENGTH_LIMIT = 256;
 const ROOM = 'main-chat-v2';
 const MAX_TEXT = 2000;
 const MAX_HISTORY = 100;
@@ -30,31 +28,32 @@ function trustedOrigin(origin) {
   } catch {}
   return '';
 }
-const LAB_CODE_SHA256 = '42edb4d61f92d416df49b91794149fa65e957e1fb5815e11eee9ab9011847a3e';
 function b64(bytes) {
   return btoa(String.fromCharCode(...bytes)).split('+').join('-').split('/').join('_').replace(/=+$/, '');
-}
-function constantEqual(a, b) {
-  let result = a.length ^ b.length;
-  for (let i = 0; i < Math.max(a.length, b.length); i++) result |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0);
-  return result === 0;
 }
 async function sha256(value) {
   return [...new Uint8Array(await crypto.subtle.digest('SHA-256', encoder.encode(value)))].map(x => x.toString(16).padStart(2, '0')).join('');
 }
-async function createSession(env, displayName) {
-  const actorId = crypto.randomUUID();
+// A musician enters their own name once. A server-side allowlist, not a
+// password, controls whether that name has access. Store only token hashes.
+const MEMBER_SESSION_EXPIRY = Date.UTC(2100, 0, 1);
+function normalizeMusicianName(value) {
+  if (typeof value !== 'string') return '';
+  const name = value.trim().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  return /^[a-z][a-z0-9_-]{0,27}$/.test(name) ? name : '';
+}
+async function createSession(env, member) {
   const token = b64(crypto.getRandomValues(new Uint8Array(32)));
-  const exp = Date.now() + 12 * 60 * 60 * 1000;
   await env.DB.prepare('INSERT INTO chat_sessions (token_hash, actor_id, display_name, expires_at) VALUES (?, ?, ?, ?)')
-    .bind(await sha256(token), actorId, displayName, exp).run();
-  return { token, actorId, displayName, expiresAt: new Date(exp).toISOString() };
+    .bind(await sha256(token), member.actor_id, member.display_name, MEMBER_SESSION_EXPIRY).run();
+  return { token, actorId: member.actor_id, displayName: member.display_name, expiresAt: new Date(MEMBER_SESSION_EXPIRY).toISOString() };
 }
 async function verifySession(env, token) {
   if (typeof token !== 'string' || !/^[A-Za-z0-9_-]{40,100}$/.test(token)) return null;
   try {
     const row = await env.DB.prepare(
-      'SELECT actor_id, display_name, expires_at FROM chat_sessions WHERE token_hash = ?'
+      'SELECT s.actor_id, m.display_name, s.expires_at FROM chat_sessions s ' +
+      'JOIN chat_members m ON m.actor_id=s.actor_id AND m.active=1 WHERE s.token_hash=?'
     ).bind(await sha256(token)).first();
     if (!row || !Number.isFinite(row.expires_at) || row.expires_at <= Date.now()) return null;
     return { actorId: row.actor_id, displayName: row.display_name, exp: row.expires_at };
@@ -96,15 +95,26 @@ export class ChatRoom {
     if (!session) return respond({ error: 'Unauthorized' }, 401);
     const actorId = session.actorId;
     const name = session.displayName;
+    const enrollmentToken = websocketSessionToken(request);
     const pair = new WebSocketPair();
     const client = pair[0], server = pair[1];
     server.accept();
     this.sockets.add(server);
-    this.members.set(server, {actorId, name});
+    this.members.set(server, {actorId, name, enrollmentToken});
     server.send(JSON.stringify({ type: 'chat.ready', at: new Date().toISOString(), users: this.onlineUsers() }));
     this.broadcast({ type: 'chat.presence', users: this.onlineUsers() });
     server.addEventListener('message', event => {
-      this.state.waitUntil(this.onMessage(server, actorId, name, event.data).catch(() => {
+      this.state.waitUntil((async () => {
+        // Revoking a name immediately denies all subsequent chat actions,
+        // including on sockets that were opened before the revocation.
+        const stillAuthorized = await verifySession(this.env, enrollmentToken);
+        if (!stillAuthorized) {
+          this.send(server, {type:'chat.revoked',error:'Acceso revocado por administrador'});
+          server.close(4003, 'Access revoked');
+          return;
+        }
+        await this.onMessage(server, actorId, name, event.data);
+      })().catch(() => {
         this.send(server, { type: 'chat.error', error: 'Delivery failed' });
       }));
     });
@@ -249,7 +259,7 @@ export default {
     if (url.pathname === '/health') {
       let row = null, database = 'error';
       try { row = await env.DB.prepare('SELECT value FROM system_meta WHERE key = ?').bind('schema_version').first(); database = 'ok'; } catch {}
-      return respond({ ok: database === 'ok', app: 'havana-nice-v2', environment: env.HAVANA_ENV || 'development', database, schemaVersion: row?.value ?? null, realtime: 'configured', media: mediaReadiness(env).enabled ? 'google-drive-v2' : 'havana-cloud-private-bridge-pending', chat: 'text-realtime-replies-reactions-search-edit-read-lab' }, database === 'ok' ? 200 : 503, origin);
+      return respond({ ok: database === 'ok', app: 'havana-nice-v2', environment: env.HAVANA_ENV || 'development', database, schemaVersion: row?.value ?? null, realtime: 'configured', media: mediaReadiness(env).enabled ? 'google-drive-v2' : 'havana-cloud-private-bridge-pending', chat: 'authorized-members-persistent-device-sessions-realtime' }, database === 'ok' ? 200 : 503, origin);
     }
     if (url.pathname.startsWith('/api/chat/media/')) {
       const session = await verifySession(env, (request.headers.get('authorization') || '').replace(/^Bearer\s+/i, ''));
@@ -258,17 +268,25 @@ export default {
     }
     if (url.pathname === '/realtime/health') return env.CHAT_ROOMS.get(env.CHAT_ROOMS.idFromName('foundation-health')).fetch('https://internal/health');
     if (url.pathname === '/api/chat/session' && request.method === 'POST') {
-      
       let payload;
-      try { payload = await request.json(); } catch { return respond({ error: 'Invalid input' }, 400, origin); }
-      if (typeof payload?.accessCode !== 'string' || payload.accessCode.length > CODE_LENGTH_LIMIT || !constantEqual(await sha256(payload.accessCode), LAB_CODE_SHA256)) return respond({ error: 'Invalid access code' }, 401, origin);
-      const name = typeof payload.displayName === 'string' ? payload.displayName.trim() : '';
-      if (!name || name.length > 28) return respond({ error: 'Name must be 1–28 characters' }, 400, origin);
-      return respond(await createSession(env, name), 200, origin);
+      try { payload = await request.json(); } catch { return respond({ error: 'Solicitud inválida' }, 400, origin); }
+      const username = normalizeMusicianName(payload?.displayName);
+      if (!username) return respond({ error: 'Escribe tu nombre para entrar' }, 400, origin);
+      const member = await env.DB.prepare(
+        'SELECT username,actor_id,display_name FROM chat_members WHERE username=? AND active=1'
+      ).bind(username).first();
+      if (!member) return respond({ error: 'Tu nombre todavía no está autorizado. Solicita acceso al administrador.' }, 403, origin);
+      return respond(await createSession(env, member), 200, origin);
+    }
+    if (url.pathname === '/api/chat/session' && request.method === 'GET') {
+      const token = (request.headers.get('authorization') || '').replace(/^Bearer\s+/i, '');
+      const valid = await verifySession(env, token);
+      if (!valid) return respond({ error: 'Acceso revocado o no autorizado' }, 401, origin);
+      return respond({ token, actorId: valid.actorId, displayName: valid.displayName, expiresAt: new Date(valid.exp).toISOString() }, 200, origin);
     }
     if (url.pathname === '/api/chat/messages' && request.method === 'GET') {
       const session = await verifySession(env, (request.headers.get('authorization') || '').replace(/^Bearer\s+/i, ''));
-      if (!session) return respond({ error: 'Session expired; enter lab code again' }, 401, origin);
+      if (!session) return respond({ error: 'Acceso revocado o sesión no autorizada' }, 401, origin);
       const before = url.searchParams.get('beforeSeq');
       const earlier = before === null ? null : Number(before);
       if (earlier !== null && (!Number.isSafeInteger(earlier) || earlier < 1)) return respond({error:'Invalid beforeSeq'},400,origin);
