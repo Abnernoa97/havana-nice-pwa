@@ -7,7 +7,6 @@ on:
     paths:
       - 'v2/apps/android/**'
       - 'v2/packages/shared/**'
-      - 'v2/package.json'
       - 'v2/package-lock.json'
       - '.github/workflows/v2-android-apk.yml'
   workflow_dispatch:

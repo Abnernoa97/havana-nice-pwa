@@ -5,7 +5,14 @@ on:
     branches:
       - havana-nice-v2-foundation
     paths:
-      - 'v2/**'
+      - 'v2/apps/**'
+      - 'v2/cloudflare/**'
+      - 'v2/packages/**'
+      - 'v2/scripts/**'
+      - 'v2/tests/**'
+      - 'v2/package.json'
+      - 'v2/package-lock.json'
+      - 'v2/tsconfig.base.json'
       - '.github/workflows/v2-foundation-check.yml'
   workflow_dispatch:
 
