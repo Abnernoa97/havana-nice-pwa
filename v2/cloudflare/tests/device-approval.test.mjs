@@ -51,9 +51,9 @@ class FakeDb {
     }
     if(sql.startsWith('UPDATE chat_device_requests SET status=')) {
       const row=this.requests.get(p[1]);if(!row)return {meta:{changes:0}};
-      if(sql.includes('approved')){if(row.status!=='pending'||row.expires_at<=p[0])return {meta:{changes:0}};row.status='approved';}
-      else if(sql.includes('denied')){if(row.status!=='pending')return {meta:{changes:0}};row.status='denied';}
-      else if(sql.includes('revoked')){if(row.status!=='approved')return {meta:{changes:0}};row.status='revoked';}
+      if(sql.startsWith("UPDATE chat_device_requests SET status='approved'")){if(row.status!=='pending'||row.expires_at<=p[0])return {meta:{changes:0}};row.status='approved';}
+      else if(sql.startsWith("UPDATE chat_device_requests SET status='denied'")){if(row.status!=='pending')return {meta:{changes:0}};row.status='denied';}
+      else if(sql.startsWith("UPDATE chat_device_requests SET status='revoked'")){if(row.status!=='approved')return {meta:{changes:0}};row.status='revoked';}
       row.decided_at=p[0];return {meta:{changes:1}};
     }
     if(sql.startsWith('UPDATE chat_device_requests SET redeemed_at=')) {
