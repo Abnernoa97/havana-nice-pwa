@@ -1,5 +1,5 @@
 import React, {useRef} from 'react';
-import {Animated, PanResponder, Pressable, StyleProp, View, ViewStyle} from 'react-native';
+import {Animated, PanResponder, Pressable, StyleProp, ViewStyle} from 'react-native';
 
 export type BubbleAnchor = { x: number; y: number; width: number; height: number };
 
@@ -17,7 +17,7 @@ export default function SwipeableBubble({children,style,onReply,onLongPress,onPr
   const callbacks = useRef({onReply,onLongPress,onPress});
   callbacks.current={onReply,onLongPress,onPress};
   const translation=useRef(new Animated.Value(0)).current;
-  const pressableRef=useRef<View|null>(null);
+  const pressableRef=useRef<React.ElementRef<typeof Pressable>|null>(null);
   const pan=useRef(PanResponder.create({
     onStartShouldSetPanResponder:()=>false,
     onMoveShouldSetPanResponder:(_,gesture)=>
