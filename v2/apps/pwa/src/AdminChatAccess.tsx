@@ -124,7 +124,7 @@ export default function AdminChatAccess({section}:{section:Section}){
       members.map(person=><div key={person.actor_id} className="a-admin-record">
         <div><strong>{person.display_name}</strong>
           <span>{person.active===1?'Autorizado':'Acceso suspendido'}</span>
-          <small>Sesiones activas: {person.session_count}</small>
+          <small>Credenciales vigentes: {person.session_count} (no equivale a teléfonos conectados ahora)</small>
         </div>
       </div>)}
   </div>}
