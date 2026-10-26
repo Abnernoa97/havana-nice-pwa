@@ -55,9 +55,13 @@ assert.equal(androidConfig.expo.android.package,'com.havananice.v2',
 assert.ok(Number.isInteger(androidConfig.expo.android.versionCode) && androidConfig.expo.android.versionCode >= 2,
   'H01: release APK needs explicit Android versionCode');
 present(androidWorkflow,/EXPECTED_CODE/,'H01: verify actual APK versionCode matches app config');
-present(distributor,/previous_signer/,'H01: verify previous signing certificate before release');
-assert.ok(distributor.includes('test "$current_signer" = "$previous_signer"'),
-  'H01: block distribution if signature changes');
+const apkSignerGate=read('scripts/apk-signature-gate.py');
+present(distributor,/python3 v2\/scripts\/apk-signature-gate\.py/,
+  'H01: compare verified v2 signing certificates directly');
+present(apkSignerGate,/previous != current/,
+  'H01: block release when public X.509 signing hashes differ');
+present(apkSignerGate,/APK Signature Scheme v2 not found/,
+  'H01: refuse missing Android signing scheme');
 assert.ok(distributor.includes('test "$current_code" -gt "$previous_code"'),
   'H01: block non-monotonic Android versionCode');
 present(distributor,/sha256sum -c -/,'H01: verify hash of preceding released APK');

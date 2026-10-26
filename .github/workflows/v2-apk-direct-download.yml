@@ -91,14 +91,9 @@ jobs:
           echo "$PREVIOUS_SHA  $PREVIOUS_APK" | sha256sum -c -
           "$SDK_BUILD_TOOLS/apksigner" verify "$PREVIOUS_APK"
 
-          signature_sha256() {
-            "$SDK_BUILD_TOOLS/apksigner" verify --print-certs "$1" |
-              sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -n 1
-          }
-          previous_signer="$(signature_sha256 "$PREVIOUS_APK")"
-          current_signer="$(signature_sha256 "/tmp/havana-v2-apk/$APK_NAME")"
-          test -n "$previous_signer"
-          test "$current_signer" = "$previous_signer"
+          # Parse the public X.509 certificate directly from verified APK v2 blocks:
+          # avoids fragile --print-certs output formatting across SDK versions.
+          python3 v2/scripts/apk-signature-gate.py "$PREVIOUS_APK" "/tmp/havana-v2-apk/$APK_NAME"
 
           version_code() {
             "$SDK_BUILD_TOOLS/aapt" dump badging "$1" |
