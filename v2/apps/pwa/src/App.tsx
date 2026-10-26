@@ -48,6 +48,21 @@ export default function App() {
   const connectLatest = useRef<(next: ChatSession) => void>(() => {});
   const refreshLatest = useRef<() => void>(() => {});
 
+  function revokeCurrentAccess() {
+    const previous = socket.current;
+    socket.current = null;
+    previous?.close();
+    clearRetry();
+    activeSession.current = null;
+    outbox.current.clear();
+    setMessages([]);
+    setSession(null);
+    setName('');
+    setConnection('desconectado');
+    setError('Acceso revocado. Consulta al administrador.');
+    void saveLocalChat(null);
+  }
+
   function persist() {
     if (!restoredStorage.current) return;
     const value = activeSession.current ? {
@@ -242,15 +257,7 @@ export default function App() {
           sendReadReceipt(value.message.seq);
           flushOutbox();
         } else if (value.type === 'chat.revoked') {
-          socket.current = null;
-          ws.close();
-          clearRetry();
-          activeSession.current = null;
-          outbox.current.clear();
-          setSession(null);
-          setConnection('desconectado');
-          setError('El administrador retiró tu acceso.');
-          void saveLocalChat(null);
+          revokeCurrentAccess();
         } else if (value.type === 'chat.error') {
           setError(value.error);
         }
@@ -304,11 +311,16 @@ export default function App() {
     const resume = () => {
       const next = activeSession.current;
       if (!next || document.visibilityState !== 'visible') return;
-      if (!socket.current || socket.current.readyState !== WebSocket.OPEN) {
-        connectLatest.current(next);
-      } else {
-        refreshLatest.current();
-      }
+      void restoreNamedChatSession(next).then(valid => {
+        if(disposed.current || activeSession.current?.token !== next.token)return;
+        if(!valid){revokeCurrentAccess();return;}
+        if(!socket.current || socket.current.readyState !== WebSocket.OPEN)
+          connectLatest.current(valid);
+        else refreshLatest.current();
+      }).catch(() => {
+        if(activeSession.current?.token===next.token && navigator.onLine)
+          connectLatest.current(next);
+      });
     };
     const offline = () => {
       pausePending();
