@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { handleChatMedia, mediaReadiness } from './drive-media.js';
 import { deviceGateEnabled, handleDeviceApprovalApi } from './device-approval.js';
-import { handleAdminSessionApi } from './admin-auth.js';
+import { handleAdminSessionApi, verifyAdminSession } from './admin-auth.js';
 // HAVANA NICE V2 isolated Worker. Only D1-authorized musician names may enroll.
 // Random durable device credentials are issued once and validated against D1 on every request.
 const encoder = new TextEncoder();
@@ -284,6 +284,17 @@ export default {
       return handleChatMedia(request, env, session, url, origin, respond);
     }
     if (url.pathname === '/realtime/health') return env.CHAT_ROOMS.get(env.CHAT_ROOMS.idFromName('foundation-health')).fetch('https://internal/health');
+    if (url.pathname === '/api/chat/admin/members') {
+      if (request.method !== 'GET') return respond({error:'Método no permitido'},405,origin);
+      if (!await verifyAdminSession(request,env)) return respond({error:'No autorizado'},401,origin);
+      // No bearer tokens, device secrets or private message history are returned.
+      const members = await env.DB.prepare(
+        'SELECT m.actor_id,m.display_name,m.username,m.active,COUNT(s.token_hash) AS session_count ' +
+        'FROM chat_members m LEFT JOIN chat_sessions s ON s.actor_id=m.actor_id AND s.expires_at>? ' +
+        'GROUP BY m.actor_id,m.display_name,m.username,m.active ORDER BY m.display_name'
+      ).bind(Date.now()).all();
+      return respond({members:members.results||[]},200,origin);
+    }
     if (url.pathname.startsWith('/api/chat/admin/auth/')) {
       return handleAdminSessionApi(request,env,url,origin,respond);
     }

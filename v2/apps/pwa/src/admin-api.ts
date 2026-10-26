@@ -40,3 +40,10 @@ export function adminDeviceAction(token:string,id:string,action:'approve'|'deny'
    '/api/chat/admin/device-requests/'+encodeURIComponent(id)+'/'+action,
    authenticated(token,{method:'POST'}));
 }
+
+export type AdminMember={
+ actor_id:string;username:string;display_name:string;active:number;session_count:number;
+};
+export function adminMembers(token:string){
+ return api<{members:AdminMember[]}>('/api/chat/admin/members',authenticated(token));
+}

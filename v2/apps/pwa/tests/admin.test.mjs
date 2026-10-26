@@ -54,3 +54,14 @@ test('privileged controls require separate login, never musician identity',()=>{
  assert.match(component,/adminAvailability\(\)/);
  assert.doesNotMatch(component+api,/localStorage\.|sessionStorage\.|indexedDB\.|V2_ADMIN_LOGIN_SECRET/);
 });
+
+test('member information is retrieved only through administrator-verified API',()=>{
+ const backend=read('../../../cloudflare/src/index.ts');
+ const adminApi=read('../src/admin-api.ts');
+ const memberUi=read('../src/AdminChatAccess.tsx');
+ assert.match(backend,/url\.pathname === '\/api\/chat\/admin\/members'/);
+ assert.match(backend,/if \(!await verifyAdminSession\(request,env\)\)/);
+ assert.match(adminApi,/adminMembers\(token:string\)/);
+ assert.match(memberUi,/Sesiones activas/);
+ assert.doesNotMatch(backend,/SELECT\s+\*\s+FROM\s+chat_admin_sessions/);
+});

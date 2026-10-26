@@ -1,6 +1,6 @@
 import {useCallback,useEffect,useState,type FormEvent} from 'react';
-import {adminAvailability,adminDeviceAction,adminDeviceRequests,adminLogin,adminLogout,adminVerify,
- type AdminDeviceRequest,type AdminSession} from './admin-api';
+import {adminAvailability,adminDeviceAction,adminDeviceRequests,adminLogin,adminLogout,adminVerify,adminMembers,
+ type AdminDeviceRequest,type AdminSession,type AdminMember} from './admin-api';
 
 type Section='overview'|'requests'|'devices'|'members'|'security';
 type Readiness='loading'|'disabled'|'enabled'|'error';
@@ -12,8 +12,20 @@ export default function AdminChatAccess({section}:{section:Section}){
  const [processing,setProcessing]=useState(false);
  const [error,setError]=useState('');
  const [rows,setRows]=useState<AdminDeviceRequest[]>([]);
+ const [members,setMembers]=useState<AdminMember[]>([]);
+ const [membersReady,setMembersReady]=useState(false);
  const [listReady,setListReady]=useState(false);
  const [pendingId,setPendingId]=useState('');
+ const refreshMembers=useCallback(async(token:string)=>{
+   setMembersReady(false);
+   try{
+     const data=await adminMembers(token);
+     setMembers(data.members);
+     setMembersReady(true);
+   }catch(e){
+     setError(e instanceof Error?e.message:'No se pudieron consultar músicos');
+   }
+ },[]);
  const refresh=useCallback(async(token:string)=>{
    setListReady(false);
    try{
@@ -36,10 +48,10 @@ export default function AdminChatAccess({section}:{section:Section}){
   if(!session)return;
   const expiry=Date.parse(session.expiresAt);
   if(!Number.isFinite(expiry)||expiry<=Date.now()){setSession(null);return;}
-  void adminVerify(session.token).then(()=>refresh(session.token)).catch(()=>{
+  void adminVerify(session.token).then(()=>{void refresh(session.token);void refreshMembers(session.token);}).catch(()=>{
     setSession(null);setError('La sesión administrativa venció o fue revocada.');
   });
- },[session,refresh]);
+ },[session,refresh,refreshMembers]);
  async function login(e:FormEvent){
   e.preventDefault();if(processing||!password)return;
   setProcessing(true);setError('');
@@ -53,7 +65,7 @@ export default function AdminChatAccess({section}:{section:Section}){
  async function logout(){
   if(!session)return;
   const value=session.token;
-  setSession(null);setRows([]);setListReady(false);setError('');
+  setSession(null);setRows([]);setMembers([]);setListReady(false);setMembersReady(false);setError('');
   try{await adminLogout(value);}catch{/* The client token is discarded even while offline. */}
  }
  async function action(item:AdminDeviceRequest,verb:'approve'|'deny'|'revoke'){
@@ -105,6 +117,18 @@ export default function AdminChatAccess({section}:{section:Section}){
       </div>
      </div>)}
    </div>}
-  {!interactive&&<p className="a-detail">La sesión administrativa está activa. Los permisos de músicos y otras secciones se conectarán aquí al finalizar S01/S02.</p>}
+  {section==='members'&&<div className="a-admin-records">
+    <h3>Músicos de HAVANA NICE V2</h3>
+    {!membersReady?<p className="a-detail">Consultando integrantes…</p>:
+      members.length===0?<p className="a-detail">Sin integrantes registrados.</p>:
+      members.map(person=><div key={person.actor_id} className="a-admin-record">
+        <div><strong>{person.display_name}</strong>
+          <span>{person.active===1?'Autorizado':'Acceso suspendido'}</span>
+          <small>Sesiones activas: {person.session_count}</small>
+        </div>
+      </div>)}
+  </div>}
+  {section==='security'&&<p className="a-detail">Sesión administrativa verificada. Los controles adicionales de dispositivos estarán disponibles tras la etapa S01/S02.</p>}
+  {section==='overview'&&<p className="a-detail">Administrador conectado al servicio V2. La gestión de dispositivos permanece bajo verificación de permisos.</p>}
  </section>;
 }
