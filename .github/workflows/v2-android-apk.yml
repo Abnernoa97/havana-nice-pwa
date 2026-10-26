@@ -10,7 +10,6 @@ on:
       - 'v2/package.json'
       - 'v2/package-lock.json'
       - '.github/workflows/v2-android-apk.yml'
-      - '.github/workflows/v2-apk-direct-download.yml'
   workflow_dispatch:
 
 permissions:
@@ -78,4 +77,4 @@ jobs:
           name: HAVANA-NICE-V2-FOUNDATION-STANDALONE-APK
           path: HAVANA-NICE-V2-FOUNDATION-STANDALONE.apk
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 1
