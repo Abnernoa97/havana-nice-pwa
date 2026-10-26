@@ -15,9 +15,12 @@ permissions:
   actions: read
   contents: write
 
+# Match the release build's 'latest commit wins' policy. An older build can be
+# cancelled by a newer source push; do not leave its distribution job polling for
+# 16 minutes and reporting a false release failure after the newer APK succeeds.
 concurrency:
   group: havana-nice-v2-direct-apk-publish
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   publish-verified-v2-android:
