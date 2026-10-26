@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  adminConfigured, deviceGateEnabled, handleDeviceApprovalApi,
+  adminConfigured, deviceGateEnabled, deviceManagementEnabled, handleDeviceApprovalApi,
   tokenDigest, verifyAdminRequest,
 } from '../src/device-approval.js';
 
@@ -139,4 +139,20 @@ test('new device requests are limited; no access granted by requests alone',asyn
   assert.equal(third.status,429);
   assert.equal(env.DB.sessions.length,0);
   assert.equal((await handle(call('POST','/api/chat/device/request',{displayName:'unknown'}),env)).status,403);
+});
+
+test('observe mode supports approvals without disabling current member logins',async()=>{
+ const env=createEnv();
+ env.V2_DEVICE_APPROVAL_MODE='observe';
+ assert.equal(deviceManagementEnabled(env),true);
+ assert.equal(deviceGateEnabled(env),false);
+ const response=await handle(call('POST','/api/chat/device/request',{displayName:'Noa',deviceLabel:'Prueba'}),env);
+ assert.equal(response.status,202);
+ assert.equal(env.DB.sessions.length,0);
+ assert.equal(response.body.status,'pending');
+});
+test('device management mode remains unavailable without observe/enforce opt-in',async()=>{
+ const env=createEnv();env.V2_DEVICE_APPROVAL_MODE='off';
+ assert.equal(deviceManagementEnabled(env),false);
+ assert.equal((await handle(call('GET','/api/chat/admin/device-requests',undefined,adminKey),env)).status,503);
 });

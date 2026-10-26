@@ -54,10 +54,9 @@ async function verifySession(env, token) {
   if (typeof token !== 'string' || !/^[A-Za-z0-9_-]{40,100}$/.test(token)) return null;
   try {
     const row = await env.DB.prepare(
-      'SELECT s.actor_id, m.display_name, s.expires_at' +
-      (deviceGateEnabled(env)?', s.enrollment_id':'') +
-      ' FROM chat_sessions s JOIN chat_members m ON m.actor_id=s.actor_id AND m.active=1 WHERE s.token_hash=?' +
-      (deviceGateEnabled(env)?" AND (s.enrollment_id IS NULL OR EXISTS (SELECT 1 FROM chat_device_requests d WHERE d.request_id=s.enrollment_id AND d.status='approved'))":'')
+      'SELECT s.actor_id, m.display_name, s.expires_at, s.enrollment_id ' +
+      'FROM chat_sessions s JOIN chat_members m ON m.actor_id=s.actor_id AND m.active=1 WHERE s.token_hash=? ' +
+      "AND (s.enrollment_id IS NULL OR EXISTS (SELECT 1 FROM chat_device_requests d WHERE d.request_id=s.enrollment_id AND d.status='approved'))"
     ).bind(await sha256(token)).first();
     if (!row || !Number.isFinite(row.expires_at) || row.expires_at <= Date.now()) return null;
     return { actorId: row.actor_id, displayName: row.display_name, exp: row.expires_at, enrollmentId:row.enrollment_id??null };

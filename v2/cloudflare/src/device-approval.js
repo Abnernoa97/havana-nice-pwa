@@ -10,6 +10,11 @@ const encode = new TextEncoder();
 export function deviceGateEnabled(env) {
   return env.V2_DEVICE_APPROVAL_MODE === 'enforce';
 }
+export function deviceManagementEnabled(env) {
+  // 'observe': non-disruptive administrator onboarding tests; legacy name
+  // login stays available. 'enforce' is a later, separate client rollout.
+  return env.V2_DEVICE_APPROVAL_MODE === 'observe' || deviceGateEnabled(env);
+}
 export function adminConfigured(env) {
   return typeof env.V2_DEVICE_ADMIN_SECRET === 'string' && env.V2_DEVICE_ADMIN_SECRET.length >= 40;
 }
@@ -38,7 +43,7 @@ async function jsonBody(request) {
 }
 export async function handleDeviceApprovalApi(request,env,url,origin,respond,normalizeName,ROOM) {
   const path=url.pathname;
-  if (!deviceGateEnabled(env)) return errorReply(respond,origin,'Administración de dispositivos todavía no habilitada',503);
+  if (!deviceManagementEnabled(env)) return errorReply(respond,origin,'Administración de dispositivos todavía no habilitada',503);
   if (!adminConfigured(env) && !adminLoginConfigured(env)) return errorReply(respond,origin,'Servicio de aprobación no configurado',503);
   const now=Date.now();
   if(path.startsWith('/api/chat/admin/device-requests')) {
