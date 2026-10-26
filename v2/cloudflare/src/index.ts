@@ -284,6 +284,14 @@ export default {
       if (!valid) return respond({ error: 'Acceso revocado o no autorizado' }, 401, origin);
       return respond({ token, actorId: valid.actorId, displayName: valid.displayName, expiresAt: new Date(valid.exp).toISOString() }, 200, origin);
     }
+    if (url.pathname === '/api/chat/session' && request.method === 'DELETE') {
+      const token = (request.headers.get('authorization') || '').replace(/^Bearer\s+/i, '');
+      const current = await verifySession(env, token);
+      if (!current) return respond({ error: 'Acceso no autorizado' }, 401, origin);
+      await env.DB.prepare('DELETE FROM chat_sessions WHERE token_hash=?')
+        .bind(await sha256(token)).run();
+      return respond({ok:true}, 200, origin);
+    }
     if (url.pathname === '/api/chat/messages' && request.method === 'GET') {
       const session = await verifySession(env, (request.headers.get('authorization') || '').replace(/^Bearer\s+/i, ''));
       if (!session) return respond({ error: 'Acceso revocado o sesión no autorizada' }, 401, origin);
