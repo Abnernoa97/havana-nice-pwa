@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   fetchBackendHealth, getChatSnapshot, getOlderChatMessages, searchChatMessages, lastReadByOther, messageDeliveryLabel, newClientMessageId,
-  openChatSocket, reconcileChatMessages, startLabChatSession,
+  openChatSocket, reconcileChatMessages, startNamedChatSession, restoreNamedChatSession,
   type BackendHealth, type ChatMessage, type ChatServerEvent, type ChatSession,
   reconcileReactions, reconcileUpdatedMessage, type ChatReaction, type ChatEmoji, type ChatReadReceipt,
 } from '@havana/shared';
@@ -10,9 +10,9 @@ import SwipeMessage from './SwipeMessage';
 
 export default function App() {
   const [health, setHealth] = useState<BackendHealth | null>(null);
-  const [name, setName] = useState('iPhone');
-  const [code, setCode] = useState('');
+  const [name, setName] = useState('');
   const [session, setSession] = useState<ChatSession | null>(null);
+  const [restoringAccess,setRestoringAccess] = useState(true);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState('');
   const [connection, setConnection] = useState('desconectado');
@@ -174,7 +174,7 @@ export default function App() {
       activeSession.current = null;
       setSession(null);
       setConnection('desconectado');
-      setError('Sesión caducada. Vuelve a entrar al laboratorio.');
+      setError('Tu acceso no está disponible. Escribe tu nombre para volver a solicitar entrada.');
       return;
     }
     activeSession.current = next;
@@ -241,6 +241,16 @@ export default function App() {
           setMessages(before => reconcileChatMessages(before, [value.message]));
           sendReadReceipt(value.message.seq);
           flushOutbox();
+        } else if (value.type === 'chat.revoked') {
+          socket.current = null;
+          ws.close();
+          clearRetry();
+          activeSession.current = null;
+          outbox.current.clear();
+          setSession(null);
+          setConnection('desconectado');
+          setError('El administrador retiró tu acceso.');
+          void saveLocalChat(null);
         } else if (value.type === 'chat.error') {
           setError(value.error);
         }
@@ -265,20 +275,29 @@ export default function App() {
 
   useEffect(() => {
     disposed.current = false;
-    void loadLocalChat().then(saved => {
-      restoredStorage.current = true;
+    void loadLocalChat().then(async saved => {
       if(disposed.current)return;
-      if(activeSession.current){persist();return;}
+      if(activeSession.current){restoredStorage.current=true;persist();return;}
       if (!saved || !saved.session || Date.parse(saved.session.expiresAt) <= Date.now()) return;
-      activeSession.current = saved.session;
+      let approved:ChatSession | null = saved.session;
+      try {approved = await restoreNamedChatSession(saved.session);}
+      catch {approved = saved.session;} // Offline: keep local chat pending reconnection
+      if(disposed.current)return;
+      if(!approved){
+        await saveLocalChat(null);
+        setName('');
+        setError('Acceso no autorizado. Consulta al administrador.');
+        return;
+      }
+      activeSession.current = approved;
       outbox.current = new Map((saved.outbox || []).map(m => [m.clientMessageId,{...m,pending:true,deliveryStatus:'queued' as const}]));
       setMessages([...outbox.current.values()]);
-      setSession(saved.session);
+      setSession(approved);
       latestDraft.current = saved.draft || '';
       setDraft(latestDraft.current);
-      setName(saved.session.displayName);
-      connectLatest.current(saved.session);
-    }).catch(() => {restoredStorage.current=true;});
+      setName(approved.displayName);
+      connectLatest.current(approved);
+    }).catch(() => {}).finally(() => {restoredStorage.current=true;setRestoringAccess(false);});
     void fetchBackendHealth().then(data => {
       if (!disposed.current) setHealth(data);
     }).catch(() => { if (!disposed.current) setError('No se pudo conectar a la API'); });
@@ -331,12 +350,11 @@ export default function App() {
   }, [messages.length]);
 
   async function join() {
-    if (!name.trim() || !code.trim() || joining) return;
+    if (!name.trim() || joining) return;
     setJoining(true);
     setError('');
     try {
-      const next = await startLabChatSession(name.trim(), code.trim());
-      setCode('');
+      const next = await startNamedChatSession(name.trim());
       setMessages([]);
       setReceipts([]);
       setSearchResults(null);
@@ -412,25 +430,23 @@ export default function App() {
         </div>
       </header>
 
-      {!session ? (
+      {restoringAccess ? <section className="join-panel"><p>Abriendo HAVANA NICE…</p></section> : !session ? (
         <section className="join-panel">
-          <span className="overline">CHAT 2 · ESTADOS Y RECONEXIÓN</span>
-          <h2>Conversemos.</h2>
-          <p>Android y iPhone conectados. Acceso privado de laboratorio.</p>
+          <span className="overline">ACCESO HAVANA NICE</span>
+          <h2>Bienvenido.</h2>
+          <p>Escribe tu nombre autorizado la primera vez. Después entrarás directamente desde este dispositivo.</p>
           <form onSubmit={event => { event.preventDefault(); void join(); }}>
             <label htmlFor="chat-name">Tu nombre</label>
-            <input id="chat-name" maxLength={28} autoComplete="nickname" value={name} onChange={event => setName(event.target.value)} />
-            <label htmlFor="chat-code">Clave de laboratorio</label>
-            <input id="chat-code" type="password" autoComplete="off" value={code} onChange={event => setCode(event.target.value)} placeholder="Clave privada" />
-            <button disabled={joining || !name.trim() || !code.trim()}>{joining ? 'Conectando…' : 'Entrar al chat'}</button>
+            <input id="chat-name" maxLength={28} autoComplete="nickname" autoCapitalize="none" value={name} onChange={event => setName(event.target.value)} placeholder="Tu nombre" />
+            <button disabled={joining || !name.trim()}>{joining ? 'Conectando…' : 'Entrar al chat'}</button>
           </form>
           {error && <p className="chat-error" role="alert">{error}</p>}
-          <small>FASE 0 ✓ · {health?.database === 'ok' ? 'D1 conectado' : 'Comprobando conexión'}</small>
+          <small>Solo pueden entrar los integrantes autorizados por Administrador.</small>
         </section>
       ) : (
         <>
           <div className="room-title">
-            <span>Conversación de laboratorio</span>
+            <span>HAVANA NICE · Chat</span>
             <span className="room-user">{typing || `${onlineUsers} en línea · ${session.displayName}`}</span>
           </div>
           <div className="chat-search">
