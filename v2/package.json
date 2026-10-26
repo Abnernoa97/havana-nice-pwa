@@ -17,6 +17,7 @@
     "dev:android": "npm run start -w @havana/android",
     "dev:pwa": "npm run dev -w @havana/pwa",
     "dev:cloudflare": "npm run dev -w @havana/cloudflare",
-    "deploy:cloudflare": "npm run deploy -w @havana/cloudflare"
+    "deploy:cloudflare": "npm run deploy -w @havana/cloudflare",
+    "audit:guard": "node scripts/audit-guard.mjs"
   }
 }
