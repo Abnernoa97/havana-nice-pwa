@@ -12,7 +12,7 @@ test('admin never bundles secrets or produces fake privileged API calls',()=>{
  for(const content of [ui,main,read('../admin.html')]){
    assert.doesNotMatch(content,/V2_DEVICE_ADMIN_SECRET|Authorization:\s*Bearer|localStorage\.|sessionStorage\.|requestSecret|api\/chat\/admin/);
  }
- assert.match(ui,/disabled>Aprobar/);
+ assert.match(ui,/disabled type="button">Aprobar/);
  assert.match(ui,/disabled>Revocar dispositivo/);
  assert.match(ui,/disabled>Administrar acceso/);
 });
