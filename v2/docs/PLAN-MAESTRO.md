@@ -36,7 +36,7 @@
 
 ## C. Android nativo + interfaz PWA para lo demás — 0/4
 
-- [ ] **H01 · Proteger y congelar línea base del Chat Android 100 % nativo.** Registrar identidad/firma de APK, SQLite, sesión, cola y rendimiento; no perder datos ni duplicar motores.
+- [ ] **H01 · Proteger y congelar línea base del Chat Android 100 % nativo.** Registrar identidad/firma de APK, SQLite, sesión, cola y rendimiento; no perder datos ni duplicar motores. **Auditoría preventiva 26/10:** el workflow `.github/workflows/v2-android-apk.yml` verifica firma, bundle JS y paquete `com.havananice.v2`, pero no compara el certificado con la APK anterior ni fija expresamente un `versionCode` ascendente en `app.json`. La actualización conservando datos requiere cotejar certificados, identificador y versiones de la APK previa y nueva; **nunca desinstalar ni borrar caché** para resolver incompatibilidades. **Pendiente de prueba, sin cambiar 4/27.**
 - [ ] **H02 · WebView de secciones NO-Chat.** Android abre Home/Calendario/Repertorio/Admin como PWA; al pulsar Chat cambia al **Chat React Native**, sin Chat PWA oculto en Android.
 - [ ] **H03 · Navegación y sesión coordinadas.** Compartir identidad de forma protegida, sin segundo login, botón Atrás por nivel, sin pantallas blancas offline ni sesiones duplicadas.
 - [ ] **H04 · Cambios visuales PWA sin APK.** Confirmar con prueba real que texto/color/estructura de Home/Repertorio/Admin se actualizan en Android WebView e iPhone PWA sin reinstalar.
