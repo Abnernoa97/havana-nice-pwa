@@ -97,6 +97,9 @@ jobs:
           STATUS="$(curl --silent --show-error --output /tmp/v2-admin-denied.json --write-out '%{http_code}' "$BASE/api/chat/admin/device-requests")"
           test "$STATUS" = "503"
           grep -q '"error"' /tmp/v2-admin-denied.json
+          STATUS="$(curl --silent --show-error --output /tmp/v2-admin-members-denied.json --write-out '%{http_code}' "$BASE/api/chat/admin/members")"
+          test "$STATUS" = "401"
+          grep -q '"No autorizado"' /tmp/v2-admin-members-denied.json
 
       - name: Verify live Durable Object
         shell: bash
