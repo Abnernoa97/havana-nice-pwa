@@ -373,7 +373,7 @@ export default function App() {
       latestDraft.current = saved.draft || '';
       setDraft(latestDraft.current);
       // An interrupted edit must not be converted silently into a new message.
-      if(saved.editing?.seq>0 && saved.editing.senderId===approved.actorId && !saved.editing.deletedAt){
+      if(saved.editing && saved.editing.seq>0 && saved.editing.senderId===approved.actorId && !saved.editing.deletedAt){
         editingSnapshot.current=saved.editing;
         beforeEdit.current=saved.beforeEdit??{draft:'',replyTo:null};
         setEditing(saved.editing);
