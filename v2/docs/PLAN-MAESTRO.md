@@ -1,169 +1,160 @@
 # HAVANA NICE V2 — PLAN MAESTRO ÚNICO
 
-**Versión del plan:** 2026-10-26 · arquitectura visual unificada aprobada  
-**Estado:** Fundación cerrada; Chat de texto funcional en laboratorio; migración de Android a interfaz PWA compartida por ejecutar; seguridad, multimedia, push y módulos restantes por completar.  
+**Versión del plan:** 2026-10-26 · arquitectura híbrida con Chat Android 100 % nativo  
+**Estado:** Fundación cerrada; Chat Android React Native conservado como módulo 100 % nativo; Chat iPhone en PWA; integración de pantallas visuales PWA dentro de Android pendiente; seguridad, multimedia, push y módulos restantes por completar.  
 **Rama de trabajo:** `havana-nice-v2-foundation` del repositorio `Abnernoa97/havana-nice-pwa`.  
 **Producción protegida:** `main`, HAVANA NICE oficial, sus usuarios y Supabase, HAVANA CLOUD y los demás proyectos permanecen intactos.  
 **Presupuesto obligatorio:** 0 MXN de costo adicional, sin productos de facturación automática.  
 **Documento rector:** este es el único plan de arquitectura, tareas, estado y auditoría de V2. La historia de cambios se conserva en Git.
 
-> **DECISIÓN ARQUITECTÓNICA DEFINITIVA — 26/10/2026:** Toda la interfaz visual de HAVANA NICE V2, **incluido el Chat**, procede de **una sola PWA React**. En Android se presenta dentro de una aplicación nativa ligera mediante WebView. Android mantiene **funciones genuinamente nativas** donde aportan valor: sistema de notificaciones, almacenamiento protegido, integración con archivos/cámara, operaciones offline especializadas, gestión del ciclo de vida y servicios del sistema. iPhone ejecuta la misma PWA instalada. Se evita mantener dos interfaces dibujadas en paralelo. El motor y las responsabilidades nativas se construyen detrás de una interfaz controlada, nunca como segunda presentación visual del producto.
+> **DECISIÓN ARQUITECTÓNICA DEFINITIVA — 26/10/2026:** **Chat Android es y seguirá siendo 100 % nativo (React Native/Expo)**: interfaz, escritura, teclado, burbujas, gestos, historial local, cola offline, WebSocket y multimedia cuando corresponda. **Chat en iPhone continúa como PWA**, porque no se distribuirá app iOS nativa de pago. **Home, Calendario, Repertorio, avisos, perfiles, ajustes visuales y Administrador** utilizan una sola **interfaz PWA React**, compartida entre iPhone y una WebView integrada en Android. El Android nativo conserva también permisos, notificaciones FCM, almacenamiento seguro, archivos, cámara, ciclo de vida y puente de integración. No transformar el Chat Android en WebView ni rehacer su código operativo. Se comparte la API, el backend y los contratos del Chat, no obligatoriamente sus componentes visuales. Los cambios puramente visuales de las pantallas PWA se publican sin APK; los cambios estructurales del Chat nativo requieren APK.
 
 ---
 
 # 1. PROPÓSITO Y EXPERIENCIA FINAL
 
-HAVANA NICE V2 será una aplicación privada para la administración y el trabajo cotidiano de HAVANA NICE: músicos, administrador, chat, calendario, repertorios, avisos, perfiles y ajustes. Debe sentirse rápida, elegante y sencilla en Android y iPhone.
+HAVANA NICE V2 es una aplicación privada de HAVANA NICE para músicos y administrador: Chat, calendario, repertorio de eventos, repertorio general, avisos, perfiles, ajustes y gestión de accesos. Debe sentirse rápida, profesional y sencilla en Android y iPhone, manteniendo estrictamente separados V2 y la aplicación oficial actual.
 
-Principios de experiencia:
+**Distribución por plataforma:**
 
-- **Una sola apariencia:** PWA React + estilos compartidos para músicos y administrador; la misma pantalla en iPhone y Android, respetando las particularidades de teclado y navegación de cada sistema.
-- **Edición visual sin reinstalar:** textos, colores, tipografías, distribución, tarjetas, menús y pantallas se cambian en el código PWA y se publican en Cloudflare Pages. Android los recibe al recuperar la versión web, sin APK nueva.
-- **Funciones nativas auténticas:** la APK conserva código Android para lo que de verdad necesita capacidades del sistema y las expone a la PWA mediante un puente estrecho y protegido.
-- **Chat fiable y pulido:** gestos coherentes, escritura fluida, notificaciones y sincronización incluso con interrupciones de red.
-- **Local-first:** arranque desde recursos disponibles en el dispositivo, datos visibles inmediatamente, sincronización posterior y colas fiables.
-- **Costo real 0 MXN:** si una característica necesita facturación o excedentes automáticos, no se habilita.
-- **Una sola fuente de verdad de datos:** Worker, D1 y Durable Objects; dos teléfonos no deben mantener bases de negocio independientes.
-- **Releases seguros:** actualizar Android conservando firma, paquete, datos, credenciales y borradores; no pedir desinstalación para un rediseño.
+- **Android:** APK nativa Expo/React Native. El **Chat completo es 100 % nativo**: render de mensajes, escritura, gestos, scroll, cola offline, conexión, multimedia cuando se implemente e integración con el teléfono. Para **las otras pantallas visuales** se integra la única PWA V2 dentro de una WebView segura.
+- **iPhone:** PWA instalada desde Safari. Chat y demás pantallas se muestran en la PWA; toda la lógica de permisos, eventos y datos queda compartida en el servidor.
+- **Diseño coherente, no código visual idéntico en Chat:** las interfaces del Chat Android e iPhone respetan el mismo lenguaje visual y mismas capacidades, aunque una esté dibujada por React Native y otra por React/CSS.
+- **Cambios frecuentes sin APK:** colores, tipografías, textos y distribución de Home, Calendario, Repertorio, Admin y otras pantallas PWA se actualizan mediante Pages. Un cambio de la **interfaz nativa del Chat** requiere nueva compilación APK.
+- **Local-first y realtime:** arranque rápido con caché, cola de mensajes, reconexión, cero duplicados y sincronización con D1/Durable Objects.
+- **Cero costo adicional:** no activar productos con cobro por uso, R2, suscripciones ni pagos automáticos. Adecuar funciones al plan Free.
+- **Preservación de datos:** ninguna actualización Android debe requerir desinstalación ni pérdida de sesión, mensajes locales, caché o borradores.
 
-# 2. ARQUITECTURA ÚNICA DEL PRODUCTO
+# 2. ARQUITECTURA OFICIAL — CHAT NATIVO Y PWA VISUAL
 
 ```text
-                 UNA SOLA INTERFAZ PWA (React + Vite + TS)
-            Chat · Home · Calendario · Repertorio · Admin
-                           │
-               ┌───────────┴───────────┐
-               │                       │
-        ANDROID — APK              iPHONE — PWA
-        Expo / React Native        instalada en Home
-        WebView de la PWA          pantalla completa
-               │                       │
-        PUENTE NATIVO              Capacidades web
-        permisos/FCM               Web Push
-        archivos/cámara            IndexedDB/Service Worker
-        almacenamiento seguro      permisos web de iOS
-        lifecycle/back
-               └───────────┬───────────┘
-                           │
-                 CLOUDFLARE WORKER V2
-               autenticación · API · roles
-                           │
-               ┌───────────┴───────────┐
-               │                       │
-            D1 SQLite            Durable Objects
-        estado persistente         WebSockets
-               │                       │
-               └───────────┬───────────┘
-                           │
-               ARCHIVOS CHAT PRIVADOS
-         puente backend privado → HAVANA CLOUD
-                 → Google Drive existente
-             solo cuando esté autorizado
+                      HAVANA NICE V2
+                             │
+           ┌─────────────────┴─────────────────┐
+           │                                   │
+     ANDROID — APK                        iPHONE — PWA
+     Expo / React Native                  React + Vite
+           │                                   │
+     ┌─────┴─────────────┐                     │
+     │                   │                     │
+ CHAT 100 % NATIVO   WebView de PWA       CHAT PWA
+ React Native        Home / Calendario    Home / Calendario
+ Texto / gestos      Repertorio / Admin   Repertorio / Admin
+ WebSocket/SQLite    Interfaces visuales  IndexedDB / Web Push
+ Multimedia futuro   actualizables
+     │                   │                     │
+     └──────────┬────────┴─────────────────────┘
+                │
+       CLOUDFLARE WORKER V2
+   identidad · sesiones · autorización · API
+                │
+           ┌────┴───────────┐
+           │                │
+         D1 SQLite     Durable Objects
+        historial      WebSockets/realtime
+                │
+         Multimedia privada
+       puente backend autorizado
+       HAVANA CLOUD → Google Drive
+       (solo cuando sea seguro y 0 MXN)
 ```
 
-**No hay dos implementaciones visuales.** La aplicación React Native que hoy renderiza el Chat en Android es una implementación provisional de laboratorio. Será reemplazada gradualmente por el contenedor WebView; se conserva hasta completar pruebas de equivalencia y migración de datos. **No retirar todavía el código o la APK actual.**
+**La frontera es explícita:** Chat Android **no entra en WebView**. La PWA Android sirve a Home, Calendario, Repertorio, Admin y pantallas de información/ajustes; iPhone muestra esos mismos módulos más su implementación web del Chat. Todas las operaciones persistentes pasan por el mismo servidor y siguen las mismas reglas.
 
-## 2.1 PWA: única capa de presentación
+## 2.1 Chat Android: 100 % React Native
 
-`v2/apps/pwa/` es el origen de toda la UI: HTML, React, CSS, componentes, diseño adaptable, accesibilidad, vistas, formularios, menús, repertorio, calendario y **Chat completo** (globos, menú de acciones, escritura, replies, reacciones, viewer, estados). El mismo conjunto visual se ve:
+`v2/apps/android/` mantiene el módulo de Chat ya construido. En Android, el Chat se dibuja mediante componentes nativos React Native y administra su propio ciclo de vida:
 
-- En iPhone, dentro de la PWA instalada.
-- En Android, dentro de una WebView incluida en la APK nativa.
-- En navegador de desarrollo, para inspección y pruebas.
+- entrada por nombre autorizado y recuperación automática de sesión;
+- historial y mensajes de caché desde SQLite, borradores y cola offline;
+- teclado, scroll, long-press WhatsApp-like, barra flotante de emojis, acciones Editar/Borrar y swipe derecho para responder;
+- recepción y envío WebSocket, búsqueda, paginación, estado de entrega, reacciones y presencia;
+- multimedia y viewers cuando el almacenamiento privado esté autorizado; FCM y archivos con módulos nativos.
 
-Las diferencias de plataforma se encapsulan en adaptadores, no bifurcando pantallas ni duplicando el diseño. El contenido mantiene safe areas, scroll, tamaños táctiles, contraste, tamaño de texto y navegación correctos.
+**No eliminar ni sustituir `App.tsx` / `SwipeableBubble.tsx` de Android por vistas HTML.** Podrán refactorizarse para separar el módulo Chat, navegación y WebView de otros módulos, conservando comportamiento y estado.
 
-El JavaScript de la interfaz gestiona los componentes, rutas, estado de UI y eventos. El núcleo compartido/Worker sigue siendo la autoridad de datos, sesiones y permisos. **PWA como visual no significa que toda la lógica se ejecute en una página o que Android deje de ser nativo.**
+Una pantalla nativa de Chat se mantiene justificadamente porque priorizamos fluidez de gestos, teclado, escritura y multimedia. Esto no garantiza por sí solo superioridad de rendimiento; se comprueba en teléfono real.
 
-## 2.2 Android: contenedor y funciones nativas
+## 2.2 PWA: capa visual reutilizable para los demás módulos
 
-Mantener el paquete **`com.havananice.v2`** y el proyecto Expo/React Native de V2. La APK dibujará únicamente un shell Android muy delgado: pantalla de carga/fallback local, WebView, integración de sistema y errores recuperables. Las vistas de producto, incluido el Chat, las dibuja la PWA.
+`v2/apps/pwa/` es el origen visual para **Home, Calendario, Repertorio general y por evento, Notificaciones internas, Perfiles, Ajustes visuales y Administrador**.
 
-Responsabilidades nativas cuando sean necesarias y estén justificadas por pruebas:
+- **iPhone:** la PWA también implementa el Chat web usando los mismos contratos y backend.
+- **Android:** la misma PWA se carga en una WebView únicamente al visitar las pantallas no-Chat. El botón Chat regresa al módulo nativo React Native, sin abrir la versión web del Chat dentro de Android.
+- Los componentes y estilos web de las secciones comunes se comparten literalmente. La UI Android nativa del Chat persigue equivalencia visual mediante guías de diseño, sin duplicar toda la lógica de negocio.
+- El Chat PWA debe permanecer funcional para iPhone. No retirarlo ni deshabilitarlo en la PWA por ser nativo en Android.
 
-- Notificaciones Android: FCM, canales, permisos, apertura de destino, navegación desde notificación y sincronización de token del dispositivo.
-- Almacenamiento protegido: credenciales y claves mediante mecanismos apropiados de Android; caché/archivos locales; traslado seguro de la sesión SQLite actual.
-- Ciclo de vida: background/foreground, conectividad, reanudación, apertura de enlaces, permisos y botón **Atrás** un nivel dentro de la navegación, sin expulsar al menú principal.
-- Cámara, selector de fotos/videos/archivos, compresión, grabación y reproducción especializada si la experiencia web lo requiere.
-- Operaciones offline persistentes/seguras, transferencia de archivos y reintentos cuando una tarea deba sobrevivir más allá de la página.
-- Integración de teclado, barra de estado, navegación Android, vibración y otros servicios del SO que mejoren de forma comprobable la experiencia.
-- Diagnóstico de versión nativa, capacidades disponibles y compatibilidad del puente.
+**Actualizaciones sin APK:** cambiar textos, paletas, tarjetas, menús, tipografía o disposición de un módulo PWA se publica en Cloudflare Pages. Puede requerir cerrar/reabrir la vista para cargar versión nueva. **Cambiar Chat Android** (incluso estructura de burbujas o estilos nativos) normalmente requiere una APK nueva.
 
-No crear interfaces paralelas de Chat, Repertorio, Calendario ni Administrador en React Native. Un problema puntual de rendimiento no autoriza duplicar una pantalla entera: se mide y se optimiza; una excepción visual nativa exigiría decisión expresa y documentada del propietario.
+## 2.3 Núcleo Android y navegación
 
-## 2.3 iPhone: misma PWA, sin app de App Store
+Mantener identificador `com.havananice.v2`, firma, caché y permisos. La aplicación Android será **nativa con navegación combinada**: una ruta o pestaña Chat nativa y secciones PWA en WebView. El proyecto nativo administra:
 
-PWA web instalada desde Safari, sin costo de cuenta de desarrollador ni distribución por App Store. Usa React y estilos de `v2/apps/pwa/`, IndexedDB/Service Worker, Web Push en condiciones compatibles con iOS, y selectores de medios web.
+- ciclo de vida, conectividad, reanudación y notificaciones;
+- FCM y permisos, servicios del sistema, archivos/cámara, haptics, multimedia y caché/almacenamiento protegido;
+- botón Atrás un nivel, cierre de overlays, regreso de PWA a Chat sin expulsar al usuario al menú principal;
+- apertura de ruta concreta al pulsar una notificación;
+- puente mínimo WebView↔Android para funciones del SO que la web necesite.
 
-Una función que no sea viable en la PWA de iPhone debe contar con fallback honesto; nunca afirmar paridad de permisos o procesos en segundo plano sin verificar en un iPhone real.
+No crear **una segunda instancia Android del Chat en WebView**, ni duplicar conexiones de Chat en Android mientras el Chat nativo ya está activo. El módulo PWA embebido no debe lanzar auto-sync ni WebSocket de Chat si el usuario navega por Home/Calendario.
 
-## 2.4 Cambios que no requieren APK y cambios que sí
+## 2.4 iPhone, compatibilidad y diseño
 
-**Se publican solo en PWA:** tipografía, colores, logotipo mostrado dentro de la UI, textos, etiquetas, tarjetas, orden y posición de botones, pantalla nueva implementable en web, menús, gestos de Chat web, diseño de Admin, Calendario y Repertorio. Se entrega por Cloudflare Pages y aparece al recargar o abrir la versión nueva según política de actualización.
+iPhone se distribuye como PWA instalada desde Safari, sin App Store. Soporta Chat web, Home, Calendario, repertorio y Admin según permisos, usando IndexedDB, Service Worker y Web Push cuando el sistema lo permite. No afirmar que las notificaciones iOS o servicios en segundo plano funcionan en todas las condiciones sin pruebas físicas.
 
-**Requieren APK solo si cambian capacidades Android:** permisos/manifest, firma, configuración de paquete, icono o splash del lanzador Android, puente JS↔nativo, librerías o servicios Android, canales especiales FCM, almacenamiento nativo, integración de cámara/archivos, motor especializado o componentes binarios.
-
-**La PWA no debe interrumpir una acción abierta:** detectar versión nueva, proteger borrador/cola offline, activar actualización en punto seguro y mantener modo offline mientras la red no esté disponible. No depender de actualizar una APK por detalles gráficos.
+El lenguaje visual es coherente en ambas plataformas: colores, iconografía, jerarquías, nombres, tarjetas y comportamiento de mensajes. Para el Chat, se valida **paridad funcional** mediante tests de React Native Android ↔ React PWA iPhone; no se exige compartir el código que dibuja burbujas.
 
 # 3. ESTRUCTURA DE CÓDIGO Y FUENTE ÚNICA DE VERDAD
 
-Repositorios y ramas:
-
-- Repositorio: `Abnernoa97/havana-nice-pwa`.
-- Desarrollo de V2: `havana-nice-v2-foundation`, directorio `v2/`.
-- Producción original: `main`; **solo lectura para V2**.
-- Publicación de binarios V2: rama `havana-nice-v2-apk-downloads`.
-- HAVANA CLOUD: proyecto y Worker aparte, sin modificaciones en producción por el desarrollo V2.
-- HAVANA MASTER LAB: laboratorio independiente, puede probar escenarios de navegador; no sustituye dispositivos Android/iPhone físicos.
-
-Estructura:
+**Repositorio:** `Abnernoa97/havana-nice-pwa`. Desarrollo V2 exclusivamente en rama `havana-nice-v2-foundation` y directorio `v2/`. Rama `main` es producción de la app actual y queda estrictamente en modo **solo lectura**. Los binarios Android V2 se distribuyen desde `havana-nice-v2-apk-downloads`.
 
 ```text
 v2/
 ├─ apps/
-│  ├─ pwa/                ÚNICA INTERFAZ VISUAL; iPhone + Android WebView
-│  └─ android/            Shell Android + módulos/puente nativo
-├─ packages/
-│  └─ shared/             Contratos de API, modelos y reglas comunes
+│  ├─ android/            Chat 100 % React Native + navegación + WebView de módulos PWA
+│  └─ pwa/                UI web de iPhone y secciones visuales compartidas
+│                         iPhone mantiene también su Chat PWA
+├─ packages/shared/       Contratos Chat/API, DTOs, validación y helpers
 ├─ cloudflare/
-│  ├─ src/                Worker + lógica de Chat + multimedia apagada
-│  ├─ migrations/         Esquemas y evolución D1 reproducible
-│  └─ tests/
-├─ tests/cross-platform/ Casos de paridad y pruebas E2E
-├─ scripts/               Auditoría y validaciones
-└─ docs/PLAN-MAESTRO.md   ÚNICO PLAN MAESTRO VIGENTE
+│  ├─ src/                Worker V2, ChatRoom, integración media apagada
+│  ├─ migrations/         D1 versionada
+│  └─ tests/              QA de backend, permisos y media
+├─ tests/cross-platform/  Casos Android Chat nativo ↔ iPhone Chat PWA
+├─ scripts/               Auditoría y regresiones
+└─ docs/PLAN-MAESTRO.md   ÚNICO DOCUMENTO RECTOR
 ```
 
-La capa compartida debe incluir contratos estables, validadores, idempotencia, formato de eventos y helpers reutilizables. No duplicar el motor del Chat en WebView y React Native: en la arquitectura final **una sola instancia administra los mensajes**; el puente nativo maneja únicamente las capacidades que el SO necesita.
+**Reutilización correcta:** ambos Chat comparten mensajes, contratos, políticas, API, deduplicación, permisos, reacciones, reglas de borrado y estado de servidor, no la UI dibujada. El Chat Android puede mantener SQLite nativo y WebSocket propio; el Chat iPhone usa IndexedDB y WebSocket del navegador. Solo existe una fuente de verdad backend, no dos sistemas de mensajes.
 
-**Regla de ingeniería:** evitar archivos de arreglos acumulativos tipo `final-fix-2`, endpoints paralelos, APIs duplicadas y dependencias sin uso. Mantener módulos legibles, interfaces acotadas, cambios pequeños y pruebas de regresión.
+La PWA de las pantallas no-Chat es única y reutilizable entre Android/iPhone. No copiar sus componentes a React Native. La integración WebView no modifica el Chat Android que el usuario ya instaló.
 
-# 4. WEBVIEW Y PUENTE NATIVO: CONTRATO OFICIAL
+**Mantenimiento:** no acumular `fix2`, `final`, motores duplicados, APIs paralelas o dependencias muertas. Hacer pruebas y auditorías preventivas; no refactorizar partes estables únicamente por estética.
 
-La decisión híbrida no consiste en abrir la web como un navegador sin controles. Debe implementarse un WebView seguro, estable y verificable.
+# 4. WEBVIEW DE SECCIONES NO-CHAT Y PUENTE NATIVO
 
-## 4.1 Navegación, origen y seguridad
+La WebView Android es un componente **de navegación para pantallas PWA**, no un reemplazo del Chat nativo.
 
-- Solo cargar el origen V2 autorizado y los recursos explícitamente necesarios; rechazar enlaces desconocidos dentro de la WebView y abrir enlaces externos en el navegador del sistema según política.
-- Permitir comunicaciones puente **únicamente desde el origen de confianza**, validar tipo, versión, identificador de petición, parámetros, permisos y estado de sesión de cada acción.
-- No usar comandos arbitrarios enviados por HTML, ni `eval` o exposición global de secretos, Google OAuth, refresh tokens o claves internas en la PWA.
-- Mantener las operaciones sensibles validadas por el **Worker**, aunque un botón esté oculto o Android tenga un permiso instalado.
-- Evitar duplicar el token del usuario en múltiples almacenes sin necesidad. Para credenciales del dispositivo Android, utilizar almacenamiento protegido y un intercambio limitado de capacidades.
-- Añadir CSP web razonable, restricciones de navegación y tratamiento seguro de mensajes WebView; probar escenarios de navegación inesperada y XSS.
+## 4.1 Seguridad y rutas
 
-## 4.2 API del puente
+- Montar `react-native-webview` solo en las secciones PWA autorizadas: Home, Calendario, Repertorio, notificaciones internas, perfiles, Admin y ajustes visuales.
+- Restringir origen a la PWA V2; abrir enlaces externos de manera controlada. Validar toda orden que cruce el puente WebView↔Android: origen, tipos, versión, autorización y parámetros.
+- No insertar secretos Cloudflare, OAuth, Google Drive, tokens de servicio ni credenciales del administrador dentro del HTML ni del bundle PWA.
+- Toda operación privilegiada sigue verificándose en el Worker; una WebView no se convierte en “admin” solo porque la APK sea nativa.
+- Proteger historial y sesión al cambiar entre Chat nativo y secciones web; minimizar duplicaciones de credenciales.
 
-El contrato versionado puede ofrecer funciones concretas: `getNativeCapabilities`, `requestNotificationPermission`, `registerPushToken`, `pickMedia`, `shareFile`, `openExternalLink`, `hapticFeedback`, `setStatusBar`, `reportAppState` y `navigateBack`. Se incorporarán solo las necesarias al módulo activo.
+## 4.2 Contrato del puente
 
-Cada llamada define autorización, tipo de entrada/salida, resultado exitoso, error, timeout y comportamiento cuando no existe puente (iPhone web/navegador). Los eventos nativos nunca se tratan como datos autenticados por el mero hecho de proceder del WebView.
+Comandos según necesidad: `getNativeCapabilities`, `requestNotificationPermission`, `registerPushToken`, `pickMedia`, `openExternalLink`, `hapticFeedback`, `setStatusBar`, `navigateBack`. También se requiere una orden restringida `openNativeChat` desde las pantallas PWA: cambia a la **ruta React Native del Chat**, sin abrir un segundo socket WebView ni recrear la pantalla en HTML.
 
-## 4.3 Arranque y continuidad sin conexión
+Una acción del puente especifica resultado, error y fallback cuando se ejecuta la PWA directamente en Safari. La UI web nunca ejecuta código nativo arbitrario.
 
-- Al primer arranque Android debe disponer de un **shell visual local** o versión web empaquetada verificable para evitar pantalla en blanco sin internet; por defecto recuperar la última versión válida desde caché web.
-- Mantener la navegación y el Chat recientes disponibles offline; sincronizar al recuperar red y permisos. Nunca borrar un borrador por actualización de UI.
-- La primera carga de un WebView puede diferir del Chat React Native actual; medir TTI, scroll, teclado y recuperación antes de sustituirlo.
-- Android Back: subir exactamente un nivel, cerrar primero overlays/visores, regresar al Chat si estaba abierto, no abandonar la app.
-- El enlace profundo del push debe llegar a la ruta compartida (Chat o sección) tras validar/restaurar sesión.
+## 4.3 Teclado, caché y Atrás
+
+- Los módulos PWA comunes disponen de shell/cache local para mostrar información cuando no exista red; ningún fallo de WebView bloquea el acceso al Chat nativo.
+- Al pulsar Chat desde PWA Android, mantener el estado del Chat React Native, incluidos posición de scroll y borrador.
+- Al salir de Chat nativo hacia WebView, se conserva sesión/caché y el motor del Chat no debe duplicarse en otra vista; la política de WebSocket en background seguirá siendo responsable de reconectar al regreso.
+- Android Back: primero cerrar menú/modal/visor, luego subir un nivel; al pasar del módulo PWA a Chat no salir a Home de forma inesperada.
+- Medir la carga WebView y los módulos web, **sin comprometer el arranque ni la fluidez del Chat Android nativo**.
 
 # 5. SERVIDOR Y DATOS — CLOUDFLARE AISLADO
 
@@ -228,7 +219,7 @@ Roles:
 
 # 7. CHAT — PRIMER MÓDULO Y PRIORIDAD DE CALIDAD
 
-**La interfaz final del Chat es la misma PWA en Android e iPhone.** Android puede ejecutar capacidades de fondo nativas, pero no una segunda UI de Chat React Native.
+**Chat Android es 100 % nativo React Native/Expo y permanece así. Chat iPhone se presenta mediante React PWA.** Ambos comparten Worker, D1, WebSockets, contratos, permisos y sincronización, pero no la implementación de sus globos o gestos. Ningún cambio en otras pantallas PWA sustituirá el Chat nativo de Android.
 
 ## 7.1 Chat de texto y comportamiento
 
@@ -254,7 +245,7 @@ Roles:
 
 1. **CHAT 1 · Texto:** envío/recepción, orden, D1, WebSocket y ambos dispositivos. Base aprobada por el usuario durante pruebas previas; mantener regresiones.
 2. **CHAT 2 · Estados y reconexión:** cola offline, reintento, persistencia y vuelta automática. Implementado; completar pruebas de proceso forzado y red.
-3. **CHAT 3 · Respuestas:** preview, gesto, referencia al original y mensajes borrados. Implementado; validar el gesto en interfaz PWA compartida.
+3. **CHAT 3 · Respuestas:** preview, gesto, referencia al original y mensajes borrados. Implementado; validar el gesto por separado en Chat Android nativo y Chat PWA iPhone.
 4. **CHAT 4 · Reacciones, edición y borrado:** backend y UI inicial operativos; cerrar overlay WhatsApp-like, límites de permisos, sincronización y QA física.
 5. **CHAT 5 · Presencia y typing:** existe funcionalidad; validar condiciones con pantalla bloqueada y no confundir conexión con notificación.
 6. **CHAT 6 · Fotografías:** almacenamiento privado con límite real cero pesos, selector, compresión, miniaturas, viewer, progreso, retry y confidencialidad. No está disponible para envío real.
@@ -306,7 +297,7 @@ Para video/audio: no usar D1 como almacén de originales grandes; evaluar stream
 
 # 9. NOTIFICACIONES Y SERVICIOS DE SEGUNDO PLANO
 
-- **Android:** FCM y componentes nativos únicamente para registro del dispositivo, permisos/canales, recepción de notificaciones, apertura de ruta y acciones que realmente deban ejecutarse fuera de la WebView. No renderizar una pantalla alternativa por activar FCM.
+- **Android:** FCM y componentes nativos para permisos/canales, recepción de notificaciones, apertura de ruta, Chat nativo, cola/cache de Chat, multimedia y servicios fuera de WebView. El push al Chat abre directamente el módulo React Native y preserva navegación.
 - **iPhone PWA:** Web Push donde el SO lo permite, particularmente con la PWA instalada según requisitos del sistema. Abrir la ruta correcta al tocar notificación.
 - **Servidor:** un evento de negocio y una sola decisión de quién debe recibir push; no duplicar por cada cliente. No mandar push duplicado cuando la conversación ya está activa cuando pueda verificarse.
 - **Estado actual:** push no validado ni desplegado integralmente en V2; jamás declarar que funciona con app cerrada antes de medirlo en teléfonos reales.
@@ -314,7 +305,7 @@ Para video/audio: no usar D1 como almacén de originales grandes; evaluar stream
 
 # 10. RESTO DE LA APP — MISMA PWA VISUAL
 
-Cada módulo utiliza el diseño único y el Worker/D1 compartidos. Android no necesita una segunda pantalla nativa para estos módulos.
+**Excepto el Chat**, los módulos de esta sección comparten la misma interfaz visual PWA en Android WebView y en iPhone. Android no duplica su UI en React Native. Todas las operaciones de negocio siguen compartiendo Worker/D1.
 
 ## 10.1 Home y navegación
 
@@ -361,10 +352,10 @@ Responsabilidades:
 
 # 12. CACHÉ, OFFLINE Y SINCRONIZACIÓN LOCAL
 
-- **PWA (ambos teléfonos):** Service Worker cachea exclusivamente shell y assets públicos del mismo origen; no guarda respuestas autenticadas ni APIs. IndexedDB para datos locales permitidos, borradores, cola y estado web. No borrar caché útil por actualización estética.
-- **Android nativo:** almacenamiento seguro de credenciales y datos/archivos cuando corresponda; bridge coordinado con el estado web; no mantener dos motores activos publicando duplicados.
+- **PWA iPhone y secciones WebView Android:** Service Worker cachea solo shell y assets públicos del mismo origen; nunca respuestas autenticadas ni APIs. IndexedDB almacena datos locales permitidos de los módulos PWA y el Chat web de iPhone. No borrar caché útil por cambiar colores.
+- **Chat Android 100 % nativo:** SQLite/almacenamiento seguro, historial, borrador y cola offline; WebSocket React Native. El bridge coordina navegación y acceso a secciones PWA, sin iniciar un segundo motor de Chat Android ni duplicar datos.
 - **Actualización PWA:** network-first para recursos cuando haya red, versión estable anterior como fallback, cache versionada, migraciones IndexedDB compatibles. No aplicar cambio que borre cola o reemplace pantalla mientras el músico escribe.
-- **Chat offline:** mismo ID de mensaje durante reintentos, FIFO, confirmación de backend, reconciliación, prioridad a no perder contenido, límites de cola y errores visibles.
+- **Chat offline en dos implementaciones:** Android Chat nativo y iPhone Chat PWA conservan el mismo ID de mensaje durante reintentos, FIFO, confirmación, deduplicación y errores. Cada plataforma usa almacenamiento apropiado, sin dos Chat simultáneos en un Android.
 - **Conectividad:** sin internet se visualiza lo que se tiene; recuperación automática al volver la red; toda operación bloqueada por permisos se explica y nunca se reintenta indefinidamente.
 - **Desinstalación:** sí destruye la caché y pendientes locales, incluso si los mensajes confirmados persisten en D1. **Evitar desinstalación** como método de actualización.
 
@@ -401,10 +392,10 @@ Las medidas deben basarse en teléfonos reales. El usuario valora apertura rápi
 
 Pruebas obligatorias por funcionalidad:
 
-- Android WebView PWA y iPhone PWA ven la misma versión visual.
+- Android WebView y iPhone PWA muestran las **mismas pantallas visuales de Home/Calendario/Repertorio/Admin**. El Chat Android debe ser **nativo** y tener paridad de funciones/estilo con el Chat web del iPhone.
 - Android→iPhone e iPhone→Android; mensajes simultáneos y ausencia de duplicados.
 - Cierre/reapertura, pantalla bloqueada, Wi-Fi↔datos, conexión lenta, modo avión, proceso Android reiniciado.
-- Borradores y cola preservados en cambios de pantalla y actualización PWA.
+- Borradores y cola preservados al cambiar del Chat Android nativo a PWA WebView y viceversa; en iPhone preservados durante actualizaciones PWA.
 - Long-press y swipe realmente funcionan en ambas plataformas; overlay contextual junto a la burbuja.
 - Teclado Android e iPhone sin saltos ni tapar el composer; botón Atrás correcto.
 - Reacciones/edición/borrado presentes tras sincronización y resync.
@@ -413,76 +404,77 @@ Pruebas obligatorias por funcionalidad:
 - Media segura sin fuga a catálogo HAVANA CLOUD únicamente cuando se habilite.
 - Actualización APK sobre una instalación existente preserva datos **con misma firma**; no forzar reinstalación.
 
-Checks automáticos actuales: `v2-foundation-check.yml`, `audit:guard`, pruebas de media cerrado y protección de Service Worker, build PWA, export Android, tests de sesión/Worker y health. Complementarlos con pruebas WebView de puente, pruebas E2E del Chat y checks de versionado. **CI verde no equivale a prueba física completa.**
+Checks automáticos actuales: `v2-foundation-check.yml`, `audit:guard`, pruebas de media cerrado y protección de Service Worker, build PWA, export Android, tests de sesión/Worker y health. Complementarlos con pruebas de navegación Android nativa↔WebView, E2E de Chat Android React Native↔iPhone PWA y checks de versionado. **CI verde no equivale a prueba física completa.**
 
-# 16. MIGRACIÓN ORDENADA A ANDROID HÍBRIDO
+# 16. INTEGRACIÓN PROGRESIVA PWA VISUAL SIN TOCAR CHAT NATIVO
 
-**El estado actual aún renderiza Chat con React Native en Android; esto es provisional.** No marcar la arquitectura final como desplegada hasta efectuar los pasos siguientes.
+**Se conserva definitivamente el Chat Android en React Native.** No existe migración prevista de su interfaz a WebView. La evolución híbrida consiste únicamente en introducir pantallas PWA para el resto de los módulos, con navegación desde la APK existente.
 
-### Etapa H1 — Línea base y protección de datos
+### Etapa H1 — Conservar Chat Android y línea base
 
-1. Identificar APK V2 instalada, `com.havananice.v2`, versión, firma y almacenamiento existente.
-2. Registrar estado y formato de `expo-sqlite/kv-store` para sesión, borrador y cola; localizar datos que NO pueden perderse.
-3. Guardar evidencia de rendimiento/gestos actuales como referencia.
-4. Mantener APK existente operativa y rama `main` intacta. Nunca pedir desinstalación por migrar tecnología visual.
+1. Verificar `com.havananice.v2`, firma, almacenamiento SQLite, sesión, cola y borradores de la APK que ya funciona.
+2. Establecer prueba de regresión del Chat Android: escritura, botones, long-press, swipe reply, borrado, edición, WebSocket, reconexión, scroll y persistencia.
+3. Preservar el Chat React Native; si se modulariza `App.tsx`, el cambio debe ser funcionalmente idéntico y reversible.
+4. Confirmar en iPhone la paridad con Chat PWA y el mismo historial D1.
 
-### Etapa H2 — Contenedor híbrido mínimo
+### Etapa H2 — Navegación híbrida y pantallas PWA
 
-1. Incorporar WebView al proyecto Expo/React Native **manteniendo package ID y firma**; crear shell y fallback local para arranque sin red.
-2. Mostrar la PWA V2 de Pages dentro del contenedor, con navegación y back correctos.
-3. Definir handshake/versión de bridge, lista de origen permitido, permisos y fallback web.
-4. Comprobar acceso por nombre, carga, reconexión, scroll, teclado, caché y retorno en Android, sin tocar producción.
-5. No habilitar todavía cámaras, FCM o bridge de archivos si no se necesita para cerrar la prueba.
+1. Incorporar componente WebView al Android Expo **manteniendo package ID, firma y datos**.
+2. Crear ruta Chat nativa y rutas WebView para **Home, Calendario, Repertorio, Admin y demás vistas**, sin renderizar Chat PWA en Android.
+3. Establecer navegación compartida: entrar desde Home a Chat abre React Native; regresar desde Chat devuelve a la sección correcta.
+4. Incluir fallback local para módulos WebView sin internet; un fallo de red no debe impedir abrir el Chat nativo.
+5. Validar seguridad de origen, permisos, actualización de diseño sin APK y botón Atrás.
 
-### Etapa H3 — Sesión y caché sin pérdida
+### Etapa H3 — Identidad, sesión y bridge
 
-1. Migrar de forma segura el token de SQLite actual al nuevo modelo de credencial protegida/dispositivo autorizado; evitar que la PWA se registre como otra persona por perder sesión.
-2. Migrar o reconciliar borrador/cola pendientes, conservando los IDs y evitando envíos duplicados.
-3. Hacer que una única capa sea propietaria del socket del Chat; no ejecutar simultáneamente el viejo Chat RN y el nuevo Chat PWA.
-4. Probar actualización sobre app instalada, apagado total del proceso, retorno, pérdida de conexión y permiso revocado.
-5. Confirmar con el usuario funcionamiento idéntico en Android e iPhone antes de retirar el código visual nativo antiguo.
+1. Evitar que la PWA WebView vuelva a pedir nombre cuando Android ya recuerda una sesión válida. Diseñar sesión/autorización compartida de forma segura entre secciones, minimizando exposición de tokens y sin crear credenciales ocultas.
+2. Mantener cola, SQLite y WebSocket del Chat React Native como instancia única de Chat en Android.
+3. Usar el bridge exclusivamente para navegación, acciones del SO y contexto controlado; no usarlo para duplicar toda la API del Chat.
+4. Probar revocación, reconexión y cambios de red con Chat y módulos WebView abiertos en secuencia.
 
-### Etapa H4 — Chat PWA como única interfaz
+### Etapa H4 — Interfaz PWA compartida de los demás módulos
 
-1. Afinar gestos de Chat PWA sobre WebView e iPhone: swipe reply, long press, emojis, editar/borrar y viewer.
-2. Igualar apariencia, teclado, accesibilidad, safe areas y rendimiento con pruebas físicas.
-3. Eliminar **solo después de confirmar equivalencia** `App.tsx`/componentes RN de renderizado de mensajes que queden obsoletos; conservar shell, módulos Android y migrador de datos si aún se necesitan.
-4. Mantener la versión anterior recuperable durante el periodo de comprobación.
-5. Reorganizar módulos visuales en la PWA y profundizar en Admin, Calendario y Repertorio sin duplicación.
+1. Construir Home, Calendario, Repertorio, avisos, perfiles, Admin y ajustes visuales en `v2/apps/pwa/`.
+2. La misma UI React se publica una sola vez para iPhone y WebView Android, sin repetir componentes en RN.
+3. Comprobar actualizaciones visuales inmediatas al volver a abrir una pantalla y sin generar APK.
+4. El Chat React Native Android y Chat PWA iPhone continúan como dos interfaces justificadas; medir rendimiento y compatibilidad continuamente.
+5. Cuando esas vistas estén probadas, retirar **solo pantallas no-Chat RN obsoletas**. Nunca eliminar el Chat nativo ni sus módulos de gestos/almacenamiento.
 
-### Etapa H5 — Núcleo Android especializado
+### Etapa H5 — Servicios Android realmente nativos
 
-Añadir progresivamente FCM y servicios nativos de cámara/archivos/seguridad cuando cada módulo los requiera, documentando claramente por qué una función no puede resolverse con las capacidades web existentes. Estas mejoras sí pueden necesitar una APK nueva, en paquetes planificados y no por retoques estéticos.
+FCM, notificaciones con app cerrada, almacenamiento protegido, cámara/archivos, multimedia, servicios y permisos se incorporan cuando se necesiten. Estos cambios sí requieren APK nuevas, agrupadas en actualizaciones planificadas. Cambios PWA de textos, colores o distribución de las otras vistas no requieren APK.
+
+**Condición de finalización:** una APK Android con Chat 100 % nativo más el resto de pantallas PWA integradas; iPhone PWA con Chat propio y pantallas comunes; ambos usan la misma API/identidad, con cambios de interfaz web no disruptivos.
 
 # 17. PLAN DE IMPLEMENTACIÓN DE MÓDULOS
 
-El orden vigente evita extender una arquitectura temporal:
+La arquitectura decidida conserva el Chat Android nativo y permite incorporar pantallas PWA visuales sin duplicación:
 
 1. **Fundación V2** — cerrada.
-2. **Chat de texto y sesiones** — conservar estado actual de funcionamiento; pruebas finales de gestos/reconexión/borrado.
-3. **Arquitectura híbrida H1–H4** — siguiente frente prioritario; una UI PWA compartida también en Chat Android, sin sacrificar historial ni datos.
-4. **Seguridad de acceso** — aprobación y revocación de dispositivos/roles, primero API y después pantalla Admin compartida.
-5. **Chat fotografías** — solo al tener puente privado de almacenamiento probado con costo 0.
-6. **Chat videos/audio + viewers** — por capacidades separadas, siempre dentro de cuotas.
-7. **Push Android e iPhone** — una lógica de eventos y dos transportes del sistema.
-8. **Home y ajustes** — PWA compartida.
-9. **Calendario y repertorios generales/por evento** — PWA compartida, sincronización con Admin.
-10. **Notificaciones internas, perfiles/Familia HAVANA NICE, Admin completo** — PWA con permisos por rol.
-11. **Pulido final, auditoría de integridad y pruebas extremo a extremo**.
-12. **Migración gradual desde la app actual solo cuando V2 esté aprobada**, con respaldos y sin cortar el servicio de producción.
+2. **Chat Android 100 % React Native y Chat iPhone PWA** — seguir corrigiendo y probando gestos, borrado, respuesta, reconexión y sincronización. No migrar Chat Android a WebView.
+3. **H1 · Protección del Chat existente** — registrar firma, SQLite, sesión, borradores y cola; cerrar las regresiones pendientes.
+4. **H2–H4 · Integrar WebView solo para módulos no-Chat** — navegación nativa↔PWA, diseño compartido Home/Calendario/Repertorio/Admin, sesión y permisos correctos.
+5. **Control de acceso y Admin de dispositivos** — alta, aprobación, retirada, sesiones, revocación; servidor primero y pantalla Admin PWA después.
+6. **Chat fotografías** — integrar desde Chat nativo Android y Chat PWA iPhone cuando exista almacenamiento privado 0 MXN.
+7. **Chat video/audio/viewers** — capacidades nativas Android, web iPhone, servidor y cuotas compartidos.
+8. **Notificaciones push** — FCM nativo Android y Web Push iPhone; sin duplicados.
+9. **Home/Ajustes/Calendario/Repertorio/Notificaciones internas/Admin** — una única UI PWA compartida.
+10. **QA y auditorías** — revisar seguridad, UI, rendimiento, ramas, compilaciones, limpieza y costo.
+11. **Migración gradual desde HAVANA NICE actual**, únicamente después de aprobación física y respaldos, sin tocar producción.
 
-No abrir capacidades que compliquen la arquitectura mientras H1–H4 no estén estables. Se puede investigar sin desplegar, pero se integra verticalmente y se valida antes de pasar al siguiente módulo.
+Cada fase se valida Android→iPhone e iPhone→Android cuando aplica. **No se hace APK por un retoque de pantalla PWA**; las modificaciones propias del Chat Android o del sistema nativo sí requieren una actualización nativa.
 
 # 18. ESTADO REAL VERIFICADO — 26 DE OCTUBRE DE 2026
 
 ## 18.1 Código y plataformas
 
-- La rama V2 contiene app Android Expo/React Native que **todavía dibuja Chat nativo de laboratorio** y una PWA React que **dibuja Chat web**. El unificado visual Android WebView está **aprobado como arquitectura, NO implementado**.
-- Android usa almacenamiento `expo-sqlite/kv-store`; PWA usa IndexedDB. Existe cola offline y conservación de borrador por dispositivo. La migración al contenedor debe preservar el acceso ya instalado.
-- El usuario confirmó recientemente que el acceso por nombre quedó funcionando. Son seis nombres iniciales. El módulo visual de autorizaciones de Admin V2 no existe.
-- Chat texto, realtime, reply, reacciones, edición/borrado, búsqueda e historial paginado están programados y se probaron parcialmente con ambos clientes. UI gestual contextual y reconexión cruzada completas requieren pruebas específicas tras la migración.
-- FASE 0 aprobada con arranque autónomo Android; problemas iniciales de Metro y WebSocket fueron corregidos en iteraciones previas. No volver a usar debug APK sin bundle.
-- Fotografías reales, video/audio, push, Home avanzado, calendario, repertorio y Admin V2 no están completos.
+- **Arquitectura elegida:** Chat Android 100 % React Native y Chat iPhone PWA; Home/Calendario/Repertorio/Admin y demás pantallas visuales PWA compartidas en Android WebView + iPhone. **La WebView de los módulos no-Chat aún no está integrada**; el Chat Android actual se conserva.
+- Android hoy usa `v2/apps/android/App.tsx`, `SwipeableBubble.tsx` y `expo-sqlite/kv-store` para su Chat nativo. No eliminar, migrar a HTML ni desinstalar esta APK.
+- iPhone usa `v2/apps/pwa/src/App.tsx` como Chat PWA; para módulos visuales futuros ese mismo proyecto React se reutilizará en Android WebView.
+- El usuario confirmó el 26/10/2026 que la entrada por nombre quedó funcionando; seis nombres iniciales. El módulo Admin de dispositivos aún está pendiente.
+- Chat texto, WebSockets, replies, reacciones, edición/borrado, búsqueda e historial existen en ambas implementaciones; long-press WhatsApp-like, swipe reply, reconexión y sincronización bidireccional requieren cierre de QA real.
+- Fundación cerrada; problemas iniciales de Metro y handshake WebSocket ya corregidos. No volver a generar una APK debug que dependa de Metro.
+- Fotos, video/audio, push, Home avanzado, Calendario, Repertorio y Admin de V2 permanecen pendientes de implementación completa. En Android Chat sigue nativo también cuando se añada multimedia.
 
 ## 18.2 Servidor
 
@@ -507,7 +499,7 @@ Cuando un cambio nativo obligue a producir APK:
 - Publicar exclusivamente en `havana-nice-v2-apk-downloads`, nunca en `main`.
 - Entregar enlace externo directo HTTPS verificado, con texto **[Descarga directa alternativa]** y archivo APK real (sin navegación intermedia GitHub ni ZIP temporal).
 - No desinstalar ni borrar datos para probar una nueva versión. Si hay incompatibilidad de firma, diagnosticar antes de recomendar acciones sobre el teléfono.
-- Los cambios solo de PWA se publican por Pages y **no ejecutan un build nativo**.
+- Los cambios solo de la interfaz **PWA de módulos no-Chat** se publican por Pages y **no ejecutan un build nativo**. Cambios del Chat Android React Native necesitan una APK verificada.
 
 # 19. AUDITORÍAS PREVENTIVAS Y LIMPIEZA DEL PROYECTO
 
@@ -546,6 +538,7 @@ Solo se requiere intervención humana para instalación física, aprobación de 
 
 Cada trabajo:
 
+0. Distinguir siempre **Chat Android React Native**, **Chat iPhone PWA** y **módulos web compartidos**; no presentar la WebView como reemplazo del Chat Android.
 1. Leer este Plan Maestro único y comprobar estado real en GitHub/Cloudflare.
 2. Elegir una capacidad pequeña y vertical; preservar producción.
 3. Preparar migraciones retrocompatibles si cambian esquemas/almacenamiento.
@@ -557,6 +550,6 @@ Cada trabajo:
 
 ## Punto de continuación actual
 
-**El siguiente paso de desarrollo es H1 → H2: preparar un contenedor Android WebView de la PWA de V2 sin perder la sesión, la cola offline ni la firma de la app actual.** Mantener intacta la última APK que funciona hasta contar con una alternativa validada. Después completar H3 → H4 y continuar con la seguridad del módulo Admin.
+**Continuamos con el Chat Android 100 % nativo y el Chat iPhone PWA**: terminar el menú WhatsApp-like, borrado, respuesta por gesto, reconexión automática y sincronización bidireccional. Paralelamente, preparar H1 y H2 para introducir **únicamente las pantallas no-Chat** como PWA dentro de la APK, conservando `com.havananice.v2`, firma y datos. Seguridad de nombres/dispositivos sigue como siguiente prioridad transversal.
 
-Esta es la arquitectura única desde la cual se deben interpretar todas las tareas siguientes. Las decisiones anteriores incompatibles —dos interfaces visuales paralelas, Chat con UI nativa permanente en Android, R2, claves temporales de laboratorio y construcción de una APK por cambios estéticos— quedan sustituidas por lo aquí definido. Su registro histórico permanece accesible mediante los commits de Git, pero **no son instrucciones vigentes**.
+**Regla inequívoca:** la PWA en Android proporciona Home, Calendario, Repertorio, Administrador y demás pantallas visuales; **no sustituye nunca el Chat React Native de Android**. La PWA de iPhone sí mantiene su propio Chat. Las decisiones previas contradictorias —Chat Android dentro de WebView, R2, clave temporal de laboratorio y APK para ajustes CSS— dejan de ser instrucciones vigentes; su historial puede consultarse en commits de Git.
