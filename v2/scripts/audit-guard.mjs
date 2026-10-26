@@ -97,6 +97,18 @@ present(pwa,/onLongPress=\{anchor=>showMessageMenu\(message,anchor\)\}/,
   'PWA Chat must show its contextual menu for the held message');
 present(pwa,/aria-modal="true"/,'PWA contextual menu must be a dialog');
 present(pwa,/Responder/,'PWA contextual menu must provide a reply action');
+// C02: retain the target of the edit after app suspension/reopening.
+const pwaLocal=read('apps/pwa/src/local.ts');
+const androidLocal=read('apps/android/chatStorage.ts');
+present(pwaLocal,/editing\?: ChatMessage \| null/,'PWA storage preserves edit context');
+present(androidLocal,/editing\?: ChatMessage \| null/,'Android storage preserves edit context');
+present(pwa,/editing: editingSnapshot\.current/,'PWA saves edit target');
+present(android,/editing: editingSnapshot\.current/,'Android saves edit target');
+present(pwa,/setEditing\(saved\.editing\)/,'PWA must restore edit mode');
+present(android,/setEditing\(saved\.editing\)/,'Android must restore edit mode');
+present(pwa,/editingSnapshot\.current=null;/,'PWA must clear completed edit');
+present(android,/editingSnapshot\.current=null;/,'Android must clear completed edit');
+
 // C02: edit must not lose its text when offline or on server rejection.
 present(android,/editPending\.current=\{seq:editing\.seq,text\}/,'Android must await edit confirmation');
 present(pwa,/editPending\.current=\{seq:editing\.seq,text\}/,'PWA must await edit confirmation');

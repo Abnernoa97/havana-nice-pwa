@@ -4,6 +4,9 @@ export interface LocalChatState {
   session: ChatSession;
   outbox: ChatMessage[];
   draft?: string;
+  // Preserve the target of an interrupted edit, not just the edited text.
+  editing?: ChatMessage | null;
+  beforeEdit?: { draft:string; replyTo:ChatMessage|null } | null;
 }
 const DB = 'havana-nice-v2-lab';
 const STORE = 'chat';

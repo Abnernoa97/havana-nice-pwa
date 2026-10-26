@@ -7,6 +7,9 @@ export interface NativeLocalChat {
   session: ChatSession;
   outbox: ChatMessage[];
   draft?: string;
+  // Preserve the target of an interrupted edit, not just the edited text.
+  editing?: ChatMessage | null;
+  beforeEdit?: { draft:string; replyTo:ChatMessage|null } | null;
 }
 const KEY = 'havana-v2-chat-local-v1';
 

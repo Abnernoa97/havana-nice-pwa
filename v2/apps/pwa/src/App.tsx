@@ -49,6 +49,7 @@ export default function App() {
   const draftTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // C02: preserve the previous composer draft and wait for the server update.
   const beforeEdit = useRef<{draft:string;replyTo:ChatMessage|null}|null>(null);
+  const editingSnapshot = useRef<ChatMessage|null>(null);
   const editPending = useRef<{seq:number;text:string}|null>(null);
   const editTimeout = useRef<ReturnType<typeof setTimeout>|null>(null);
   const [savingEdit,setSavingEdit] = useState(false);
@@ -62,6 +63,9 @@ export default function App() {
     clearRetry();
     activeSession.current = null;
     outbox.current.clear();
+    editingSnapshot.current=null;
+    beforeEdit.current=null;
+    setEditing(null);
     setMessages([]);
     setSession(null);
     setName('');
@@ -76,6 +80,8 @@ export default function App() {
       session: activeSession.current,
       outbox: [...outbox.current.values()].map(m => ({...m, deliveryStatus:'queued' as const, pending:true})),
       draft: latestDraft.current,
+      editing: editingSnapshot.current,
+      beforeEdit: beforeEdit.current,
     } : null;
     storageQueue.current = storageQueue.current.catch(() => {}).then(() => saveLocalChat(value)).catch(() => {});
   }
@@ -116,9 +122,12 @@ export default function App() {
     setEditing(null);
     const previous=beforeEdit.current;
     beforeEdit.current=null;
-    setDraft(previous?.draft??'');
+    editingSnapshot.current=null;
+    latestDraft.current=previous?.draft??'';
+    setDraft(latestDraft.current);
     setReplyTo(previous?.replyTo??null);
     setError('');
+    persist();
   }
   function abandonPendingEdit(reason:string){
     if(!editPending.current)return;
@@ -145,7 +154,10 @@ export default function App() {
     }
     if(!deleting){
       if(!beforeEdit.current)beforeEdit.current={draft,replyTo};
+      editingSnapshot.current=message;
+      latestDraft.current=message.text;
       setReplyTo(null);setEditing(message);setDraft(message.text);setError('');
+      persist();
       return;
     }
     setError('');
@@ -360,6 +372,16 @@ export default function App() {
       setSession(approved);
       latestDraft.current = saved.draft || '';
       setDraft(latestDraft.current);
+      // An interrupted edit must not be converted silently into a new message.
+      if(saved.editing?.seq>0 && saved.editing.senderId===approved.actorId && !saved.editing.deletedAt){
+        editingSnapshot.current=saved.editing;
+        beforeEdit.current=saved.beforeEdit??{draft:'',replyTo:null};
+        setEditing(saved.editing);
+        setError('Edición recuperada. Puedes continuar o cancelar.');
+      } else {
+        editingSnapshot.current=null;
+        beforeEdit.current=null;
+      }
       setName(approved.displayName);
       connectLatest.current(approved);
     }).catch(() => {}).finally(() => {restoredStorage.current=true;setRestoringAccess(false);});
@@ -367,6 +389,7 @@ export default function App() {
       if (!disposed.current) setHealth(data);
     }).catch(() => { if (!disposed.current) setError('No se pudo conectar a la API'); });
     const resume = () => {
+      if(document.visibilityState==='hidden'){persist();return;}
       const next = activeSession.current;
       if (!next || document.visibilityState !== 'visible') return;
       void restoreNamedChatSession(next).then(valid => {
@@ -426,6 +449,9 @@ export default function App() {
     setError('');
     try {
       const next = await startNamedChatSession(name.trim());
+      editingSnapshot.current=null;
+      beforeEdit.current=null;
+      setEditing(null);
       setMessages([]);
       setReceipts([]);
       setSearchResults(null);
@@ -494,6 +520,7 @@ export default function App() {
     }
   }
   function typeText(value: string) {
+    latestDraft.current=value;
     setDraft(value);
     const now = Date.now();
     if (now - typingLast.current > 1700 && socket.current?.readyState === WebSocket.OPEN) {
