@@ -1,39 +1,22 @@
 # HAVANA NICE V2
 
-Nueva generación de HAVANA NICE, construida desde cero y completamente separada de producción.
+Nueva generación privada de HAVANA NICE, desarrollada en aislamiento respecto a la aplicación de producción.
 
-## Arquitectura oficial
-- Android: app nativa con React Native / Expo.
-- iPhone: PWA premium mientras el objetivo de costo siga siendo 0 MXN.
-- Backend: Cloudflare.
-- API: Cloudflare Worker.
-- Datos persistentes: Cloudflare D1.
-- Realtime de Chat: Durable Objects + WebSockets.
-- Fotos y miniaturas: módulo CHAT 6 pendiente. R2 desactivado por política de costo cero; se evalúa puente privado de HAVANA CLOUD con autorización y cuotas propias de V2. No activar OAuth paralelo ni duplicar catálogos.
-- Android push: FCM, pendiente de implementación y pruebas físicas.
-- iPhone PWA push: Web Push, pendiente de implementación y pruebas físicas.
-- Código: GitHub.
-- Desarrollo: vertical, capacidad por capacidad, Android + PWA antes de avanzar.
+**Documento único y obligatorio:** [Plan Maestro V2](docs/PLAN-MAESTRO.md). Todas las decisiones, responsabilidades, estado real, seguridad, costos, auditorías y orden de implementación se mantienen únicamente allí.
 
-## Estado
-FASE 0 — FUNDACIÓN COMPLETADA. CHAT 1–5 en validación por etapas; chat de texto, respuestas, reacciones, edición, borrado y acceso por nombre implementados en Android y PWA de desarrollo. CHAT 6 multimedia y notificaciones push NO están activos. No declarar finalizado el chat sin prueba física simultánea Android ↔ iPhone.
+## Arquitectura vigente desde el 26 de octubre de 2026
 
-## Producción actual
-La HAVANA NICE actual está totalmente fuera de alcance para V2:
-- no modificar,
-- no migrar,
-- no reutilizar como backend de pruebas,
-- no tocar datos ni despliegue,
-- solo consultar arquitectura y comportamiento como referencia.
+- **Una sola UI visual:** PWA React/Vite/TypeScript para Android (WebView) y iPhone (PWA instalada), **incluido Chat, Home, Calendario, Repertorio y Administrador**.
+- **Android genuinamente nativo:** APK Expo/React Native como contenedor WebView y plataforma para FCM, almacenamiento protegido, cámara/archivos, permisos, servicios, teclado y navegación cuando se necesiten. La interfaz visual del producto no se duplica en React Native.
+- **iPhone:** la misma PWA, sin publicación en App Store.
+- **Backend común:** Worker Cloudflare V2, D1 y Durable Objects/WebSockets.
+- **Multimedia:** almacenamiento privado por puente de servicios a Google Drive existente de HAVANA CLOUD, únicamente después de aprobación y pruebas. R2 descartado por política estricta de cero costos adicionales.
+- **Producción:** rama `main`, HAVANA NICE actual, HAVANA CLOUD, FAMILIA NOA y otros proyectos quedan intactos.
 
-FAMILIA NOA también permanece independiente. Se pueden reutilizar patrones técnicos, nunca compartir Worker, D1, R2, datos o lógica de producción.
+## Estado actual
 
-## Fuente única de verdad
-Leer únicamente:
+La decisión híbrida está **aprobada pero pendiente de implementación**. Actualmente el Chat Android sigue renderizado en React Native; debe migrarse a WebView con una sola UI React antes de desarrollar el resto de pantallas. Se conserva el funcionamiento actual hasta comprobar instalación sobre APK anterior, migración segura de sesión/cola, reconexión, teclado, gestos y rendimiento. Fotos, audio, video, push y Administrador V2 aún no se han completado.
 
-`v2/docs/PLAN-MAESTRO.md`
+Rama de desarrollo: `havana-nice-v2-foundation`. APK V2 directa: rama `havana-nice-v2-apk-downloads`.
 
-No crear documentos paralelos de continuidad, decisiones o planes alternativos.
-
-## Auditorías técnicas
-Revisiones periódicas y decisiones de conservación, corrección o eliminación se registran exclusivamente en `v2/docs/PLAN-MAESTRO.md`, bajo «AUDITORÍAS PREVENTIVAS». Los archivos de seguridad y pruebas jamás deben eliminarse solo por parecer inactivos.
+**No crear planes o documentos de decisiones paralelos; editar solo [el Plan Maestro](docs/PLAN-MAESTRO.md).**
