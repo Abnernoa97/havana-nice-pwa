@@ -6,7 +6,7 @@ import {
   reconcileReactions, reconcileUpdatedMessage, type ChatReaction, type ChatEmoji, type ChatReadReceipt,
 } from '@havana/shared';
 import { loadLocalChat, saveLocalChat } from './local';
-import SwipeMessage from './SwipeMessage';
+import SwipeMessage, {type MessageAnchor} from './SwipeMessage';
 
 export default function App() {
   const [health, setHealth] = useState<BackendHealth | null>(null);
@@ -30,6 +30,7 @@ export default function App() {
   const [searching, setSearching] = useState(false);
   const [editing, setEditing] = useState<ChatMessage | null>(null);
   const [menuMessage,setMenuMessage] = useState<ChatMessage | null>(null);
+  const [menuAnchor,setMenuAnchor] = useState<MessageAnchor|null>(null);
   const socket = useRef<WebSocket | null>(null);
   const activeSession = useRef<ChatSession | null>(null);
   const outbox = useRef<Map<string, ChatMessage>>(new Map());
@@ -101,6 +102,12 @@ export default function App() {
   function replyToMessage(message:ChatMessage){
     if(message.seq<1||message.deletedAt)return;
     setMenuMessage(null);setEditing(null);setReplyTo(message);
+  }
+  function showMessageMenu(message:ChatMessage,anchor:MessageAnchor){
+    // No reactions or privileged actions before the server has accepted a message.
+    if(message.seq<=0 || message.deletedAt)return;
+    setMenuAnchor(anchor);
+    setMenuMessage(message);
   }
   function updateOwn(message: ChatMessage, deleting = false) {
     if(message.senderId!==session?.actorId || message.seq<1 || message.deletedAt || connection!=='en vivo') return;
@@ -241,7 +248,10 @@ export default function App() {
           }
         } else if (value.type === 'chat.updated') {
           setMessages(before=>reconcileUpdatedMessage(before,value.message));
-          if(value.message.deletedAt)setReactions(before=>before.filter(r=>r.messageSeq!==value.message.seq));
+          if(value.message.deletedAt){
+            setReactions(before=>before.filter(r=>r.messageSeq!==value.message.seq));
+            setMenuMessage(current=>current?.seq===value.message.seq?null:current);
+          }
           setError('');
         } else if (value.type === 'chat.read') {
           setReceipts(before=>[
@@ -429,6 +439,26 @@ export default function App() {
     flushOutbox();
   }
 
+  // The context menu follows the held bubble. Keep it inside the visual
+  // viewport so keyboard, notch and small-screen scrolling do not hide actions.
+  const menuWidth=Math.min(290,Math.max(180,window.innerWidth-24));
+  const menuOwn=!!menuMessage && menuMessage.senderId===session?.actorId && !menuMessage.pending;
+  const menuAge=menuMessage?Date.now()-Date.parse(menuMessage.sentAt):Infinity;
+  const canEdit=menuOwn && connection==='en vivo' && menuAge<15*60*1000;
+  const canDelete=menuOwn && connection==='en vivo' && menuAge<48*60*60*1000;
+  const visibleTop=window.visualViewport?.offsetTop??0;
+  const visibleHeight=window.visualViewport?.height??window.innerHeight;
+  const menuHeight=122;
+  const preferredTop=menuAnchor && menuAnchor.y>visibleTop+menuHeight+16
+    ? menuAnchor.y-menuHeight-8
+    : (menuAnchor?.y??(visibleTop+(visibleHeight-menuHeight)/2))+(menuAnchor?.height??0)+8;
+  const menuTop=Math.max(visibleTop+10,
+    Math.min(preferredTop,visibleTop+visibleHeight-menuHeight-10));
+  const preferredLeft=menuAnchor
+    ? (menuOwn ? menuAnchor.x+menuAnchor.width-menuWidth : menuAnchor.x)
+    : (window.innerWidth-menuWidth)/2;
+  const menuLeft=Math.max(12,Math.min(preferredLeft,window.innerWidth-menuWidth-12));
+
   return (
     <main className="chat-app">
       <header className="chat-header">
@@ -478,7 +508,7 @@ export default function App() {
               return <SwipeMessage className={mine?'bubble mine':'bubble theirs'}
                 key={message.senderId+':'+message.clientMessageId}
                 onSwipeRight={()=>replyToMessage(message)}
-                onLongPress={()=>{if(!message.deletedAt)setMenuMessage(message);}}>
+                onLongPress={anchor=>showMessageMenu(message,anchor)}>
                 {!mine&&<span className="sender">{message.senderName}</span>}
                 {message.replyToSeq&&<div className="reply-original">
                   ↪ {messages.find(m=>m.seq===message.replyToSeq)?.text.slice(0,70)||'Mensaje anterior'}
@@ -503,26 +533,33 @@ export default function App() {
             })}
             <div ref={bottom} />
           </section>
-          {menuMessage&&<div className="message-menu-overlay" onClick={()=>setMenuMessage(null)}>
-            <div className="whatsapp-context" role="dialog" aria-label="Acciones del mensaje"
-              onClick={e=>e.stopPropagation()}>
+          {menuMessage&&<div className="message-menu-overlay"
+              onClick={()=>setMenuMessage(null)} onKeyDown={event=>{
+                if(event.key==='Escape')setMenuMessage(null);
+              }}>
+            <div className="whatsapp-context" role="dialog" aria-modal="true" tabIndex={-1}
+              aria-label="Acciones del mensaje" style={{
+                left:menuLeft,top:menuTop,width:menuWidth,
+              }} onClick={event=>event.stopPropagation()}>
               <div className="whatsapp-reactions">
                 {(['👍','❤️','😂'] as ChatEmoji[]).map(emoji=>
-                  <button type="button" key={emoji} aria-label={emoji} onClick={()=>{react(menuMessage.seq,emoji);setMenuMessage(null);}}>
+                  <button type="button" key={emoji} aria-label={emoji}
+                    aria-pressed={reactions.some(r=>r.messageSeq===menuMessage.seq&&
+                      r.actorId===session.actorId&&r.emoji===emoji)}
+                    disabled={connection!=='en vivo'}
+                    onClick={()=>{react(menuMessage.seq,emoji);setMenuMessage(null);}}>
                     {emoji}
                   </button>)}
-                <button type="button" aria-label="Cerrar reacciones" onClick={()=>setMenuMessage(null)}>＋</button>
               </div>
               <div className="whatsapp-actions">
-                {menuMessage.senderId===session.actorId&&!menuMessage.pending&&connection==='en vivo'&&
-                  Date.now()-Date.parse(menuMessage.sentAt)<48*60*60*1000&&
-                  <button type="button" className="whatsapp-delete" onClick={()=>{
-                    const m=menuMessage;setMenuMessage(null);
-                    if(window.confirm('¿Borrar este mensaje para todos?'))updateOwn(m,true);
-                  }}>Borrar</button>}
-                {menuMessage.senderId===session.actorId&&!menuMessage.pending&&connection==='en vivo'&&
-                  Date.now()-Date.parse(menuMessage.sentAt)<15*60*1000&&
-                  <button type="button" onClick={()=>{const m=menuMessage;setMenuMessage(null);updateOwn(m);}}>Editar</button>}
+                <button type="button" onClick={()=>replyToMessage(menuMessage)}>Responder</button>
+                {canEdit&&<button type="button" onClick={()=>{
+                  const m=menuMessage;setMenuMessage(null);updateOwn(m);
+                }}>Editar</button>}
+                {canDelete&&<button type="button" className="whatsapp-delete" onClick={()=>{
+                  const m=menuMessage;setMenuMessage(null);
+                  if(window.confirm('¿Borrar este mensaje para todos?'))updateOwn(m,true);
+                }}>Borrar</button>}
               </div>
             </div>
           </div>}
