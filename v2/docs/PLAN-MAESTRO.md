@@ -232,7 +232,7 @@ Roles:
 
 ## 7.1 Chat de texto y comportamiento
 
-- Mensajes uno a uno dentro de la conversación privada del equipo, timestamp de servidor, nombre del remitente, orden estable e historial paginado.
+- Mensajes en la conversación privada grupal del equipo, timestamp de servidor, nombre del remitente, orden estable e historial paginado.
 - Texto local inmediato; estado `en cola`, `enviando`, `enviado`, `error`, reintento con el mismo ID.
 - Cola offline persistente, reconciliación FIFO, deduplicación; no perder borradores al cambiar de sección, suspender app ni actualizar estilos.
 - Respuesta a mensaje original con preview, incluso cuando original haya sido eliminado; navegación al mensaje si existe.
