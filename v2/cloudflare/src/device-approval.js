@@ -1,6 +1,7 @@
 // HAVANA NICE V2 device approval foundation. Never enable enforcement without
 // 0009 migration, an independent administrator secret and upgraded clients.
 // All sensitive tokens are random; D1 stores SHA-256 digests only.
+import { verifyAdminSession } from './admin-auth.js';
 const WINDOW = 24 * 60 * 60 * 1000;
 const SESSION_LIFETIME = 90 * WINDOW;
 const APP_ORIGIN = 'https://havana-nice-v2-dev.pages.dev';
@@ -41,7 +42,7 @@ export async function handleDeviceApprovalApi(request,env,url,origin,respond,nor
   if (!adminConfigured(env)) return errorReply(respond,origin,'Servicio de aprobación no configurado',503);
   const now=Date.now();
   if(path.startsWith('/api/chat/admin/device-requests')) {
-    if (!await verifyAdminRequest(request,env)) return errorReply(respond,origin,'No autorizado',401);
+    if (!await verifyAdminSession(request,env) && !await verifyAdminRequest(request,env)) return errorReply(respond,origin,'No autorizado',401);
     if(path==='/api/chat/admin/device-requests' && request.method==='GET') {
       const entries=await env.DB.prepare(
         "SELECT request_id,actor_id,display_name,device_label,status,created_at,expires_at,decided_at,redeemed_at FROM chat_device_requests ORDER BY created_at DESC LIMIT 100"

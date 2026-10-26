@@ -31,6 +31,13 @@ present(worker,/active=1/,'Worker must deny revoked names');
 present(worker,/chat\.revoked/,'Worker must notify active sessions when access is revoked');
 // Device approvals are staged behind an opt-in. Never switch on enrollment
 // until 0009 migration, admin secret and both native/web clients are ready.
+const adminAuth=read('cloudflare/src/admin-auth.js');
+const adminMigration=read('cloudflare/migrations/0010_chat_admin_sessions.sql');
+present(adminAuth,/V2_ADMIN_LOGIN_MODE==='enabled'/,'Admin login must be explicitly enabled');
+present(adminAuth,/chat_admin_login_limits/,'Admin login must rate limit failed attempts');
+present(adminAuth,/revoked_at/,'Admin session must support revocation');
+present(adminMigration,/CREATE TABLE IF NOT EXISTS chat_admin_sessions/,'Admin sessions need isolated D1 storage');
+present(adminAuth,/MIN_SECRET_LENGTH=40/,'Require high entropy bootstrap administrator secret');
 const approvals=read('cloudflare/src/device-approval.js');
 const migration=read('cloudflare/migrations/0009_chat_device_approvals.sql');
 present(approvals,/V2_DEVICE_APPROVAL_MODE === 'enforce'/,'S01 approvals must require explicit enablement');

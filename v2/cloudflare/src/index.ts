@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { handleChatMedia, mediaReadiness } from './drive-media.js';
 import { deviceGateEnabled, handleDeviceApprovalApi } from './device-approval.js';
+import { handleAdminSessionApi } from './admin-auth.js';
 // HAVANA NICE V2 isolated Worker. Only D1-authorized musician names may enroll.
 // Random durable device credentials are issued once and validated against D1 on every request.
 const encoder = new TextEncoder();
@@ -284,6 +285,9 @@ export default {
       return handleChatMedia(request, env, session, url, origin, respond);
     }
     if (url.pathname === '/realtime/health') return env.CHAT_ROOMS.get(env.CHAT_ROOMS.idFromName('foundation-health')).fetch('https://internal/health');
+    if (url.pathname.startsWith('/api/chat/admin/auth/')) {
+      return handleAdminSessionApi(request,env,url,origin,respond);
+    }
     if (url.pathname.startsWith('/api/chat/device/') || url.pathname.startsWith('/api/chat/admin/device-requests')) {
       return handleDeviceApprovalApi(request,env,url,origin,respond,normalizeMusicianName,ROOM);
     }

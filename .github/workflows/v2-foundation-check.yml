@@ -53,6 +53,9 @@ jobs:
       - name: Verify zero-billing Drive adapter safety
         run: npm run test:media -w @havana/cloudflare
 
+      - name: Validate independent administrator authentication
+        run: npm run test:admin-auth -w @havana/cloudflare
+
       - name: Validate staged device approval security
         run: npm run test:security -w @havana/cloudflare
 
