@@ -43,8 +43,8 @@
 
 ## D. Seguridad y Administración de accesos — 0/2
 
-- [ ] **S01 · Alta y aprobación de nombres/dispositivos desde Administrador.** El músico ingresa solo su nombre la primera vez, pero un teléfono nuevo necesita autorización segura; permitir dar/quitar acceso.
-- [ ] **S02 · Revocación efectiva y sesiones seguras.** Bloquear token y WebSockets, registrar dispositivos, renovar credenciales sin exigir ingreso frecuente y proteger almacenamiento nativo.
+- [ ] **S01 · Alta y aprobación de nombres/dispositivos desde Administrador.** El músico ingresa solo su nombre la primera vez, pero un teléfono nuevo necesita autorización segura; permitir dar/quitar acceso. **Diagnóstico inicial 26/10:** `0007_named_musician_access.sql` mantiene lista de nombres, pero aún no establece aprobación individual de teléfonos; `createSession` otorga token nuevo cuando se acepta el nombre. Prioridad: diseñar alta pendiente y aprobación segura de dispositivos SIN invalidar los dos teléfonos ya aprobados ni requerir nueva contraseña a cada músico. Hasta implementar y probar, no distribuir al equipo.
+- [ ] **S02 · Revocación efectiva y sesiones seguras.** Bloquear token y WebSockets, registrar dispositivos, renovar credenciales sin exigir ingreso frecuente y proteger almacenamiento nativo. **Diagnóstico inicial 26/10:** Worker almacena hash SHA256 del bearer token en D1 y valida sesiones contra miembro activo; `MEMBER_SESSION_EXPIRY` actualmente apunta a 2100, sin política de renovación periódica. Revisar controles de revocación inmediata de WebSockets y almacenamiento protegido del token en Android y PWA antes de marcar seguro el Chat completo; preservar continuidad de sesiones existentes con migración compatible.
 
 ## E. Chat multimedia y avisos del sistema — 0/5
 
