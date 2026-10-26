@@ -13,7 +13,7 @@
 
 # 0. TABLERO DE AVANCE — CHECKLIST VIVA
 
-**Actualizado:** 26 de octubre de 2026. **Avance certificado: 9 de 27 hitos**; los otros 18 requieren implementación y/o validación. Este conteo representa hitos cerrados, **no porcentaje de funciones o tiempo restante**. La fase de Chat básico está cerrada (C01–C05). **Prioridad actual: H01**, auditar y proteger la base nativa instalada (firma, versión, identidad, SQLite, sesión, cola offline y notificaciones futuras) antes de integrar pantallas visuales PWA mediante H02.
+**Actualizado:** 26 de octubre de 2026. **Avance certificado: 9 de 27 hitos**; los otros 18 requieren implementación y/o validación. Este conteo representa hitos cerrados, **no porcentaje de funciones o tiempo restante**. La fase de mensajería de texto **C01–C05 está confirmada (5/5)**, pero **NO representa el Chat completo al 100 %**. **Decisión del propietario, 26/10/2026 a las 15:52:** concentrar el trabajo exclusivamente en **terminar, endurecer y probar integralmente el Chat de información Android nativo ↔ iPhone PWA**, antes de continuar con la interfaz inicial, WebView, Calendario, Repertorio, Notificaciones visuales o Familia. Prioridad: **H01 (APKs y datos) → S01–S02 (autorización, revocación y sesiones seguras) → M01–M05 (fotos, videos, audio, visor y push) → batería específica de QA del Chat dentro de Q01**. H02/H03/H04 y P01–P05 quedan congelados hasta aprobación explícita del Chat completo. Las mejoras implementadas en el prototipo visual quedan conservadas, no se publican nuevos cambios visuales por ahora.
 
 **Cómo se usa:** `[x]` y texto tachado = terminado y confirmado; `[ ]` = todavía abierto. `EN REVISIÓN` significa que existe código o alguna prueba pero **no** está cerrado físicamente. Cuando el propietario confirme «ya quedó» y exista evidencia aplicable (CI, pruebas reales y control de regresión), cambiar **solo** la tarea correspondiente a `[x] ~~...~~` en este tablero, actualizar su evidencia y continuar. No marcar toda una fase por aprobar una captura aislada. Este tablero es la **lista única de progreso** y las secciones siguientes explican sus requisitos, sin crear planes paralelos.
 
@@ -54,6 +54,19 @@
 - [ ] **M04 · Visor multimedia.** Foto/video fullscreen, zoom, gestos, Atrás y conservación de posición del Chat.
 - [ ] **M05 · Push real.** Android FCM nativo e iPhone Web Push, con app cerrada/bloqueada y navegación al Chat correcto.
 
+### Puerta de calidad del Chat de información — decisión vinculante de desarrollo
+
+**Definición operativa de “Chat 100 % aprobado” (no equivale a promesa de cero defectos absolutos):**
+
+1. **C01–C05 (5/5):** mensajería de texto, menús, responder, editar/borrar, cola offline y sincronización Android nativo ↔ iPhone PWA; ya confirmados. No repetir pruebas exitosas salvo regresión concreta.
+2. **H01:** APK con paquete y firma compatibles, versionCode creciente, actualización sobre instalada, respaldo razonable y datos locales conservados tras reinicio y actualización. El Chat Android no se sustituye por WebView. Verificar en el teléfono la APK posterior al bloqueo de distribución y nunca recomendar desinstalar.
+3. **S01/S02 (2 abiertos):** alta/aprobación real de dispositivo con roles del servidor, expulsión y revocación, sesiones protegidas, autorización de WebSocket y API, rotación/renovación de credenciales, límites y almacenamiento seguro. Evitar que solo el nombre conceda acceso a un tercero. Panel visual de administración completo seguirá en P04, pero el **control seguro indispensable del Chat** debe funcionar antes.
+4. **M01–M05 (5 abiertos):** selección/compresión/envío y recepción de fotos, videos y audios; miniaturas, reproducción, visor, zoom, navegación; notificaciones Android FCM e iPhone Web Push con aplicación cerrada y teléfono bloqueado. Probar archivos inválidos, límites, reintentos, desconexión, permisos y privacidad. **Costo incremental 0 MXN documentado antes de habilitar almacenamiento**; no activar R2, ni tocar HAVANA CLOUD o proveedores ajenos sin autorización específica.
+5. **QA final del Chat (subconjunto de Q01, sin tachar anticipadamente Q01):** dos plataformas y varios usuarios/dispositivos, conexión estable/intermitente, bloqueo, cierre forzoso, orden/no duplicados, sesiones revocadas, fondos, memoria/latencia, límites de edición/borrado, adjuntos y push reales; pruebas de regresión y datos intactos durante actualización. Documentar bugs abiertos y resolver los críticos antes de que el propietario apruebe la etapa.
+6. **Criterio de salto a interfaz inicial:** solo tras implementación, CI y pruebas físicas de los puntos anteriores y aceptación explícita del propietario. Luego construir desde la **primera versión funcional** el Home estructurado como HAVANA NICE original: Calendario, Repertorio, Notificaciones, Familia HAVANA NICE y Chat de información. Android llama directamente al Chat nativo; iPhone al Chat PWA. El prototipo `/visual.html` queda congelado hasta entonces.
+
+**Este bloque define la secuencia y evidencia de aprobación; no agrega ni tacha hitos adicionales al tablero oficial de 27.**
+
 ## F. Pantallas PWA compartidas — 0/5
 
 - [ ] **P01 · Home, navegación y Ajustes visuales.** PWA única dentro de Android WebView y PWA iPhone. **Primer código de interfaz compartida:** shell de Inicio y navegación en `/visual.html` creado; pendiente integración, sesión segura y QA móvil. No marcar completado.
@@ -67,7 +80,7 @@
 - [ ] **Q01 · QA integral / auditoría final.** Seguridad, costo 0, rendimiento, pruebas multiusuario, actualizaciones APK sobre instalada, offline, no duplicados y respaldo; sin regresiones Android/iPhone.
 - [ ] **Q02 · Transición gradual desde HAVANA NICE actual.** Únicamente con aprobación expresa y backups, sin romper producción ni perder datos del equipo.
 
-**Reglas de mantenimiento del tablero:** cada confirmación se tacha aquí con fecha/evidencia, se revisan contadores de hitos, y se conserva §main§/producción y HAVANA CLOUD. No eliminar tareas porque aún no estén implementadas; se tachan al cerrarlas o se sustituyen solo por una decisión explícita. Prioridad inmediata: **H01 → H02 → H03 → H04**, manteniendo el Chat Android 100 % nativo y los hitos C01–C05 cerrados.
+**Reglas de mantenimiento del tablero:** cada confirmación se tacha aquí con fecha/evidencia, se revisan contadores de hitos, y se conserva §main§/producción y HAVANA CLOUD. No eliminar tareas porque aún no estén implementadas; se tachan al cerrarlas o se sustituyen solo por una decisión explícita. Prioridad inmediata: **H01 → S01/S02 → M01/M02/M03/M04/M05 → QA específica del Chat**, y **solo después H02/H03/H04 y P01–P05**, manteniendo Chat Android 100 % nativo y los hitos C01–C05 cerrados.
 
 ---
 
