@@ -150,15 +150,14 @@ export async function getChatSnapshot(session: ChatSession, apiBaseUrl = HAVANA_
   return { messages: data.messages || [], reactions: data.reactions || [], receipts:data.receipts||[], hasMore: !!data.hasMore };
 }
 
-export async function startLabChatSession(
+export async function startNamedChatSession(
   displayName: string,
-  accessCode: string,
   apiBaseUrl = HAVANA_V2_DEV_API_BASE_URL,
 ): Promise<ChatSession> {
   const response = await fetch(`${apiBaseUrl}/api/chat/session`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ displayName, accessCode }),
+    body: JSON.stringify({ displayName }),
   });
   const data = await response.json() as ChatSession & { error?: string };
   if (!response.ok) throw new Error(data.error || 'Could not join the lab chat');
