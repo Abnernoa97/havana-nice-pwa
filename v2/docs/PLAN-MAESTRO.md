@@ -1,1428 +1,562 @@
 # HAVANA NICE V2 — PLAN MAESTRO ÚNICO
 
-**Última actualización:** 2026-10-26 · Auditoría preventiva #1  
-**Estado:** FASE 0 y CHAT 1 aprobados; paquete CHAT 2/3/4/5 validado parcialmente; CHAT 6 evalúa Google Drive de HAVANA CLOUD con adaptador aislado, sin R2 ni costos  
-**Costo objetivo permanente:** 0 MXN  
-**Plataformas:** Android nativo + iPhone PWA premium  
-**Backend oficial:** Cloudflare  
-**Fuente única de verdad de continuidad:** este archivo  
-**Modo operativo:** el usuario pide el resultado; ChatGPT ejecuta todo el trabajo técnico de punta a punta
+**Versión del plan:** 2026-10-26 · arquitectura visual unificada aprobada  
+**Estado:** Fundación cerrada; Chat de texto funcional en laboratorio; migración de Android a interfaz PWA compartida por ejecutar; seguridad, multimedia, push y módulos restantes por completar.  
+**Rama de trabajo:** `havana-nice-v2-foundation` del repositorio `Abnernoa97/havana-nice-pwa`.  
+**Producción protegida:** `main`, HAVANA NICE oficial, sus usuarios y Supabase, HAVANA CLOUD y los demás proyectos permanecen intactos.  
+**Presupuesto obligatorio:** 0 MXN de costo adicional, sin productos de facturación automática.  
+**Documento rector:** este es el único plan de arquitectura, tareas, estado y auditoría de V2. La historia de cambios se conserva en Git.
+
+> **DECISIÓN ARQUITECTÓNICA DEFINITIVA — 26/10/2026:** Toda la interfaz visual de HAVANA NICE V2, **incluido el Chat**, procede de **una sola PWA React**. En Android se presenta dentro de una aplicación nativa ligera mediante WebView. Android mantiene **funciones genuinamente nativas** donde aportan valor: sistema de notificaciones, almacenamiento protegido, integración con archivos/cámara, operaciones offline especializadas, gestión del ciclo de vida y servicios del sistema. iPhone ejecuta la misma PWA instalada. Se evita mantener dos interfaces dibujadas en paralelo. El motor y las responsabilidades nativas se construyen detrás de una interfaz controlada, nunca como segunda presentación visual del producto.
 
 ---
 
-# 1. OBJETIVO
+# 1. PROPÓSITO Y EXPERIENCIA FINAL
 
-Construir HAVANA NICE V2 desde cero, limpia, rápida, mantenible y profesional, sin arrastrar parches ni dependencias innecesarias de la aplicación actual.
+HAVANA NICE V2 será una aplicación privada para la administración y el trabajo cotidiano de HAVANA NICE: músicos, administrador, chat, calendario, repertorios, avisos, perfiles y ajustes. Debe sentirse rápida, elegante y sencilla en Android y iPhone.
 
-La nueva app debe:
+Principios de experiencia:
 
-- sentirse nativa y rápida;
-- abrir inmediatamente desde caché local;
-- sincronizar en segundo plano;
-- tener Chat realmente realtime;
-- funcionar de forma coherente entre Android e iPhone;
-- permitir fotos, video, audio y push;
-- tener un sistema de acceso pequeño y seguro;
-- tener costo real 0 MXN, sin activaciones de productos de cobro por uso, pagos, suscripciones o tarjetas para habilitar módulos; si una función no puede cumplirlo, ajustar alcance o detenerla;
-- ser administrable y desplegable de forma automatizada;
-- dejar a producción actual completamente fuera de riesgo.
+- **Una sola apariencia:** PWA React + estilos compartidos para músicos y administrador; la misma pantalla en iPhone y Android, respetando las particularidades de teclado y navegación de cada sistema.
+- **Edición visual sin reinstalar:** textos, colores, tipografías, distribución, tarjetas, menús y pantallas se cambian en el código PWA y se publican en Cloudflare Pages. Android los recibe al recuperar la versión web, sin APK nueva.
+- **Funciones nativas auténticas:** la APK conserva código Android para lo que de verdad necesita capacidades del sistema y las expone a la PWA mediante un puente estrecho y protegido.
+- **Chat fiable y pulido:** gestos coherentes, escritura fluida, notificaciones y sincronización incluso con interrupciones de red.
+- **Local-first:** arranque desde recursos disponibles en el dispositivo, datos visibles inmediatamente, sincronización posterior y colas fiables.
+- **Costo real 0 MXN:** si una característica necesita facturación o excedentes automáticos, no se habilita.
+- **Una sola fuente de verdad de datos:** Worker, D1 y Durable Objects; dos teléfonos no deben mantener bases de negocio independientes.
+- **Releases seguros:** actualizar Android conservando firma, paquete, datos, credenciales y borradores; no pedir desinstalación para un rediseño.
 
----
+# 2. ARQUITECTURA ÚNICA DEL PRODUCTO
 
-# 2. MODELO OPERATIVO — ENTREGA LLAVE EN MANO
-
-La regla de trabajo de HAVANA NICE V2 es:
-
-```
-USUARIO
-“Quiero X”
-↓
-CHATGPT
-arquitectura
-código
-Cloudflare
-GitHub
-permisos
-infraestructura
-base de datos
-storage
-realtime
-seguridad
-tests
-builds
-deploy
-diagnóstico
-correcciones
-↓
-ENTREGA LISTA
-```
-
-El usuario NO debe encargarse de tareas técnicas manuales como:
-
-- entrar a Cloudflare para crear recursos;
-- crear Workers;
-- crear D1;
-- crear R2;
-- configurar Durable Objects;
-- crear bindings;
-- crear rutas;
-- editar variables;
-- crear permisos internos;
-- escribir SQL;
-- crear tablas;
-- configurar GitHub Actions;
-- copiar tokens;
-- ejecutar Wrangler;
-- compilar Android;
-- preparar PWA;
-- revisar logs;
-- diagnosticar errores;
-- hacer deploy;
-- corregir fallos de infraestructura;
-- mantener sincronizados Android y PWA.
-
-ChatGPT debe hacer directamente todo lo anterior usando las herramientas conectadas y automatizaciones disponibles.
-
-## 2.1 Acceso directo a Cloudflare
-
-El complemento oficial de Cloudflare para ChatGPT está instalado y autenticado.
-
-Está autorizado para trabajar sobre las cuentas Cloudflare existentes seleccionadas por el propietario.
-
-El flujo oficial pasa a ser:
-
-```
-ChatGPT
-├── Cloudflare oficial → crear / leer / modificar / desplegar infraestructura
-├── GitHub → código fuente, commits, ramas y automatizaciones
-└── builds/tests → validar antes de entregar
-```
-
-Para HAVANA NICE V2 se debe usar infraestructura NUEVA y aislada.
-
-No reutilizar ni modificar recursos existentes de otros proyectos salvo orden expresa del usuario.
-
-## 2.2 Intervención del usuario
-
-Objetivo: cero intervención técnica del usuario.
-
-Solo se solicitará una acción al usuario cuando una plataforma externa exija obligatoriamente una acción personal del propietario que no pueda ejecutarse por API o por las herramientas conectadas, por ejemplo:
-
-- aceptar una autorización OAuth;
-- aprobar una acción especialmente sensible;
-- iniciar sesión cuando la plataforma exija presencia humana;
-- instalar físicamente un APK/PWA en un teléfono;
-- realizar una prueba física que no pueda ejecutarse remotamente.
-
-Estas excepciones NO deben convertirse en trabajo técnico delegado al usuario.
-
-Nunca pedirle al usuario que haga manualmente un paso que ChatGPT pueda ejecutar.
-
-## 2.3 Entrega
-
-Cuando el usuario pida una función, ChatGPT debe intentar completar en la misma tarea:
-
-1. diseño;
-2. implementación;
-3. backend;
-4. permisos;
-5. infraestructura;
-6. pruebas automáticas;
-7. compilación;
-8. despliegue;
-9. verificación;
-10. documentación;
-11. entrega del artefacto o enlace listo para usar.
-
-No entregar instrucciones cuando se pueda entregar el resultado.
-
----
-
-# 3. REGLAS ABSOLUTAS
-
-## 3.1 HAVANA NICE actual
-
-La aplicación HAVANA NICE actual es PRODUCCIÓN y está totalmente prohibido:
-
-- modificarla para construir V2;
-- reutilizar su backend como laboratorio;
-- alterar datos;
-- migrar tablas;
-- cambiar credenciales;
-- cambiar despliegue;
-- borrar archivos;
-- introducir módulos V2;
-- “limpiar” producción mientras hacemos V2.
-
-Solo se puede:
-
-- leer arquitectura;
-- observar comportamiento;
-- reutilizar ideas funcionales;
-- consultar estructura como referencia.
-
-## 3.2 FAMILIA NOA
-
-FAMILIA NOA es otro proyecto independiente.
-
-Se pueden estudiar patrones técnicos útiles, pero HAVANA NICE V2 NO compartirá:
-
-- Worker;
-- base de datos;
-- almacenamiento;
-- sesiones;
-- usuarios;
-- secretos;
-- deploy;
-- lógica de producción.
-
-## 3.3 Costo — REGLA ABSOLUTA (2026-10-25)
-
-**HAVANA NICE 2 debe costar exactamente 0 MXN, sin cobros por uso, sin suscripciones de pago, sin introducir tarjeta ni checkout y sin riesgo automático de excedentes.** El usuario confirmó expresamente «No quiero pagar un peso». Esta regla prevalece sobre cualquier plan técnico previo que dependiera de R2.
-
-- No activar Cloudflare R2: aunque incluye 10 GB-mes, 1M operaciones clase A y 10M clase B gratuitas al mes, es un producto de suscripción con cobro automático por excedentes; no satisface el requisito estricto de 0 MXN.
-- No contratar otros productos de consumo variable, ni activar Workers Paid, ni introducir medios de pago como dependencia de V2.
-- Usar solamente recursos disponibles en el plan realmente gratuito y verificar sus límites antes de desplegar. En D1 Free las operaciones o escrituras se detienen al alcanzar los límites, en lugar de pasar automáticamente al nivel de pago.
-- Cuando un límite gratuito se aproxime, la app debe **rechazar nuevas subidas de forma segura**, mostrar el motivo y nunca intentar una compra o escalado automático.
-- Nunca prometer uso ilimitado o disponibilidad total bajo un presupuesto cero. Si el usuario pide original multimedia grande que no cabe en recursos gratuitos, explicar límites y proponer una versión local/punto a punto sin tarifa.
-- La infraestructura y gastos ajenos a V2 no se alteran; este proyecto no debe generar obligaciones económicas adicionales.
-
-**Alternativa preferida en evaluación para CHAT 6:** aprovechar la capacidad gratuita de las cuentas Google Drive que utiliza HAVANA CLOUD, mediante autorización y adaptador independientes de V2, con carpeta privada exclusiva y cuotas estrictas. No utilizar ni modificar el Worker, catálogo, secretos, DO, login u originales de HAVANA CLOUD. D1 V2 almacena metadatos y referencias. Si Drive no puede ofrecer 0 MXN comprobable o no se dispone de autorización independiente, evaluar D1 Free limitado para imágenes comprimidas, nunca R2.
-
-
-## 3.4 Validación
-
-Nunca decir “ya funciona” por haber escrito código.
-
-Una función queda terminada únicamente cuando:
-
-- compila;
-- pasa pruebas automáticas;
-- funciona en Android;
-- funciona en iPhone PWA;
-- funciona Android → iPhone;
-- funciona iPhone → Android;
-- se prueba reconexión/caché cuando corresponda;
-- el usuario la confirma físicamente.
-
----
-
-# 4. ARQUITECTURA OFICIAL
-
-```
-                    HAVANA NICE V2
+```text
+                 UNA SOLA INTERFAZ PWA (React + Vite + TS)
+            Chat · Home · Calendario · Repertorio · Admin
                            │
-              ┌────────────┴────────────┐
-              │                         │
-       ANDROID NATIVO              IPHONE PWA
-       React Native/Expo           PWA premium
-              │                         │
-              └────────────┬────────────┘
+               ┌───────────┴───────────┐
+               │                       │
+        ANDROID — APK              iPHONE — PWA
+        Expo / React Native        instalada en Home
+        WebView de la PWA          pantalla completa
+               │                       │
+        PUENTE NATIVO              Capacidades web
+        permisos/FCM               Web Push
+        archivos/cámara            IndexedDB/Service Worker
+        almacenamiento seguro      permisos web de iOS
+        lifecycle/back
+               └───────────┬───────────┘
                            │
-                           ↓
-                 CLOUDFLARE WORKER
-                    API CENTRAL
+                 CLOUDFLARE WORKER V2
+               autenticación · API · roles
                            │
-          ┌────────────────┼────────────────┐
-          │                │                │
-          ↓                ↓                ↓
-         D1          DURABLE OBJECTS        R2
-      datos           WebSockets           media
-   persistentes          Chat          foto/video/audio
+               ┌───────────┴───────────┐
+               │                       │
+            D1 SQLite            Durable Objects
+        estado persistente         WebSockets
+               │                       │
+               └───────────┬───────────┘
+                           │
+               ARCHIVOS CHAT PRIVADOS
+         puente backend privado → HAVANA CLOUD
+                 → Google Drive existente
+             solo cuando esté autorizado
 ```
 
-Complementos:
+**No hay dos implementaciones visuales.** La aplicación React Native que hoy renderiza el Chat en Android es una implementación provisional de laboratorio. Será reemplazada gradualmente por el contenedor WebView; se conserva hasta completar pruebas de equivalencia y migración de datos. **No retirar todavía el código o la APK actual.**
 
-```
-Android push  → FCM
-iPhone PWA    → Web Push
+## 2.1 PWA: única capa de presentación
 
-GitHub        → código y versionado
-GitHub Actions / Wrangler → validación y despliegue automatizado
-```
+`v2/apps/pwa/` es el origen de toda la UI: HTML, React, CSS, componentes, diseño adaptable, accesibilidad, vistas, formularios, menús, repertorio, calendario y **Chat completo** (globos, menú de acciones, escritura, replies, reacciones, viewer, estados). El mismo conjunto visual se ve:
 
----
+- En iPhone, dentro de la PWA instalada.
+- En Android, dentro de una WebView incluida en la APK nativa.
+- En navegador de desarrollo, para inspección y pruebas.
 
-# 5. RESPONSABILIDAD DE CADA PIEZA
+Las diferencias de plataforma se encapsulan en adaptadores, no bifurcando pantallas ni duplicando el diseño. El contenido mantiene safe areas, scroll, tamaños táctiles, contraste, tamaño de texto y navegación correctos.
 
-## 5.1 Cloudflare Worker — API central
+El JavaScript de la interfaz gestiona los componentes, rutas, estado de UI y eventos. El núcleo compartido/Worker sigue siendo la autoridad de datos, sesiones y permisos. **PWA como visual no significa que toda la lógica se ejecute en una página o que Android deje de ser nativo.**
 
-Será la única puerta de entrada del backend.
+## 2.2 Android: contenedor y funciones nativas
 
-Android y PWA NO hablarán directamente con D1 ni R2.
+Mantener el paquete **`com.havananice.v2`** y el proyecto Expo/React Native de V2. La APK dibujará únicamente un shell Android muy delgado: pantalla de carga/fallback local, WebView, integración de sistema y errores recuperables. Las vistas de producto, incluido el Chat, las dibuja la PWA.
 
-El Worker será responsable de:
+Responsabilidades nativas cuando sean necesarias y estén justificadas por pruebas:
 
-- autenticación;
-- sesiones;
-- permisos;
-- validación de entrada;
-- lectura/escritura de D1;
-- URLs firmadas o acceso controlado a R2;
-- conexión con Durable Objects;
-- rutas admin;
-- push;
-- diagnóstico;
-- rate limiting cuando haga falta;
-- auditoría de acciones sensibles.
+- Notificaciones Android: FCM, canales, permisos, apertura de destino, navegación desde notificación y sincronización de token del dispositivo.
+- Almacenamiento protegido: credenciales y claves mediante mecanismos apropiados de Android; caché/archivos locales; traslado seguro de la sesión SQLite actual.
+- Ciclo de vida: background/foreground, conectividad, reanudación, apertura de enlaces, permisos y botón **Atrás** un nivel dentro de la navegación, sin expulsar al menú principal.
+- Cámara, selector de fotos/videos/archivos, compresión, grabación y reproducción especializada si la experiencia web lo requiere.
+- Operaciones offline persistentes/seguras, transferencia de archivos y reintentos cuando una tarea deba sobrevivir más allá de la página.
+- Integración de teclado, barra de estado, navegación Android, vibración y otros servicios del SO que mejoren de forma comprobable la experiencia.
+- Diagnóstico de versión nativa, capacidades disponibles y compatibilidad del puente.
 
-Estructura prevista:
+No crear interfaces paralelas de Chat, Repertorio, Calendario ni Administrador en React Native. Un problema puntual de rendimiento no autoriza duplicar una pantalla entera: se mide y se optimiza; una excepción visual nativa exigiría decisión expresa y documentada del propietario.
 
-```
-/api/auth/*
-/api/chat/*
-/api/calendar/*
-/api/repertoire/*
-/api/notifications/*
-/api/family/*
-/api/admin/*
-/api/media/*
-/api/push/*
-/health
-```
+## 2.3 iPhone: misma PWA, sin app de App Store
 
-## 5.2 D1 — fuente persistente de datos
+PWA web instalada desde Safari, sin costo de cuenta de desarrollador ni distribución por App Store. Usa React y estilos de `v2/apps/pwa/`, IndexedDB/Service Worker, Web Push en condiciones compatibles con iOS, y selectores de medios web.
 
-D1 guardará información estructurada:
+Una función que no sea viable en la PWA de iPhone debe contar con fallback honesto; nunca afirmar paridad de permisos o procesos en segundo plano sin verificar en un iPhone real.
 
-- usuarios;
-- sesiones;
-- dispositivos;
-- permisos;
-- mensajes;
-- replies;
-- reacciones;
-- estados de lectura;
-- calendario;
-- destinatarios;
-- repertorio;
-- repertorio por evento;
-- notificaciones;
-- metadata de archivos;
-- configuración;
-- auditoría básica.
+## 2.4 Cambios que no requieren APK y cambios que sí
 
-D1 NO guardará blobs pesados de fotos, videos o audio.
+**Se publican solo en PWA:** tipografía, colores, logotipo mostrado dentro de la UI, textos, etiquetas, tarjetas, orden y posición de botones, pantalla nueva implementable en web, menús, gestos de Chat web, diseño de Admin, Calendario y Repertorio. Se entrega por Cloudflare Pages y aparece al recargar o abrir la versión nueva según política de actualización.
 
-## 5.3 Durable Objects + WebSockets — realtime
+**Requieren APK solo si cambian capacidades Android:** permisos/manifest, firma, configuración de paquete, icono o splash del lanzador Android, puente JS↔nativo, librerías o servicios Android, canales especiales FCM, almacenamiento nativo, integración de cámara/archivos, motor especializado o componentes binarios.
 
-La ruta rápida del Chat no debe esperar a la base de datos.
+**La PWA no debe interrumpir una acción abierta:** detectar versión nueva, proteger borrador/cola offline, activar actualización en punto seguro y mantener modo offline mientras la red no esté disponible. No depender de actualizar una APK por detalles gráficos.
 
-Durable Objects manejará eventos vivos como:
+# 3. ESTRUCTURA DE CÓDIGO Y FUENTE ÚNICA DE VERDAD
 
-- mensaje nuevo;
-- typing;
-- online/offline;
-- reacción;
-- read receipt;
-- eventos instantáneos del Chat.
+Repositorios y ramas:
 
-Principio:
-
-```
-usuario toca enviar
-↓
-mensaje aparece localmente
-↓
-WebSocket lo distribuye
-↓
-persistencia ocurre en paralelo
-↓
-cliente reconcilia confirmación
-```
-
-Nunca diseñar Chat como:
-
-```
-guardar DB
-↓
-esperar
-↓
-volver a consultar
-↓
-mostrar
-```
-
-## 5.4 Multimedia — modo estricto 0 MXN (R2 DESCARTADO)
-
-R2 queda descartado para V2 mientras exista riesgo de cargos automáticos. No completar su checkout ni habilitar suscripción R2.
-
-Para **CHAT 6 fotografías**, primera opción en evaluación: reutilizar capacidad gratis de Google Drive usada por HAVANA CLOUD (proyecto privado `Abnernoa97/havana-nice-cloud`) a través de un **adaptador y credenciales OAuth propios de V2**, carpeta exclusiva, metadatos en D1 V2, acceso privado autenticado por Worker y cuotas duras. No depender del login por cookie de HAVANA CLOUD, ni extraer/copiar sus refresh tokens o modificar su Worker/catálogo/archivos. Puede requerir consentimiento OAuth del propietario para permitir acceso de V2. Alternativa si no es viable: D1 Free V2 para fotografías reducidas con tamaño por valor/fila y cuota interna muy conservadores, nunca originales grandes. El diseño no garantiza almacenaje ilimitado.
-
-Para audio/video posteriores no asumir que D1 puede funcionar como almacén de archivos grandes: investigar flujo local/punto a punto y limitaciones del tier Free. Si no hay solución comprobable con 0 MXN y control estricto, dejar el módulo sin desplegar en vez de introducir cobros.
-
-
-## 5.5 FCM y Web Push
-
-Android:
-- FCM para notificaciones cuando la app esté cerrada o el teléfono bloqueado.
-
-iPhone PWA:
-- Web Push para la PWA instalada en Home Screen.
-
-El Worker centralizará la lógica para que una misma notificación pueda salir hacia ambos sistemas.
-
----
-
-# 6. ACCESO, SESIONES Y PERMISOS
-
-No se utilizará un sistema empresarial complicado de identidad si no aporta valor.
-
-HAVANA NICE tiene pocos usuarios y roles claros.
-
-## 6.1 Roles iniciales
-
-### ADMIN
-Puede:
-- administrar usuarios;
-- administrar dispositivos;
-- calendario;
-- repertorio;
-- notificaciones;
-- Chat según reglas definidas;
-- ajustes administrativos.
-
-### MÚSICO
-Puede:
-- acceder a sus módulos;
-- usar Chat;
-- leer calendario autorizado;
-- leer repertorio;
-- recibir notificaciones;
-- ejecutar acciones explícitamente permitidas.
-
-### INACTIVO / BLOQUEADO
-No puede acceder aunque conserve la app instalada.
-
-## 6.2 Permisos
-
-El servidor siempre verifica permisos.
-
-Ocultar un botón NO cuenta como seguridad.
-
-Ejemplos futuros:
-
-```
-chat.read
-chat.send
-chat.react
-chat.delete_own
-calendar.read
-calendar.write
-repertoire.read
-repertoire.write
-notifications.read
-admin.access
-```
-
-## 6.3 Sesiones
-
-Objetivo:
-
-- login sencillo;
-- sesión persistente;
-- token corto + mecanismo seguro de renovación;
-- revocación;
-- dispositivo registrado;
-- cierre remoto;
-- cambio inmediato a bloqueado;
-- no guardar secretos sensibles en PWA o APK.
-
-## 6.4 Diseño de acceso
-
-Primera versión prevista:
-
-```
-usuario
-+
-credencial personal
-↓
-Worker valida
-↓
-sesión segura
-↓
-dispositivo autorizado
-```
-
-Passkeys se pueden añadir después si mejoran claramente la experiencia.
-
----
-
-# 7. ESTRATEGIA DE CÓDIGO
-
-Un solo proyecto lógico y una sola fuente de verdad.
+- Repositorio: `Abnernoa97/havana-nice-pwa`.
+- Desarrollo de V2: `havana-nice-v2-foundation`, directorio `v2/`.
+- Producción original: `main`; **solo lectura para V2**.
+- Publicación de binarios V2: rama `havana-nice-v2-apk-downloads`.
+- HAVANA CLOUD: proyecto y Worker aparte, sin modificaciones en producción por el desarrollo V2.
+- HAVANA MASTER LAB: laboratorio independiente, puede probar escenarios de navegador; no sustituye dispositivos Android/iPhone físicos.
 
 Estructura:
 
-```
+```text
 v2/
-│
-├── apps/
-│   ├── android/
-│   └── pwa/
-│
-├── packages/
-│   └── shared/
-│
-├── cloudflare/
-│   ├── src/
-│   └── wrangler.jsonc
-│
-├── tests/
-│   └── cross-platform/
-│
-├── docs/
-│   └── PLAN-MAESTRO.md
-│
-└── scripts/
+├─ apps/
+│  ├─ pwa/                ÚNICA INTERFAZ VISUAL; iPhone + Android WebView
+│  └─ android/            Shell Android + módulos/puente nativo
+├─ packages/
+│  └─ shared/             Contratos de API, modelos y reglas comunes
+├─ cloudflare/
+│  ├─ src/                Worker + lógica de Chat + multimedia apagada
+│  ├─ migrations/         Esquemas y evolución D1 reproducible
+│  └─ tests/
+├─ tests/cross-platform/ Casos de paridad y pruebas E2E
+├─ scripts/               Auditoría y validaciones
+└─ docs/PLAN-MAESTRO.md   ÚNICO PLAN MAESTRO VIGENTE
 ```
 
-No debe existir una segunda documentación de arquitectura o continuidad.
+La capa compartida debe incluir contratos estables, validadores, idempotencia, formato de eventos y helpers reutilizables. No duplicar el motor del Chat en WebView y React Native: en la arquitectura final **una sola instancia administra los mensajes**; el puente nativo maneja únicamente las capacidades que el SO necesita.
 
-Si cambia una decisión importante, se reescribe ESTE documento.
+**Regla de ingeniería:** evitar archivos de arreglos acumulativos tipo `final-fix-2`, endpoints paralelos, APIs duplicadas y dependencias sin uso. Mantener módulos legibles, interfaces acotadas, cambios pequeños y pruebas de regresión.
 
----
-
-# 8. METODOLOGÍA DE CONSTRUCCIÓN
+# 4. WEBVIEW Y PUENTE NATIVO: CONTRATO OFICIAL
 
-Se trabaja VERTICALMENTE.
+La decisión híbrida no consiste en abrir la web como un navegador sin controles. Debe implementarse un WebView seguro, estable y verificable.
 
-Nunca:
+## 4.1 Navegación, origen y seguridad
 
-```
-terminar toda Android
-↓
-meses después intentar copiar a PWA
-```
-
-Siempre:
-
-```
-capacidad compartida/backend
-↓
-Android
-↓
-PWA
-↓
-Android → PWA
-↓
-PWA → Android
-↓
-prueba física
-↓
-CERRADO
-```
-
-No se abre la siguiente capacidad mientras la actual esté incompleta.
-
----
-
-# 9. FASE 0 — FUNDACIÓN
-
-Objetivo: dejar una base técnica estable antes de hacer funciones visibles complejas.
-
-## 0.1 Aislamiento
-
-- rama V2 aislada;
-- producción intacta;
-- futura migración a repo dedicado si se habilita creación del repo;
-- ningún deploy V2 puede apuntar a producción actual.
-
-## 0.2 Android
-
-- React Native / Expo;
-- paquete Android propio;
-- app arranca;
-- pantalla Fundación;
-- configuración por entorno;
-- cliente API compartido;
-- caché local base;
-- diagnóstico.
-
-## 0.3 PWA
-
-- Vite + React;
-- manifest;
-- standalone;
-- service worker;
-- safe areas iPhone;
-- caché base;
-- cliente API compartido;
-- diagnóstico.
-
-## 0.4 Cloudflare
-
-Crear recursos independientes para HAVANA NICE V2:
-
-- Worker;
-- D1;
-- Durable Object namespace;
-- variables y secretos;
-- entorno development;
-- health endpoint;
-- deploy automatizado.
-
-R2 sigue siendo el almacenamiento oficial de media, pero Cloudflare exige una activación inicial de la suscripción R2 mediante checkout en el dashboard antes de permitir su API. Como R2 no es necesario para Chat de texto ni para cerrar la base técnica inicial, su activación se difiere hasta justo antes de CHAT 6 — FOTOS. No bloquear FASE 0 por R2.
-
-No reutilizar Worker ni recursos de FAMILIA NOA.
-
-## 0.5 Contratos compartidos
-
-Definir:
-
-- User;
-- Session;
-- Device;
-- Permission;
-- Message;
-- Reaction;
-- Attachment;
-- Event;
-- Recipient;
-- Song;
-- Notification;
-- API result/error;
-- realtime envelope.
-
-## 0.6 Observabilidad
-
-Cada cliente debe poder mostrar internamente:
-
-- versión;
-- build;
-- plataforma;
-- entorno;
-- estado API;
-- estado WebSocket;
-- última sincronización;
-- estado push;
-- errores recientes útiles.
-
-## 0.7 Cierre de FASE 0
-
-FASE 0 solo se cierra cuando:
-
-- Android compila;
-- PWA compila;
-- Worker está desplegado;
-- /health responde;
-- Android consume /health;
-- PWA consume /health;
-- D1 existe y responde;
-- Durable Objects está preparado y responde;
-- R2 puede permanecer pendiente hasta el módulo de media si Cloudflare sigue exigiendo activación manual de suscripción;
-- primer APK laboratorio existe;
-- preview PWA existe;
-- Android arranca físicamente;
-- iPhone PWA arranca físicamente;
-- usuario confirma ambos.
-
----
-
-# 10. CHAT — PRIMER MÓDULO FUNCIONAL
-
-Chat será el primer módulo completo porque obliga a validar realtime, caché, archivos, reconexión y push.
-
-## CHAT 1 — TEXTO BÁSICO
-
-### Backend/shared
-- Message v1;
-- client_message_id;
-- sender;
-- server timestamp;
-- texto;
-- estado;
-- persistencia D1;
-- distribución WebSocket;
-- orden determinista;
-- deduplicación.
-
-### Android
-- abrir Chat;
-- render local;
-- escribir;
-- enviar;
-- recibir sin refresh;
-- scroll estable;
-- teclado estable.
-
-### PWA iPhone
-- misma capacidad;
-- teclado iOS estable;
-- safe areas;
-- recibir sin refresh;
-- scroll estable.
-
-### Prueba obligatoria
-- Android → iPhone;
-- iPhone → Android;
-- envío simultáneo;
-- 20 mensajes seguidos;
-- cambio Wi‑Fi/datos;
-- cerrar/abrir;
-- cero duplicados;
-- orden correcto.
-
-No avanzar hasta aprobar.
-
----
-
-## CHAT 2 — ESTADOS Y RECONEXIÓN
-
-Android + PWA:
-
-- enviando;
-- enviado;
-- error;
-- reintentar;
-- cola offline;
-- reconnect;
-- mensaje creado offline;
-- sincronización posterior;
-- no duplicar;
-- preservar orden.
-
----
-
-## CHAT 3 — REPLY
-
-Android + PWA:
-
-- reply_to_message_id;
-- preview;
-- localizar original;
-- original ausente/borrado.
-
----
-
-## CHAT 4 — REACCIONES
-
-Android + PWA:
-
-- ❤️;
-- 😂;
-- 👍;
-- optimista;
-- agregar/quitar;
-- múltiples usuarios;
-- realtime.
-
----
-
-## CHAT 5 — PRESENCE / TYPING
-
-- online;
-- offline;
-- escribiendo;
-- expiración;
-- no persistir ruido innecesario en D1.
-
----
-
-## CHAT 6 — FOTOS
-
-### Almacenamiento gratuito con límites estrictos (SIN R2)
-- Preferencia: Google Drive de las cuentas ya usadas como destino físico por HAVANA CLOUD, accedido exclusivamente por un **adaptador V2 separado**, carpeta privada V2, autorización OAuth V2 específica y cuotas internas. No modificar la app de nube, su Worker o los originales existentes; nunca exponer datos del chat en su catálogo/galería.
-- Si no hay acceso autorizado sin gastos, alternativa limitada: D1 Free V2 aislada y cuota estricta muy por debajo del techo gratuito, con fotos reducidas;
-- optimizar imágenes y thumbnails en cliente con límites estrictos de bytes y dimensiones;
-- metadata, tipo, tamaño y estado de subida;
-- acceso privado mediante Worker y autorización por sesión;
-- política de eliminación/caducidad; cuando la cuota esté llena, rechazar la nueva subida sin cargos;
-- no aceptar originales grandes ni prometer almacenamiento ilimitado.
-
-### Android
-- cámara/selector;
-- compresión razonable;
-- progreso;
-- cancelación;
-- retry;
-- viewer.
-
-### PWA
-- cámara/selector;
-- progreso;
-- cancelación;
-- retry;
-- viewer.
-
-### Prueba
-- Android → iPhone;
-- iPhone → Android;
-- varias fotos;
-- red lenta;
-- reconexión.
-
-Cerrar fotos antes de video.
-
----
-
-## CHAT 7 — VIDEO
-
-Android + PWA:
-
-- selección;
-- metadata;
-- thumbnail/poster;
-- duración;
-- upload solo si existe una solución de video 0 MXN comprobada, con límites seguros;
-- progreso;
-- cancelación;
-- retry;
-- reproducción;
-- red lenta.
-
-No imponer límites arbitrarios sin necesidad real.
-
----
-
-## CHAT 8 — AUDIO
-
-Android + PWA:
-
-- grabar;
-- duración;
-- enviar;
-- reproducir;
-- pausar;
-- upload;
-- retry.
-
-Waveform/velocidad solo si aportan valor real.
-
----
-
-## CHAT 9 — VIEWER / GESTOS
-
-- foto fullscreen;
-- zoom;
-- swipe;
-- video fullscreen;
-- cerrar;
-- regresar al mismo punto del Chat.
-
----
-
-## CHAT 10 — PUSH
-
-### Android
-- FCM;
-- app cerrada;
-- teléfono bloqueado;
-- tap abre conversación correcta.
-
-### iPhone PWA
-- Web Push;
-- permiso;
-- badge cuando aplique;
-- tap abre conversación correcta.
-
-### Pruebas cruzadas
-- Android cerrado recibe desde iPhone;
-- iPhone cerrado recibe desde Android;
-- no duplicar push si la conversación ya está activa.
-
----
-
-## CHAT 11 — PULIDO
-
-Solo después de estabilidad:
-
-- animaciones;
-- emojis;
-- stickers si se decide;
-- menú contextual;
-- timestamps;
-- agrupación;
-- unread separator;
-- scroll-to-bottom;
-- optimización de historial grande.
-
-SALIDA: Chat V2 aprobado físicamente en Android + iPhone.
-
----
-
-# 11. RESTO DE MÓDULOS
-
-Después de Chat se mantiene la misma metodología vertical.
-
-## MÓDULO 2 — ACCESO
-- login;
-- sesión;
-- dispositivo;
-- bloqueo;
-- revocación;
-- admin/músico;
-- Android + PWA.
-
-## MÓDULO 3 — HOME
-- caché inmediata;
-- refresh silencioso;
-- navegación;
-- Android + PWA.
-
-## MÓDULO 4 — CALENDARIO
-1. lista;
-2. cards;
-3. horarios texto libre;
-4. detalle;
-5. Maps;
-6. destinatarios;
-7. realtime;
-8. caché/offline;
-9. repertorio de evento.
-
-Cada capacidad: Android + PWA antes de seguir.
-
-## MÓDULO 5 — REPERTORIO
-1. English;
-2. Español;
-3. búsqueda si aporta valor;
-4. links;
-5. realtime;
-6. caché.
-
-## MÓDULO 6 — NOTIFICACIONES
-1. feed;
-2. detalle;
-3. imágenes;
-4. links;
-5. push Android;
-6. Web Push iPhone;
-7. badge;
-8. leído/no leído.
-
-## MÓDULO 7 — FAMILIA
-Solo funcionalidades que realmente se decidan para HAVANA NICE V2.
-
-No conectar ni mezclar datos con la app FAMILIA NOA.
-
-## MÓDULO 8 — AJUSTES
-- cuenta;
-- dispositivo;
-- notificaciones;
-- versión;
-- diagnóstico;
-- cerrar sesión.
-
----
-
-# 12. ADMIN V2
-
-Administrador utiliza la MISMA API central.
-
-Orden:
-
-1. acceso admin;
-2. dashboard;
-3. músicos/dispositivos;
-4. calendario;
-5. destinatarios;
-6. repertorio;
-7. repertorio de evento;
-8. notificaciones;
-9. Chat admin;
-10. Familia si aplica;
-11. media/diagnóstico.
-
-Reglas:
-
-- no crear una API admin paralela;
-- permisos se verifican en Worker;
-- ninguna operación sensible depende solo de UI;
-- toda acción destructiva importante debe ser auditable;
-- cliente nunca recibe secretos del servidor.
-
----
-
-# 13. CACHÉ Y OFFLINE
-
-Android y PWA deben compartir reglas, no necesariamente la misma tecnología física.
-
-Principios:
-
-- mostrar cache local primero;
-- sincronizar después;
-- no bloquear Home por red;
-- colas para acciones offline cuando tenga sentido;
-- IDs generados en cliente para reconciliar;
-- deduplicación;
-- timestamps del servidor para orden final;
-- conflictos explícitos, no silenciosos.
-
----
-
-# 14. MEDIA
-
-Principios:
-
-- D1 guarda metadata;
-- R2 guarda archivos;
-- thumbnail/poster separado cuando ayude a velocidad;
-- upload resumible cuando sea necesario;
-- no cargar video completo para mostrar una lista;
-- liberar memoria local;
-- limpiar archivos huérfanos;
-- nunca hacer pública una colección privada por comodidad.
-
----
-
-# 15. SEGURIDAD
-
-Reglas mínimas:
-
-- Worker autentica cada operación sensible;
-- verificar autorización, no solo autenticación;
-- secretos solo servidor;
-- no incluir secretos en APK/PWA;
-- sesiones revocables;
-- dispositivos identificables;
-- inputs validados;
-- queries parametrizadas;
-- R2 privado por defecto para media privada;
-- URLs temporales/controladas;
-- rate limits donde corresponda;
-- logs sin exponer credenciales;
-- backups/export periódico de datos importantes cuando el proyecto madure.
-
----
-
-# 16. PERFORMANCE
-
-Objetivos:
-
-- arranque local primero;
-- evitar requests redundantes;
-- WebSocket para realtime;
-- no consultar historial completo para mostrar lo reciente;
-- paginación;
-- índices D1;
-- thumbnails;
-- compresión razonable;
-- no mezclar archivos pesados con datos estructurados;
-- medir antes de optimizar;
-- cualquier cuello real se demuestra con métricas.
-
----
-
-# 17. LIMITACIONES FREE A VIGILAR
-
-La arquitectura se diseña para mantenerse cómodamente dentro del nivel gratuito.
-
-No codificar lógica dependiente de un número comercial fijo.
-
-En cada release importante revisar límites vigentes de:
-
-- Workers requests/CPU;
-- D1 lecturas/escrituras/almacenamiento;
-- Durable Objects;
-- WebSockets;
-- R2 almacenamiento/operaciones;
-- FCM;
-- Web Push.
-
-Si un límite cambia, se optimiza arquitectura antes de aceptar un costo.
-
----
-
-# 18. REGLAS PARA NO REPETIR LA DEUDA DE LA APP ACTUAL
-
-1. No crear archivos `fix2`, `patch-final`, etc.
-2. No duplicar lógica Android/PWA.
-3. No mezclar módulos sin relación.
-4. No esconder problemas con refresh manual.
-5. No hacer seguridad desde la UI.
-6. No dejar archivos cargados que no existen.
-7. No usar WebView para fingir nativo.
-8. No crear una segunda API para resolver una inconsistencia de la primera.
-9. No agregar validaciones arbitrarias a campos de información.
-10. No experimentar en producción.
-11. No abrir múltiples features complejas simultáneamente.
-12. No refactorizar algo estable solo por estética.
-13. No declarar terminado sin prueba física.
-14. Toda infraestructura V2 debe ser reproducible desde código/configuración.
-15. Todo cambio importante actualiza ESTE documento, no crea otro.
-
----
-
-# 19. FLUJO DE TRABAJO EN CADA CHAT FUTURO
-
-Al entrar a cualquier chat de HAVANA NICE V2:
-
-1. leer `v2/docs/PLAN-MAESTRO.md`;
-2. identificar ESTADO ACTUAL;
-3. revisar rama/commit;
-4. trabajar solo el paso actual;
-5. ejecutar pruebas;
-6. dejar commit identificable;
-7. indicar al usuario prueba física exacta;
-8. corregir si falla;
-9. cuando el usuario confirme, marcar CERRADO;
-10. actualizar directamente la sección ESTADO ACTUAL de ESTE archivo.
-
-No crear:
-- continuidad aparte;
-- decisiones aparte;
-- plan alternativo;
-- “plan actualizado 2”.
-
----
-
-# 20. ORDEN OFICIAL
-
-```
-0. FUNDACIÓN
-1. CHAT TEXTO
-2. CHAT ESTADOS / RECONEXIÓN
-3. CHAT REPLY
-4. CHAT REACCIONES
-5. CHAT PRESENCE / TYPING
-6. CHAT FOTOS
-7. CHAT VIDEO
-8. CHAT AUDIO
-9. CHAT VIEWER
-10. CHAT PUSH
-11. CHAT PULIDO
-12. ACCESO
-13. HOME
-14. CALENDARIO
-15. REPERTORIO
-16. NOTIFICACIONES
-17. FAMILIA SI APLICA
-18. AJUSTES
-19. ADMIN V2
-20. QA COMPLETO
-21. MIGRACIÓN GRADUAL
+- Solo cargar el origen V2 autorizado y los recursos explícitamente necesarios; rechazar enlaces desconocidos dentro de la WebView y abrir enlaces externos en el navegador del sistema según política.
+- Permitir comunicaciones puente **únicamente desde el origen de confianza**, validar tipo, versión, identificador de petición, parámetros, permisos y estado de sesión de cada acción.
+- No usar comandos arbitrarios enviados por HTML, ni `eval` o exposición global de secretos, Google OAuth, refresh tokens o claves internas en la PWA.
+- Mantener las operaciones sensibles validadas por el **Worker**, aunque un botón esté oculto o Android tenga un permiso instalado.
+- Evitar duplicar el token del usuario en múltiples almacenes sin necesidad. Para credenciales del dispositivo Android, utilizar almacenamiento protegido y un intercambio limitado de capacidades.
+- Añadir CSP web razonable, restricciones de navegación y tratamiento seguro de mensajes WebView; probar escenarios de navegación inesperada y XSS.
+
+## 4.2 API del puente
+
+El contrato versionado puede ofrecer funciones concretas: `getNativeCapabilities`, `requestNotificationPermission`, `registerPushToken`, `pickMedia`, `shareFile`, `openExternalLink`, `hapticFeedback`, `setStatusBar`, `reportAppState` y `navigateBack`. Se incorporarán solo las necesarias al módulo activo.
+
+Cada llamada define autorización, tipo de entrada/salida, resultado exitoso, error, timeout y comportamiento cuando no existe puente (iPhone web/navegador). Los eventos nativos nunca se tratan como datos autenticados por el mero hecho de proceder del WebView.
+
+## 4.3 Arranque y continuidad sin conexión
+
+- Al primer arranque Android debe disponer de un **shell visual local** o versión web empaquetada verificable para evitar pantalla en blanco sin internet; por defecto recuperar la última versión válida desde caché web.
+- Mantener la navegación y el Chat recientes disponibles offline; sincronizar al recuperar red y permisos. Nunca borrar un borrador por actualización de UI.
+- La primera carga de un WebView puede diferir del Chat React Native actual; medir TTI, scroll, teclado y recuperación antes de sustituirlo.
+- Android Back: subir exactamente un nivel, cerrar primero overlays/visores, regresar al Chat si estaba abierto, no abandonar la app.
+- El enlace profundo del push debe llegar a la ruta compartida (Chat o sección) tras validar/restaurar sesión.
+
+# 5. SERVIDOR Y DATOS — CLOUDFLARE AISLADO
+
+Recursos existentes de V2:
+
+- Cloudflare Worker de desarrollo: **`havana-nice-v2-dev`**.
+- API de desarrollo: **https://havana-nice-v2-dev.soloaplicaciones97.workers.dev/**.
+- Cloudflare Pages PWA: **https://havana-nice-v2-dev.pages.dev/**.
+- D1 aislada: `havana-nice-v2-dev`, UUID `6a4abd3a-c01b-4d4f-b0ed-49f7eaca0cc5`.
+- Durable Object: clase `ChatRoom` con estado SQLite y WebSockets.
+- Configuración: `v2/cloudflare/wrangler.jsonc`. No hay R2 activado.
+
+## 5.1 Worker/API
+
+Única puerta de entrada para autenticación, autorización, Chat, reglas, acceso a D1, medios, notificaciones y futuras operaciones Admin. Ningún cliente accede directamente a D1. Rutas existentes incluyen `/health`, `/realtime/health`, `/api/chat/session`, `/api/chat/messages`, `/api/chat/media/*` (deshabilitadas para uploads reales) y `/ws`.
+
+Las futuras rutas para Calendar, Repertoire, Notifications, Family y Admin pertenecen al **mismo servicio lógico** y requieren validaciones centralizadas. No crear backend separado para iPhone, Android o Administrador.
+
+## 5.2 D1
+
+Fuente persistente de usuarios, miembros, sesiones, dispositivos futuros, eventos, permisos, mensajes, replies, reacciones, recibos de lectura, calendario, repertorio, notificaciones y metadatos de multimedia. Nunca almacenar videos u originales grandes en D1.
+
+Esquemas reproducibles mediante migraciones existentes `0001` a `0008`. Las tablas de Chat incluyen `chat_messages`, `chat_reactions`, `chat_read_receipts`, `chat_sessions` y `chat_members`. Existen tablas `v2_media_assets`/`v2_media_quota` preparadas pero la subida de fotografías NO está activada.
+
+Preservar IDs, orden de secuencia, unicidad de `sender_id + client_message_id` y tombstones del borrado. Los índices se revisan por consulta real; no duplicar B-trees sobre columnas que ya son clave primaria.
+
+## 5.3 Durable Objects / WebSockets
+
+Chat es realtime por WebSocket sobre Durable Objects; D1 almacena el estado confirmado. Orden correcto, ACK tras persistencia, idempotencia, difusión, presencia y typing efímero. Los clientes muestran mensajes locales en cola y los reconcilian tras confirmación del servidor.
+
+No interpretar “enviado” como “leído”. “Enviado” significa aceptado/persistido por backend según contrato; recibos de lectura pertenecen a otra señal. Si un mensaje llega repetido, el identificador del cliente permite deduplicación.
+
+## 5.4 Sincronización entre Android y iPhone
+
+No hay una “versión Android de los datos” y otra “versión iPhone”. Los dos dispositivos consultan el mismo Worker y comparten historial y validaciones; la presentación PWA también es común.
+
+Probar Chat Android↔iPhone con mensajes simultáneos, cambio de red, app minimizada, volver tras cierre, historial paginado, edición, borrado, reacciones y orden. Las pruebas sintéticas de WebSocket no prueban por sí mismas teclado, gestos, permisos ni reconexión real de ambos sistemas.
+
+# 6. IDENTIDAD, PRIMER ACCESO Y ADMINISTRACIÓN DE DISPOSITIVOS
+
+El acceso de músico será deliberadamente sencillo y coherente con el funcionamiento anterior de HAVANA NICE:
+
+1. El músico autorizado escribe **solo su nombre** en su primer acceso al dispositivo.
+2. No distinguen mayúsculas ni minúsculas: `ORLY`, `orly` y `Orly` son la misma identidad.
+3. Si está autorizado, el servidor emite una credencial aleatoria del dispositivo y la sesión se recuerda.
+4. En siguientes aperturas entra directamente a la aplicación sin repetir nombre ni contraseña.
+5. El administrador podrá dar de alta, permitir y retirar el acceso de nombres/dispositivos, con comprobación **en servidor** y revocación efectiva aunque la app continúe instalada.
+
+Lista inicial V2 ya autorizada: **Orly, Andy, Jali, Rafa, Noa y Fer**. Otros nombres se darán de alta únicamente desde Admin V2 cuando exista ese módulo. No hardcodear una lista abierta dentro del frontend.
+
+El acceso temporal de laboratorio mediante clave adicional ha sido retirado del flujo vigente. El backend ahora consulta `chat_members` y verifica `active` al emitir/restaurar sesión. La aplicación Android y la PWA recuerdan el último acceso local y consultan al servidor para restaurarlo.
+
+**Riesgo de seguridad que debe resolverse antes de distribución al equipo completo:** escribir un nombre conocido todavía permite que otro dispositivo intente registrarse como esa persona. El módulo Admin V2 debe introducir **aprobación inicial del dispositivo**, inventario, bloqueo, reemplazo y revocación. La experiencia de músico seguirá siendo “escribir nombre una vez y entrar”; la complejidad queda del lado del administrador. No habilitar identidades no aprobadas por comodidad.
+
+La caducidad técnica larga que actualmente evita reingresos no sustituye un sistema maduro. Sustituir por credencial de dispositivo revocable y renovación transparente, con registro de dispositivo y fecha de último uso. En Android guardar material sensible con protección del SO; en PWA aplicar modelo web seguro. No almacenar secretos de Google/Cloudflare en cliente.
+
+Roles:
+
+- **Administrador:** autoriza nombres y dispositivos, revoca permisos, administra eventos, repertorios, avisos y configuración.
+- **Músico:** Chat, calendario y repertorio que le correspondan, notificaciones, su perfil y ajustes habilitados.
+- **Inactivo o revocado:** sin acceso a API, WebSocket, multimedia ni recursos protegidos; si tenía app instalada no recupera permisos.
+
+# 7. CHAT — PRIMER MÓDULO Y PRIORIDAD DE CALIDAD
+
+**La interfaz final del Chat es la misma PWA en Android e iPhone.** Android puede ejecutar capacidades de fondo nativas, pero no una segunda UI de Chat React Native.
+
+## 7.1 Chat de texto y comportamiento
+
+- Mensajes uno a uno dentro de la conversación privada del equipo, timestamp de servidor, nombre del remitente, orden estable e historial paginado.
+- Texto local inmediato; estado `en cola`, `enviando`, `enviado`, `error`, reintento con el mismo ID.
+- Cola offline persistente, reconciliación FIFO, deduplicación; no perder borradores al cambiar de sección, suspender app ni actualizar estilos.
+- Respuesta a mensaje original con preview, incluso cuando original haya sido eliminado; navegación al mensaje si existe.
+- Edición y borrado de mensaje propio con permisos en Worker, sincronizados a los dos equipos; tombstone mantiene secuencia y referencias.
+- Reacciones actuales **❤️ 😂 👍**, con posibilidad de ampliar solo tras adaptar contrato y base de datos.
+- Presencia (sockets) y “escribiendo” efímeros; separar del estado de recepción del push.
+- Búsqueda en historial, scroll consistente, botón volver al final, lectura/no leído.
+- Reconexión automática al retornar de background, cambiar Wi-Fi/datos o volver a abrir. No depender de “Reconectar” como requisito habitual.
+
+## 7.2 Interfaz del Chat
+
+- **Pulsación prolongada:** barra contextual de emojis junto a la burbuja, con acciones textuales **Borrar** y **Editar** donde correspondan. No mostrar botones fijos bajo cada mensaje.
+- **Deslizar hacia la derecha:** responder al mensaje, con gesto fluido y sin conflicto con scroll vertical.
+- Burbujas claras, buena tipografía, menú que se ajusta a bordes, teclado que no tapa el campo de entrada, sin saltos de cursor.
+- El overlay se ancla a la burbuja en pantalla; no dejarlo flotando en el centro por aproximación.
+- Video/foto/audio y visualizador se desarrollan en sus fases; permitir regresar desde fullscreen al Chat correcto con historial y scroll preservados.
+
+## 7.3 CHAT 1–11: secuencia de producto
+
+1. **CHAT 1 · Texto:** envío/recepción, orden, D1, WebSocket y ambos dispositivos. Base aprobada por el usuario durante pruebas previas; mantener regresiones.
+2. **CHAT 2 · Estados y reconexión:** cola offline, reintento, persistencia y vuelta automática. Implementado; completar pruebas de proceso forzado y red.
+3. **CHAT 3 · Respuestas:** preview, gesto, referencia al original y mensajes borrados. Implementado; validar el gesto en interfaz PWA compartida.
+4. **CHAT 4 · Reacciones, edición y borrado:** backend y UI inicial operativos; cerrar overlay WhatsApp-like, límites de permisos, sincronización y QA física.
+5. **CHAT 5 · Presencia y typing:** existe funcionalidad; validar condiciones con pantalla bloqueada y no confundir conexión con notificación.
+6. **CHAT 6 · Fotografías:** almacenamiento privado con límite real cero pesos, selector, compresión, miniaturas, viewer, progreso, retry y confidencialidad. No está disponible para envío real.
+7. **CHAT 7 · Videos:** poster, duración, selector, reproducción, red lenta, subida controlada, fullscreen y volver al punto anterior. No disponible.
+8. **CHAT 8 · Audio:** grabación, duración, envío, pausa/reproducir, subida y retry. No disponible.
+9. **CHAT 9 · Viewer y gestos multimedia:** foto/video fullscreen, zoom pellizco, swipe, navegación y retorno fiable. No cerrado.
+10. **CHAT 10 · Push:** FCM Android, Web Push iPhone, rutas profundas, permisos, duplicados y app cerrada/bloqueada. No implementado de extremo a extremo.
+11. **CHAT 11 · Pulido final:** animaciones, agrupación, scroll, grandes historiales, tiempos y accesibilidad. Solo al finalizar estabilidad.
+
+**Puerta de cierre:** la fase no está concluida por compilar o por un simulador. Requiere funcionamiento del Chat PWA dentro del Android híbrido, PWA iPhone y confirmación física cuando aplique.
+
+# 8. ARCHIVOS Y MULTIMEDIA — COSTO CERO
+
+**Cloudflare R2 permanece DESCARTADO** mientras implique suscripción, alta de facturación, tarjeta o cobros automáticos por excedentes.
+
+## 8.1 Arquitectura de almacenamiento elegida
+
+Para fotos privadas del Chat, la arquitectura final seleccionada es:
+
+```text
+PWA de Chat (Android/iPhone)
+        ↓
+Worker HAVANA NICE V2 autentica usuario y mensaje
+        ↓
+Binding privado y servicio backend-a-backend
+        ↓
+HAVANA CLOUD delega acceso a Google Drive existente
+        ↓
+Carpeta/área EXCLUSIVA de archivos de CHAT V2
+        ↓
+Metadatos, permisos, cuotas y referencias en D1 V2
 ```
 
-Cada punto cierra Android + PWA antes de avanzar.
+Solo HAVANA CLOUD administra Google OAuth y sus tokens existentes; V2 no expone ni copia refresh tokens, cookies ni contraseñas. El Chat debe quedar completamente separado del catálogo y galería de HAVANA CLOUD: ni indexación de sus originales ni inclusión accidental de archivos de Chat en la galería. No se modifica la nube de producción sin autorización explícita para una integración probada y aislada.
 
----
+El laboratorio del puente en el repositorio de HAVANA CLOUD existe como trabajo experimental, deshabilitado y sin subida de archivos. El cliente V2 `havana-cloud-bridge-client.js` es preparación, no función activa. El antiguo adaptador independiente `drive-media.js` permanece **apagado y congelado** hasta reemplazarse ordenadamente por el bridge privado; no instalar dos rutas de Google OAuth.
 
-# 21. ESTADO ACTUAL
+Para fotos: compresión local, validación de MIME real, control de tamaño, thumbnails, cuota por usuario/total, cancelación, acceso solo autenticado, rechazo seguro al llegar al límite gratuito, limpieza de archivos huérfanos. El límite de prototipo documentado es **640 KiB por imagen y 64 MiB de biblioteca**, sujeto a revisar cuando exista integración real; no prometer ilimitado.
 
-## Rama de trabajo
-`havana-nice-v2-foundation`
+Para video/audio: no usar D1 como almacén de originales grandes; evaluar streaming y cuotas, y si el sistema no puede garantizar cero cobros, mantener esa capacidad cerrada hasta encontrar una solución adecuada.
 
-## Control de versión
-El estado vigente siempre es el HEAD de `havana-nice-v2-foundation`. No fijar este documento a su propio commit porque cada actualización del plan genera un commit nuevo.
+## 8.2 Estado real
 
-## Ya hecho
-- plan de desarrollo vertical;
-- scaffold Android;
-- scaffold PWA;
-- manifest PWA;
-- service worker inicial;
-- paquete shared inicial;
-- workflow de validación;
-- producción actual aislada;
-- decisión definitiva Cloudflare-first;
-- decisión D1 + Durable Objects + R2;
-- decisión API central Worker;
-- decisión FCM Android + Web Push iPhone;
-- decisión de acceso propio y simple;
-- decisión de no reutilizar infraestructura de FAMILIA NOA;
-- complemento oficial de Cloudflare instalado y autenticado;
-- acceso directo confirmado a las cuentas Cloudflare autorizadas;
-- lectura de Workers existentes confirmada sin modificar recursos;
-- modo operativo “usuario pide → ChatGPT ejecuta todo → entrega lista” establecido como regla oficial;
-- Worker Cloudflare creado: `havana-nice-v2-dev`;
-- Worker deployment inicial: `ead5da47803447f4860514803c8d667d`;
-- workers.dev habilitado: `https://havana-nice-v2-dev.soloaplicaciones97.workers.dev`;
-- D1 creado: `havana-nice-v2-dev`;
-- D1 UUID: `6a4abd3a-c01b-4d4f-b0ed-49f7eaca0cc5`;
-- D1 foundation schema aplicado: `foundation-v1`;
-- Durable Object creado: `ChatRoom`;
-- Durable Object namespace: `9ad73b6bb654447ab5b4a3ba4fae9185`;
-- Durable Object SQLite verificado mediante consulta directa exitosa;
-- Worker observability/invocation logs habilitados;
-- Android y PWA apuntan al mismo endpoint Cloudflare `/health`;
-- R2 detectado como no activado en la cuenta; Cloudflare exige checkout inicial desde dashboard y se difiere hasta el módulo de media;
-- dependencias bloqueadas en `v2/package-lock.json` (lockfile v3);
-- CI reproducible usa `npm ci`;
-- CI Fundación verde: run `40068871342`;
-- CI verifica estructura, dependencias exactas, typecheck, build PWA, export Android, Worker/D1 vivo y Durable Object vivo;
-- Cloudflare Pages V2 creado: `havana-nice-v2-dev`;
-- Pages project ID: `737f5483-cd45-4711-bd97-d2b06fd94313`;
-- URL PWA V2 reservada: `https://havana-nice-v2-dev.pages.dev`;
-- Pages V2 usa rama `havana-nice-v2-foundation`, root `v2`, build `npm ci && npm run build:pwa`, output `apps/pwa/dist`;
-- filtro de despliegue Pages corregido a `*` para que Cloudflare detecte commits del monorepo con root `v2`;
-- workflow APK Android creado y validado;
-- APK Android Fundación compilado: `HAVANA-NICE-V2-FOUNDATION.apk`;
-- Android APK workflow run: `40068929315` — SUCCESS;
-- Android APK artifact ID: `12550492280`;
-- Android APK tamaño: `146037722` bytes (~140 MB, debug foundation);
-- Android APK SHA-256: `5433f123b31bccf4ae1965fd94eff5a35b2e81834deea57b351e077bb4ba3041`;
-- Cloudflare Pages deploy real: SUCCESS;
-- Pages deployment con iconos: `68cae54f-d160-4dc1-a306-733ce171907e`;
-- PWA estable: `https://havana-nice-v2-dev.pages.dev`;
-- CI Fundación con validación PWA en vivo: run `40069278714` — SUCCESS;
-- PWA incluye manifest standalone y assets de icono HAVANA NICE 192/512.
-- Auditoría de continuidad 2026-10-24: rama, plan completo, APK descargado y SHA-256 del APK comprobados directamente.
-- GitHub Actions V2 última validación verificada sobre commit `d9d6091d917612d9e1bc17331bf90c4bb81e08f0`: run `40069493140` — SUCCESS (incluye comprobaciones en vivo de API, Durable Object y PWA).
-- Cloudflare Pages último deployment verificado sobre ese commit: `48f6457e-3b56-421d-aa00-14be4fb1d9b5` — SUCCESS.
-- D1 consulta directa de lectura confirmó `system_meta.schema_version = foundation-v1`; sin escrituras sobre los datos.
-- Primer APK laboratorio extraído del artifact de GitHub Actions y verificado: `146037722` bytes, SHA-256 `5433f123b31bccf4ae1965fd94eff5a35b2e81834deea57b351e077bb4ba3041`; pendiente confirmar instalación/arranque en Android real.
-- Confirmación física pendiente en Android y en iPhone PWA; NO marcar FASE 0 como cerrada hasta que el usuario compruebe ambos.
-- Prueba física Android 2026-10-24: la app V2 anterior (`assembleDebug`, run `40068929315`) se instaló, pero falló al iniciar con `Unable to load script / Metro`, porque el JS no estaba embebido para ejecución autónoma. Capturas de usuario documentan el bloqueo. NO reutilizar ese APK para instalación.
-- Corrección aplicada exclusivamente al workflow `.github/workflows/v2-android-apk.yml` en commit `b5ed00b9ce21481786ecff5bd9c54b3f28a4ad88`: `assembleRelease` y comprobaciones de bundle `assets/index.android.bundle`, firma `apksigner`, paquete `com.havananice.v2`; GitHub run `40070809476` — SUCCESS, incluida subida de artifact `12551153324`.
-- APK autónomo entregado para Android `HAVANA-NICE-V2-STANDALONE-ANDROID.apk`: 67,784,170 bytes; contiene `assets/index.android.bundle` (1,250,680 bytes); SHA-256 `51c8b5f6e222a07b168e9e6717999ed7dba5bffa6cc631f9a1b6326c813b0e88`. El usuario aún debe confirmar físicamente su arranque sin Metro. En caso de conflicto de firma durante actualización, desinstalar SOLO paquete V2, nunca producción.
-- Entrega APK 2026-10-24: se detectó error `Library file not found` al abrir el primer vínculo generado por ChatGPT; se creó nueva copia APK directamente como archivo de conversación verificado con el SHA-256 ya registrado. GitHub Actions puede descargar el artifact original, pero la creación de GitHub Release pública con `GITHUB_TOKEN` devolvió HTTP 403; se retiró el workflow experimental. No se afectó Android, backend, main ni producción. Pendiente confirmar que el nuevo archivo sea descargable e instalable físicamente.
+- D1 V2 tiene las tablas de media y el código de preparación.
+- Los endpoints de media sin credenciales responden 401; no hay subida privada habilitada.
+- No existen permisos, bindings ni autorización final del bridge que permitan subir fotos desde V2.
+- No afirmar que CHAT 6 funciona por la presencia de archivos o tablas.
+- HAVANA CLOUD original, sus cuentas, fotos y catálogos permanecen fuera de alcance de las limpiezas de V2.
 
+# 9. NOTIFICACIONES Y SERVICIOS DE SEGUNDO PLANO
 
-- Capturas físicas recibidas 2026-10-24: Android nativo V2 release muestra `API CONECTADA`, `D1: ok`, `Schema: foundation-v1`, `Realtime: configured`, `Media: pending-r2-enable`; se confirma que el error de Metro fue resuelto en el dispositivo real. Segunda captura PWA con la misma salud, pero tiene controles inferiores de Android, de modo que NO acredita prueba física desde iPhone.
-- Corrección de presentación PWA: `v2/apps/pwa/index.html` incluía el texto escapado literal `\\n` junto al enlace de manifest, visible en esquina superior izquierda; sustituido por salto real de línea en commit `bb31f5fab1338096d391af84928352b3ec5e0663`. Validación CI/Pages posterior al commit pendiente al momento de documentación.
+- **Android:** FCM y componentes nativos únicamente para registro del dispositivo, permisos/canales, recepción de notificaciones, apertura de ruta y acciones que realmente deban ejecutarse fuera de la WebView. No renderizar una pantalla alternativa por activar FCM.
+- **iPhone PWA:** Web Push donde el SO lo permite, particularmente con la PWA instalada según requisitos del sistema. Abrir la ruta correcta al tocar notificación.
+- **Servidor:** un evento de negocio y una sola decisión de quién debe recibir push; no duplicar por cada cliente. No mandar push duplicado cuando la conversación ya está activa cuando pueda verificarse.
+- **Estado actual:** push no validado ni desplegado integralmente en V2; jamás declarar que funciona con app cerrada antes de medirlo en teléfonos reales.
+- Una WebView **no sustituye automáticamente** un servicio nativo de background: permisos, ejecución y restricciones de batería siguen siendo responsabilidad Android.
 
-- Confirmación expresa 2026-10-24: el usuario indicó «Ya quedó. Seguimos», por lo que FASE 0 se marca CERRADA y se inicia vertical CHAT 1. Se conserva la distinción entre prueba de arranque y prueba real de mensajería (aún no completada).
+# 10. RESTO DE LA APP — MISMA PWA VISUAL
 
-## CHAT 1 — implementación de laboratorio del 2026-10-24
-- FASE 0 cerrada por confirmación del usuario («Ya quedó. Seguimos»). No confundir prueba de Fundación con prueba de CHAT 1.
-- Backend fuente única `v2/cloudflare/src/index.ts`: ruta `POST /api/chat/session`, `GET /api/chat/messages`, websocket `/ws`; Durable Object `ChatRoom` distribuye mensajes; D1 guarda mensajes e IDs de cliente con restricción `UNIQUE(sender_id,client_message_id)`.
-- Persistencia D1 V2: migraciones `0002_chat_text.sql` y `0003_chat_sessions.sql` aplicadas, tablas `chat_messages` y `chat_sessions` confirmadas. `schema_version` de Fundación se conserva en `foundation-v1`.
-- Acceso LAB: clave aleatoria de alta entropía entregada privadamente al propietario, únicamente su SHA-256 reside en fuente; el Worker compara la huella, genera tokens aleatorios y almacena solo SHA-256 de token + caducidad de 12 horas en D1. NO introducir clave original ni tokens en el repositorio, aplicaciones, logs o documentación. Este acceso temporal NO sustituye el módulo de autenticación final.
-- Worker nuevo V2 `havana-nice-v2-dev` desplegado: versión `70e6084c-9c43-4813-8760-6024656dd91b`, bindings D1 y DO preservados. Nunca tocar el Worker de la app original.
-- Contratos compartidos en `v2/packages/shared/src/index.ts`: sesión, mensaje, lectura de historial, WebSocket y reconciliación/deduplicación.
-- Android `v2/apps/android/App.tsx` + PWA `v2/apps/pwa/src/App.tsx`: entrada por nombre + clave temporal, sala, envío local optimista, recepción realtime, historial y reconexión manual de laboratorio. Reconexión y cola offline automáticas corresponden a CHAT 2.
-- Android release `HAVANA-NICE-V2-CHAT1-ANDROID.apk`: GitHub Actions run `40072538159` — SUCCESS, artifact ID `12551702638`; 67,795,190 bytes; contiene bundle JavaScript del CHAT 1 de 1,261,700 bytes; SHA-256 `69233faeaa40399cfeb880369877494fdf8ddbfc53ffecb333fa1bee79e8eee1`. Requiere instalación y prueba física.
-- PWA `https://havana-nice-v2-dev.pages.dev/`: Pages deployment `2e66b6b6-c378-43ed-a6f9-6274d9c4704f` — SUCCESS sobre commit `39cc2e82ebbe381d0296ae742ff51ca30a9f8513`.
-- CI run `40072987235` — SUCCESS (typecheck, build PWA, export Android, API health, Durable Object health, rechazo HTTP 401 para lectura sin sesión y para código inválido, PWA viva).
-- CHAT 1 aún NO aprobado físicamente: faltan login auténtico con clave, comunicación bidireccional Android/iPhone, mensajes simultáneos, 20 mensajes continuos, abrir/cerrar, cambio de red y verificación de no duplicación. Los checks anteriores validan compilación y protección, pero NO sustituyen esas pruebas.
-- Limitación de laboratorio: el APK release se firma con keystore debug temporal del runner, de modo que actualizar sobre un APK de otra ejecución puede requerir desinstalar SOLO V2. Estabilizar firma antes de distribución general o datos locales permanentes; nunca desinstalar producción.
+Cada módulo utiliza el diseño único y el Worker/D1 compartidos. Android no necesita una segunda pantalla nativa para estos módulos.
 
-## Entrega directa de APK CHAT 1 — 2026-10-24
-- El usuario reportó que el enlace de archivo dentro de ChatGPT fallaba con `Library file not found`; es un fallo de distribución/enlace, NO un fallo de compilación.
-- Se creó un workflow V2 aislado `.github/workflows/v2-apk-direct-download.yml` que descargó del run `40072538159` el APK CHAT 1 y verificó su SHA-256 `69233faeaa40399cfeb880369877494fdf8ddbfc53ffecb333fa1bee79e8eee1`.
-- Workflow de distribución `40105509935` — SUCCESS. El APK se publicó únicamente en la nueva rama huérfana `havana-nice-v2-apk-downloads` (commit `30e962a7dfd5fb77959d78950667b94c1659c3fb`); no cambió `main`, el backend ni la PWA actual.
-- **ENLACE EXTERNO DIRECTO VALIDADO**: `https://raw.githubusercontent.com/Abnernoa97/havana-nice-pwa/havana-nice-v2-apk-downloads/HAVANA-NICE-V2-CHAT1-ANDROID.apk`.
-- La verificación HTTP HEAD de GitHub Actions confirmó respuesta 200 del enlace final. No usar `sandbox:/mnt/data` para la entrega a teléfonos, pues puede fallar la biblioteca de ChatGPT.
-- Este enlace corresponde a la APK compilada de CHAT 1 (67,795,190 bytes), aún pendiente de instalación y pruebas físicas bidireccionales. Para próximas APK se debe actualizar el artefacto publicado en la rama exclusiva de distribución; no publicar binarios en `main`.
+## 10.1 Home y navegación
 
-## Incidencia CHAT 1 — WebSocket desconectado (24 de octubre de 2026)
-- Las capturas de los dos clientes (Android nativo y PWA) muestran entrada al chat con sesión emitida, pero indicador `desconectado` y botón Enviar inactivo. El fallo era en el establecimiento del WebSocket, no en la instalación APK.
-- Diagnóstico del Worker: se reconstruía la solicitud Upgrade con `new Request(request,{headers})`, se reemplazaba `Sec-WebSocket-Protocol` y el DO no confirmaba explícitamente el subprotocolo. La negociación no estaba validada por ninguna prueba anterior.
-- CORREGIDO SOLO en `v2/cloudflare/src/index.ts` commit `c3f25b2d3403d069b72131c558d2ba8af71a460e`: el Worker autentica y reenvía el Upgrade original intacto al Durable Object; el DO revalida el token de sesión, selecciona `havana-v2` en respuesta 101 y mantiene el mismo modelo de persistencia D1/realtime.
-- Worker V2 `havana-nice-v2-dev` desplegado y confirmado al 100% con versión `8f6e66f3-80c2-4879-ae45-857171d86462`. No requiere recompilar ni reinstalar el APK Android ni cambiar la PWA.
-- **Prueba REAL automatizada sobre Cloudflare en vivo**: GitHub Actions run `40106457975`, SUCCESS. Dos WebSocket simultáneos negociaron `havana-v2`, el emisor y receptor recibieron el mismo mensaje, D1 persistió el evento y `GET /api/chat/messages` autenticado devolvió el mensaje. CI de Fundación posterior al cambio: `40106333983` SUCCESS.
-- Los dos tokens efímeros, sesiones y mensaje generado exclusivamente para QA fueron eliminados de D1; consulta confirmó `0` sesiones y `0` mensajes QA. El workflow temporal de diagnóstico (que contenía credenciales temporales de prueba) se retiró del árbol activo de la rama en commit `b50e8a61bb38f0c19cdb9f893c354f13d42bd4e9`.
-- **Pendiente**: prueba física del usuario tocando `Reconectar` en Android y PWA, verificar `en vivo`, enviar mensajes en ambos sentidos y hacer las pruebas de CHAT 1 pactadas. NO cerrar CHAT 1 solo por CI.
+Inicio inmediato desde shell/caché local, actualizaciones silenciosas, navegación interna por rutas, volver un nivel, estado de sesiones y prioridades por rol. Interfaz minimalista, clara y rápida.
 
-## CHAT 1 — Android nativo: conexión + campo de escritura (2026-10-25)
-- Capturas físicas posteriores al fix del handshake: PWA muestra `en vivo` y mensaje enviado; Android nativo sigue `desconectado` con botón Enviar inactivo. Además, composer (campo de texto + Enviar) invade botones de navegación Android. Esto NO es una validación completa de CHAT 1.
-- En V2 `v2/cloudflare/src/index.ts`: nuevo método compatible con React Native que acepta `Authorization: Bearer <sesión>` en la apertura WebSocket y valida otra vez en Durable Object; conserva sin cambios el acceso anterior de PWA por subprotocolo `session.<token>`. No se admiten credenciales en URL/query string.
-- En V2 `v2/apps/android/App.tsx`: Android utiliza constructor WebSocket nativo con autorización por header y el único protocolo `havana-v2`, en lugar de colocar el token en la lista de protocolos; manejo explícito de errores/cierre y protección contra eventos de sockets obsoletos.
-- Layout Android: espacio inferior de 42dp reservado para navegación de tres botones/edge-to-edge y `softwareKeyboardLayoutMode: resize` en app.json para alzar el composer al abrir teclado. Requiere comprobación visual física.
-- Backend V2 `havana-nice-v2-dev` actualizado a `1dce1f33a6b443ff8923f73ebebafe5b`; se conservaron bindings D1/DO. PWA antigua de V2 y app de producción no se modificaron.
-- Prueba automatizada real: dos conexiones de WebSocket contra Cloudflare (una con encabezado Authorization de Android, otra con subprotocolo PWA), recepción del mismo mensaje y persistencia D1: PASS en GitHub Actions `40171919196`. Los mensajes y sesiones exclusivamente QA eliminados de D1 (0 restantes); workflow temporal retirado del árbol activo.
-- GitHub Actions CI typecheck, build PWA y export Android: run `40171655371` — SUCCESS. Build nativo release autónomo `40171655288` — **SUCCESS**, firma y bundle verificados. Archivo APK final: `HAVANA-NICE-V2-CHAT1-ANDROID-NATIVE-FIX.apk`, 67,795,710 bytes, SHA-256 `66cc856281f4145fb718254c2b56d1d099a5d64edc0aeada529d9ba42a1261c5`.
-- Incidencia adicional confirmada: React Native/OkHttp envía por defecto el encabezado `Origin: https://havana-nice-v2-dev.soloaplicaciones97.workers.dev` al abrir WSS; lista previa de `trustedOrigin` solo admitía Pages y localhost, así que el Worker rechazaba Android con HTTP 403. Se añadió SOLO el origen exacto del Worker V2, sin permitir sitios extraños. Commit de fuente `19507bfd693aac316aced162b9729e5064e92995`; backend desplegado versión `100f563ddea34eb69dc1a790bf7958bd` al 100%. CI de regresión `40172235368` — SUCCESS: origen Android permitido (401 por token inválido, no 403); origen no autorizado rechazado con 403.
-- **Descarga Android directa y verificada (no sandbox ChatGPT)**: `https://raw.githubusercontent.com/Abnernoa97/havana-nice-pwa/havana-nice-v2-apk-downloads/HAVANA-NICE-V2-CHAT1-ANDROID-NATIVE-FIX.apk`. GitHub distribución `40172130063` — SUCCESS, HTTP 200 comprobado en GitHub Actions. Archivo 67,795,710 bytes, SHA-256 `66cc856281f4145fb718254c2b56d1d099a5d64edc0aeada529d9ba42a1261c5`. Rama de descargas `havana-nice-v2-apk-downloads`, commit `21bb6c56e6bb1929f75cfb5c5a14b5c045dfd83e`. `main` sin cambios.
-- PENDIENTE: instalación de nuevo APK y verificación visual del composer sobre barra Android, envío y recepción Android ↔ PWA en teléfono real; no cerrar CHAT 1 antes de esas pruebas.
+## 10.2 Calendario de músicos
 
-## CHAT 1 — Reanudación Android automática y formato de entrega (2026-10-25)
-- El usuario confirmó comunicación de texto Android ↔ PWA y que la caja de escritura queda por encima de los botones Android. Incidencia restante observada en su captura: al salir de Android y volver, socket cerrado (1006) obliga pulsar "Reconectar" para restablecer el chat.
-- Se corrigió únicamente `v2/apps/android/App.tsx` en commit `0aed585baccac831cdaa24f06f94805a996c6ccb`: observar `AppState`, suspender limpiamente WebSocket al pasar a segundo plano, iniciar un WebSocket nativo nuevo y sincronizar historial D1 al regresar; reintentar automáticamente con backoff progresivo frente a fallas de red, sin requerir botón manual. Se limita a la sesión de laboratorio vigente (expira a las 12 horas), no promete persistencia después de finalizar proceso o sesión.
-- GitHub Actions CI `40206188312` — SUCCESS, incluidos typecheck, export Android, PWA, Worker, D1 y autenticación. Build release Android `40206188419` — SUCCESS: APK autónomo con firma y bundle verificados. Publicación externa `40206254893` — SUCCESS: archivo directo HTTP 200, en rama de descargas aislada, sin modificaciones en main. Archivo `HAVANA-NICE-V2-CHAT1-AUTO-RECONNECT.apk`, 67,797,606 bytes, SHA-256 `333940b017c791903e6283eb7997ffdbfc84064df5d1561e91bbcb79e1708be4`. La prueba física de retorno desde background AÚN ESTÁ PENDIENTE.
-- **DESCARGA DIRECTA ALTERNATIVA (ENLACE QUE EL USUARIO PREFIERE):** `https://raw.githubusercontent.com/Abnernoa97/havana-nice-pwa/havana-nice-v2-apk-downloads/HAVANA-NICE-V2-CHAT1-AUTO-RECONNECT.apk`. Confirmado workflow HTTP 200 y repositorio, branch de distribuciones commit `9985ca3a78b135d0d7f262ccf146fde4179033e6`; entrega de esta versión con Markdown `[Descarga directa alternativa](https://raw.githubusercontent.com/Abnernoa97/havana-nice-pwa/havana-nice-v2-apk-downloads/HAVANA-NICE-V2-CHAT1-AUTO-RECONNECT.apk)`.
-- **Preferencia de entrega PRIORITARIA Y PERMANENTE**: cada actualización de la app nativa Android debe incluir un enlace simple visible exactamente con el texto **"Descarga directa alternativa"** vinculado al APK externo `https://raw.githubusercontent.com/Abnernoa97/havana-nice-pwa/havana-nice-v2-apk-downloads/<archivo-actualizado>.apk`; este formato es el que el usuario abre para descargar e instalar directamente desde el chat. Puede añadirse un botón opcional pero NUNCA sustituye este enlace de texto. No entregar solo sandbox ni vínculos a páginas intermedias o ZIP de GitHub Actions. Verificar antes código HTTP 200 y SHA-256 del APK.
-- No modificar `main`, producción ni la PWA oficial. No adelantar CHAT 2 hasta verificar que la reconexión nativa automática funciona en teléfono real.
+Eventos sincronizados en tiempo real, tarjetas legibles y detalles de llegar/vestuario/notas/llamadas/show/horario. El **horario es texto completamente libre**: admite `por definir`, símbolos o texto en lugar de imponer únicamente un reloj.
 
-## Confirmación de usuario y apertura de CHAT 2 (2026-10-25)
-- El usuario confirmó «Ya quedó, con que seguimos» tras recibir e instalar la APK `HAVANA-NICE-V2-CHAT1-AUTO-RECONNECT.apk`. Se considera aceptado el recorrido físico base de CHAT 1 y el retorno automático al chat, sin afirmar que ya se ejecutaron las pruebas de estrés pendientes.
-- Próxima vertical, **CHAT 2 — ESTADOS Y RECONEXIÓN**, conforme sección 10: `enviando`, `enviado`, `error`, reintento manual, cola offline, recuperación posterior, idempotencia, orden estable. Implementar tanto Android como iPhone PWA, reutilizar D1 y Durable Object; sin tocar producción.
-- Para CHAT 2, los estados `enviado` significan confirmación de persistencia/eco del servidor, NO lectura ni recepción por el destinatario (reservado para fases posteriores). Los mensajes creados offline deben conservar el mismo `clientMessageId` cuando se transmitan. Entrega de esta fase necesita prueba física.
-- Mantener la entrega Android mediante enlace Markdown exacto **[Descarga directa alternativa]** directamente al APK publicado en la rama aislada `havana-nice-v2-apk-downloads`, con verificación HTTP 200 y SHA-256.
+El repertorio propio de un evento aparece **dentro de su tarjeta de Calendario**, solo si fue generado. Abrir/cerrar acordeón, checklist y enlaces correspondientes. Los cambios de Admin llegan al músico sin instalación de APK.
 
-## CHAT 2 — Primera implementación Android y PWA (2026-10-25)
-- El usuario confirmó físicamente que CHAT 1 ya quedó («Ya quedó, con que seguimos») y aprobó continuar.
-- Se implementó en la rama aislada `havana-nice-v2-foundation` la lógica de cola de mensajes **en la sesión activa** tanto Android nativo como PWA. El usuario puede redactar y pulsar Enviar sin red; el mensaje muestra `en cola`, cambia a `enviando` cuando el socket está disponible y a `enviado` únicamente cuando llega el eco/ACK persistido en D1. Si falta confirmación tras 12 s, estado `error` y reintento con el mismo `clientMessageId`. No afirmar confirmación de lectura del destinatario.
-- Se estableció envío FIFO: el siguiente mensaje pendiente se manda solo tras recibir el ACK del anterior. Reconciliación compartida en `v2/packages/shared/src/index.ts`, sin insertar múltiples filas para el mismo par sender+clientMessageId.
-- Android: preserva en memoria la cola a través de salir/volver (AppState) y reintenta al restablecer WebSocket; botón Enviar disponible incluso desconectado, permite tocar un globo en error para reintentar. PWA: misma cola en sesión, reconexión al regresar a primer plano, eventos online/offline, backoff y botón de reintento por mensaje.
-- **Límite actual de laboratorio**: cola en memoria durante la sesión y proceso activos; NO se promete conservación de borradores en cola si Android o Safari matan el proceso, o al caducar la sesión de 12 horas. Esta persistencia local durable debe añadirse y probarse antes de marcar CHAT 2 totalmente CERRADO.
-- CI de la nueva lógica Android/PWA en run `40208067427` — SUCCESS (typecheck, export Android, build PWA, API/DO/seguridad). Cloudflare Pages desplegó la PWA sobre commit `fd8ab16d80a4fd960f864b287721bbb80bdb5398` en despliegue `12240ed3-0b8f-4ffd-9f2c-4fd2af1f1a0b`, activo.
-- Android release `40208063556` — SUCCESS (bundle JS y firma validados). Distribución directa `40208110701` — SUCCESS, incluida validación HTTP 200. APK `HAVANA-NICE-V2-CHAT2-OFFLINE-QUEUE.apk`, 67,799,962 bytes, SHA-256 `5ed3e0c6f34f33cddb366c7977a41b590947aab06ec7457a366e1d07ee94a50f`. Rama de descargas aislada commit `d8c9463d3e7cc006739e6525fa1523b7dab999a4`. Enlace EXACTO preferido por el usuario: [Descarga directa alternativa](https://raw.githubusercontent.com/Abnernoa97/havana-nice-pwa/havana-nice-v2-apk-downloads/HAVANA-NICE-V2-CHAT2-OFFLINE-QUEUE.apk). Se verificó que main permanece en `3f2d2379d0ed855a025d8e7162cd5c00cd2a8be9`. No se modificaron Worker, D1, producción, main ni proyectos ajenos.
-- Prueba física requerida: crear mensajes sin red, recuperar conexión Android↔PWA, confirmar `enviado`, que aparezcan una sola vez, conservar orden y reconectar tras cerrar/abrir interfaz.
+## 10.3 Repertorio
 
-## ACTUALIZACIÓN CONSOLIDADA — CHAT 2/3/4/5 (2026-10-25)
-- Solicitud del usuario: «Ya está, ya quedó. Ahora necesito que hagamos un paquete entero para actualizar de una vez». Decisión: un solo paquete integral de **Chat de texto avanzado**, no APK por cada ajuste; continúa totalmente separado del Chat/Worker de producción. Multimedia (fotos, videos, audio), push y permisos finales permanecen en fases posteriores porque R2 y las credenciales de push no están listas; NO vender esta versión como todas las funciones terminadas.
-- **CHAT 2 persistencia:** Android usa dependencia oficial `expo-sqlite@~58.0.14` con lock reproducible `npm ci`, módulo `v2/apps/android/chatStorage.ts`; PWA usa IndexedDB en `v2/apps/pwa/src/local.ts`. Al cerrar y reabrir la aplicación dentro de la validez de sesión de 12 h, se recupera la sesión de laboratorio y la cola de mensajes pendientes. Se conserva mismo clientMessageId para evitar duplicados al reintentar, FIFO con ACK del servidor y estados en cola/enviando/enviado/error. **Advertencia**: token de laboratorio está persistido en sandbox de la app, no es todavía el sistema definitivo seguro de autenticación ni garantiza entrega tras caducidad de sesión.
-- **CHAT 3 Responder:** columna nueva `chat_messages.reply_to_seq`, validación servidor del mensaje original, campo de referencia en evento, UI Android/PWA «Responder» y preview del original.
-- **CHAT 4 Reacciones:** nueva tabla `chat_reactions`, soporta ❤️ 😂 👍 por usuario/mensaje; al pulsar se agrega o retira y el evento WebSocket sincroniza ambos clientes. `GET /api/chat/messages` devuelve snapshot actual de reacciones.
-- **CHAT 5 Presencia/escritura:** Durable Object emite snapshot `chat.ready` y `chat.presence` con usuarios conectados al socket, más `chat.typing` efímero con expiración; ambas UI muestran indicador de escritura y cantidad online. No confundir presencia de socket con push/dispositivo bloqueado.
-- Backend V2 Worker `havana-nice-v2-dev` desplegado versión `422c3c1c-fc55-48f2-a19c-56acd4aa480a`. D1 V2 migración `0004_replies_reactions.sql` creada y aplicada; consulta real confirmó columna `reply_to_seq` y tabla `chat_reactions`.
-- CI consolidado `40209865949`: SUCCESS (typecheck Android y PWA, export Android, build PWA, API/DO, origin y seguridad). PWA V2 desplegada activa en Cloudflare Pages.
-- APK consolidado de un solo paquete Android: GitHub Actions build `40209846766` SUCCESS, firma y bundle de distribución comprobados; publicación directa `40210094450` SUCCESS, HTTP 200 confirmado. Archivo `HAVANA-NICE-V2-COMPLETE-CHAT-PACK.apk`, 75,178,479 bytes, SHA-256 `322792339f981c53794e5eade4f1a3a051207c62c48c3b849e451cc5f34aa622`. Descargas rama dedicada `havana-nice-v2-apk-downloads`, commit `410eb0519240cb40f365779833041909b5d8a2b1`. URL directa: [Descarga directa alternativa](https://raw.githubusercontent.com/Abnernoa97/havana-nice-pwa/havana-nice-v2-apk-downloads/HAVANA-NICE-V2-COMPLETE-CHAT-PACK.apk). `main` no modificado (`3f2d2379d0ed855a025d8e7162cd5c00cd2a8be9`).
-- Validación real pendiente: reply y reacciones ambos sentidos, presencia/escritura, envío offline Android/PWA, cierre forzado/relanzar, expiración de sesión, retransmisión y ausencia de duplicados. No marcar todas las funciones oficialmente cerradas hasta que la prueba física las confirme.
-- Entregar una sola descarga mediante Markdown **[Descarga directa alternativa]** apuntando a `https://raw.githubusercontent.com/Abnernoa97/havana-nice-pwa/havana-nice-v2-apk-downloads/HAVANA-NICE-V2-COMPLETE-CHAT-PACK.apk` exclusivamente si publicación validada. No proporcionar sandbox como vía principal.
+Repertorio general y listas de evento, categorías visibles **ENGLISH** y **ESPAÑOL**, enlaces a videos junto a canciones cuando existan, búsqueda, sincronización, lectura offline razonable y estado de selección. No limitar artificialmente la cantidad de canciones por evento.
 
-## Evidencia física del paquete consolidado — 2026-10-25
-- El usuario respondió «Listo» y compartió dos capturas tras instalar el paquete unificado `HAVANA-NICE-V2-COMPLETE-CHAT-PACK.apk`.
-- La captura Android nativo muestra **«en vivo»**, varios globos del historial sincronizado, acciones visibles **Responder/❤️/😂/👍**, contadores de reacción (❤️1, 👍1), indicador **2 en línea** y composer correctamente ubicado por encima de la navegación Android.
-- La captura de PWA muestra **«en vivo»**, las mismas entradas del historial, las acciones de respuesta/reacción y los contadores sincronizados. Muestra **1 en línea**, pero las capturas tienen marcas de tiempo distintas (10:19 y 10:20); eso NO demuestra fallo de presencia.
-- Se considera **aceptado visualmente el paquete en ambos clientes**, NO equivale a haber probado la acción efectiva de responder ni el indicador de escritura, ni la supervivencia de mensajes en cola después de un cierre forzoso y reconexión; esos casos siguen abiertos y deben ser testeados antes del cierre formal de CHAT 2/3/4/5.
-- Siguiente vertical según Plan Maestro: **CHAT 6 — FOTOS**, que requiere R2 privado, metadatos de medios, thumbnails, control de acceso, progreso y reintentos Android/PWA.
-- Verificación R2 real mediante Cloudflare conectado: `GET /accounts/.../r2/buckets` devolvió **HTTP 403 / código 10042 «Please enable R2 through the Cloudflare Dashboard»**. La conexión ya dispone de permisos R2 read/write; reconectar no resuelve esta prohibición. Solo la activación inicial en el Dashboard oficial por parte del titular desbloquea el almacenamiento R2; NO se intentó bypass ni se cambió producción.
-- Hasta esa autorización, no marcar CHAT 6 listo ni afirmar que fotos se pueden subir. Se conserva el objetivo de paquete consolidado, evitando una APK por corrección menor.
+Para Admin: checklist con contador **hechas/total**, marcar, desmarcar, selección múltiple, canciones añadidas fuera del catálogo y reordenación drag-and-drop. Las listas por evento se crean automáticamente desde eventos o a solicitud; si no existen, no aparecen.
 
-## Bloqueo económico aclarado — 2026-10-25
-- El usuario mostró el checkout «Comenzar con R2» que ofrece uso gratuito mensual y tarifas de excedentes. Reiteró que todo el proyecto debe costar **0 MXN y no pagar absolutamente nada**.
-- Decisión definitiva: NO activar R2 ni aceptar suscripciones que permitan cobros automáticos. El intento anterior de crear bucket falló HTTP 403/10042, sin recursos R2 creados ni pagos iniciados.
-- Diseño sustituto CHAT 6: fotos comprimidas para chat privado y cuotadas en recursos D1 Free **separados de la DB principal si existe cupo disponible**, control server-side de tamaños y almacenamiento, stop al alcanzar cuotas, expiración, acceso privado. Confirmar plan y límites efectivos antes del despliegue. Esta alternativa NO soporta tamaño original ilimitado.
-- No cambiar cuenta de Cloudflare a modalidad de pago, no solicitar tarjeta, no abrir checkout por terceros, ni tocar `main`/producción. 
+## 10.4 Notificaciones de información
 
-## Viabilidad de reutilizar almacenamiento HAVANA CLOUD — 2026-10-25
-- Pregunta expresa del usuario: «¿Podemos utilizar la aplicación de HAVANA CLOUD como almacenamiento?» Se inspeccionó en **solo lectura** el repositorio real privado `Abnernoa97/havana-nice-cloud` (rama `main`), `README.md`, `wrangler.jsonc`, `worker/index.ts`, `docs/HAVANA_CLOUD_3_BASELINE.md` y configuración Worker.
-- **Confirmado:** HAVANA CLOUD utiliza Google Drive como almacenamiento físico, Google OAuth y Durable Object `GOOGLE_ACCOUNTS` para tokens/catálogo. Su Worker `havana-nice-cloud` exige sesión privada (cookie), no ofrece una API interaplicaciones de V2 autorizada de forma independiente. No confundir su caché local con storage remoto. El worker conectado muestra bindings `GOOGLE_ACCOUNTS`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (privado) y protección de acceso.
-- **Decisión arquitectónica preliminar**: reutilizar, en la medida de lo posible, **la capacidad física de Google Drive**, no el backend/secretos de producción de HAVANA CLOUD. Construir adaptador propio en `havana-nice-v2-dev`, con OAuth explícito del propietario si es necesario, permiso por archivo `drive.file`, carpeta propia y sin indexación en la galería actual.
-- Google Drive ofrece hasta 15 GB gratuitos por cuenta personal según condiciones de la cuenta y compartidos con Gmail/Photos, pero las cuotas de API son propias y Google anunció facturación de excedentes API más adelante en 2026 para proyectos con facturación. **No prometer que esta integración cuesta siempre 0 MXN sin verificar facturación y establecer límites duros o sin billing habilitado.**
-- NUNCA compartir/copiar refresh tokens ni relajar la autenticación de la nube actual; nunca editar Worker `havana-nice-cloud`, originales, catalogación, ramas de respaldo o main; V2 mantiene metadata y control de acceso propios.
-- Estado: **viabilidad investigada, no implementada ni autorizada**. Crear adaptador de V2 y hacer pruebas controladas únicamente tras garantizar aislamiento, cuotas y consentimiento OAuth si es indispensable.
+Feed, tarjetas, texto/imagen/enlaces, leídas/no leídas, filtros y conexión con push. Las secciones Admin “Crear nueva notificación” y “Añadir evento” se presentan como paneles plegables en PWA.
 
-## CHAT 6 — Adaptador privado Google Drive V2: base técnica entregada (2026-10-25)
-- **Código aislado de V2 creado:** `v2/cloudflare/src/drive-media.js`, importado únicamente por el Worker `v2/cloudflare/src/index.ts` de `havana-nice-v2-dev`. Repositorio HAVANA CLOUD `Abnernoa97/havana-nice-cloud`, Worker `havana-nice-cloud`, su OAuth, catálogo, archivos originales, credenciales y backups NO fueron modificados ni leídos como tokens.
-- **Seguridad y costo:** el adaptador queda `enabled=false` salvo que existan credenciales OAuth exclusivas de V2 (`V2_DRIVE_CLIENT_ID`, `V2_DRIVE_CLIENT_SECRET`, `V2_DRIVE_REFRESH_TOKEN`, `V2_DRIVE_FOLDER_ID`), verificación explícita de proyecto sin facturación (`V2_DRIVE_BILLING_MODE=no-billing`) y activación deliberada (`V2_MEDIA_UPLOADS=enabled`). Ninguna variable de este tipo está definida aún. No se habilitaron suscripciones ni pagos.
-- **Rutas de laboratorio:** `GET /api/chat/media/status` requiere sesión válida; `POST /api/chat/media/upload` y `GET /api/chat/media/:id` comparten autorización y están inactivos por la puerta de configuración. Un usuario no autenticado recibe 401. No se generaron URLs públicas de Drive ni se expusieron refresh tokens a las apps.
-- **Límites codificados:** solo firmas reales JPEG/PNG/WebP, hasta 640 KiB por foto ya optimizada, máximo 64 MiB de medios totales; D1 hace reserva atómica y se rechaza al exceder la cuota. Guardar únicamente metadatos y `drive_file_id` en V2 D1; los bytes, cuando se habilite OAuth, se guardarían en una carpeta V2 privada creada por el permiso `drive.file`.
-- **Esquema aplicado solo a V2 D1:** migración `0005_v2_drive_media.sql`, tablas `v2_media_assets` y `v2_media_quota` e índice. Verificación remota: `0` archivos y `0` bytes, sin cargas de medios realizadas.
-- **Pruebas automatizadas:** `v2/cloudflare/tests/media-drive.test.mjs` valida firma de imagen, estado apagado sin auditoría de facturación/OAuth y ausencia de claves en respuesta. CI `40213838934` SUCCESS: tests, typecheck, builds PWA, export Android y endpoints de Chat existentes.
-- **Despliegue limitado y seguro:** V2 Worker `havana-nice-v2-dev` recibió solo dos módulos `index.js` + `drive-media.js` en deployment `760a96811378432e80da90f504eb47db`, preservando `DB` y `CHAT_ROOMS`. Sin OAuth y sin bandera de coste cero, el almacenamiento sigue inhabilitado.
-- **Bloqueo externo real:** no hay aplicación/cliente OAuth exclusivo V2 conectado ni verificación de proyecto Google Cloud sin facturación. HAVANA CLOUD sí tiene sus propias credenciales, pero reutilizarlas violaría aislamiento y controles de propiedad. Requiere eventualmente autorización Google explícita del titular en la página de Google; no copiar refresh tokens ni pedir contraseñas.
-- **Próximos pasos:** verificar en vivo 401/503 y salud Chat de este deployment, completar flujo OAuth V2 sin facturación, reservar carpeta exclusiva, integrar compresión/selector Android y PWA, probar fotos de extremo a extremo y solo entonces hacer UNA APK con el enlace obligatorio `[Descarga directa alternativa]`.
-- **Límite de esta entrega:** no existe envío de fotos operativo todavía y no se generó APK Android nueva (el cambio fue de backend, sin cambios visuales en clientes). CHAT 6 sigue abierto.
+## 10.5 Perfil y Familia HAVANA NICE
 
-## CAMBIO DE ARQUITECTURA — CHAT 6 usa OAuth existente de HAVANA CLOUD (2026-10-25)
-- El usuario propone y aprueba vincular directamente **HAVANA NICE 2 → HAVANA CLOUD → Google Drive**, en lugar de autorizar de nuevo Google para V2. HAVANA CLOUD ya añade cuentas mediante el flujo Google OAuth y renueva sus tokens internamente. **Esta decisión sustituye la propuesta previa de OAuth exclusivo de V2**, que se conserva únicamente como antecedente histórico. Nunca pedir consentimiento OAuth duplicado para el mismo acceso si HAVANA CLOUD puede proveer acceso delegado privado.
-- Auditoría técnica: `Abnernoa97/havana-nice-cloud` `worker/index.ts` ya incluye `listStoredGoogleAccounts`, `getStoredGoogleAccount`, `refreshGoogleAccessToken` y `/api/google/upload/fast` con elección automática de cuenta por espacio libre; los endpoints actuales exigen la cookie de HAVANA CLOUD, por lo que **NO** son adecuados para que V2 se conecte directamente. Los uploads normales de Cloud pueden terminar en el catálogo/galería: no utilizar sin segregación.
-- **Arquitectura elegida:** `havana-nice-v2-dev` autoriza la sesión de Chat y llama a `havana-nice-cloud` mediante **Cloudflare Worker Service Binding privado**, con contrato mínimo, secreto backend a backend y límites de fotos/cuotas. Solo HAVANA CLOUD refresca tokens y habla con Google Drive. No compartir cookies de navegador, contraseñas, refresh tokens ni devolver token Drive a V2.
-- Los archivos de CHAT 6 deben quedar en carpeta/biblioteca dedicada por cuenta, excluida del catálogo principal de HAVANA CLOUD (no destruir ni recomprimir originales existentes). `appDataFolder` de Google Drive requeriría el scope `drive.appdata` y no debe asumirse disponible con autorización actual `drive`; preferir carpeta normal privada y reglas de exclusión probadas si es viable.
-- La capacidad de una cuenta Google personal suele tener máximo gratuito compartido de 15 GB con otros productos y dependiente del espacio restante, **no 15 GB adicionales por cada vinculación a la app**. Siempre usar datos de cuota de HAVANA CLOUD; rechazar si falta espacio, no comprar almacenamiento ni cambiar a plan de pago.
-- **Preparación realizada sin tocar producción:** se creó `Abnernoa97/havana-nice-cloud` rama `havana-nice-v2-cloud-bridge-lab` derivada de `main`. Allí solamente, un endpoint `/api/internal/havana-v2/capabilities` protegido por secreto de backend con estado **apagado por defecto**, devuelve únicamente cantidad de cuentas con capacidad y no datos privados. Implementación inicial en `worker/havana-v2-private-bridge.ts` y enrutamiento de laboratorio en `worker/index.ts`. El `main`, deployment `havana-nice-cloud`, OAuth actual y archivos Google Drive siguen SIN MODIFICAR.
-- **Estado real:** arquitectura confirmada y endpoint de diagnóstico desarrollado en rama experimental, **no desplegado, no habilitado y NO permite subir fotos todavía**. Para uploads reales falta implementar/validar creación de carpeta privada separada, filtrado catálogo/sync, acceso al archivo solo por mensaje/sesión, cuota, reintentos y test multicuenta. Solo después integrar binding en V2 y considerar despliegue limitado de la nueva ruta, protegiendo HAVANA CLOUD.
-- **Validación técnica adicional:** GitHub Actions `40215039654` en la rama experimental HAVANA CLOUD — SUCCESS: bridge apagado por defecto, rechaza pedidos sin secreto, responde solo la cantidad agregada de cuentas con espacio y no admite subidas. En V2 se creó `v2/cloudflare/src/havana-cloud-bridge-client.js`, que solo habla a través del futuro binding `HAVANA_CLOUD_BRIDGE`, exige secreto interno y bandera explícita, y considera no disponible el bridge hasta que éste confirme `uploadRouteEnabled:true`. Pruebas de client bridge incorporadas a `v2/cloudflare/tests/media-drive.test.mjs` y CI V2 `40215001597` iniciado. No hay binding/proxy ni subida desplegada a producción aún.
-- La anterior ruta de V2 `src/drive-media.js` es un prototipo apagado bajo ausencia de OAuth exclusivo; debe adaptarse o sustituirse para delegar en HAVANA CLOUD tras terminar el bridge. No activar esa ruta con credenciales copiadas ni declarar envío multimedia operativo.
-- Service Bindings no añaden cargo por llamada en Workers Standard según documentación Cloudflare, pero siguen aplicando límites/CPU del plan gratuito. Regla $0 MXN sin servicios pagos ni exceso automático.
+Perfil, imagen, portada e información de integrantes solamente cuando esté aprobado el alcance; no conectar ni mezclar datos con el proyecto **FAMILIA NOA**.
 
-## 2026-10-25 — Actualización unificada del CHAT V2 (paquete para prueba física)
-**Solicitud:** el usuario quiere una sola actualización grande, sin instalar por cada función; avisó que va a desinstalar la app mientras viaja. **Advertencia de datos:** la desinstalación borra SQLite local, borradores, credenciales locales y mensajes todavía sin confirmación. Los mensajes confirmados en D1 quedan guardados.
-**Rama única:** `havana-nice-v2-foundation`, sin tocar `main`, la aplicación oficial ni el Worker/archivos de HAVANA CLOUD.
+## 10.6 Ajustes
 
-### Funciones completas en código (laboratorio, requieren pruebas físicas)
-- CHAT 1–5 existentes: textos, WebSocket bidireccional, cola offline en SQLite Android/IndexedDB iPhone, reconexión, estados, respuestas, reacciones, presencia y typing. Guardar también el borrador local tras cierre (no sobrevive desinstalación).
-- Nuevo paquete: **historial paginado**, `GET /api/chat/messages?beforeSeq=<seq>` y búsqueda autenticada `?search=<texto>` limitada a 60 resultados; Android y PWA tienen UI para buscar, cargar anteriores y cerrar búsqueda.
-- **Editar y eliminar mensajes propios:** comandos `chat.edit` y `chat.delete` por WebSocket, validados por actor en servidor y con límite de 15 minutos. Edición conserva `edited_at`. Eliminación **lógica**/tombstone `deleted_at` preserva orden/referencias, elimina reacciones y excluye texto borrado de búsqueda. `chat.updated` notifica ambos clientes. Android exige confirmación explícita.
-- **Confirmaciones de lectura:** comando `chat.read` con secuencia máxima persistida y evento `chat.read`, tabla `chat_read_receipts` por actor. La UI muestra «leído» únicamente cuando otro actor reportó lectura; **no es prueba de notificación push ni entrega al móvil bloqueado**.
-- Cliente compartido: tipos `ChatMessage` extendidos (editedAt,deletedAt) y contratos de paginación, búsqueda, receipts, reconciliación de edits; Android/PWA mismo modelo lógico.
-- **Migración aislada 0006:** `edited_at`, `deleted_at` y `chat_read_receipts` aplicada/confirmada en D1 `havana-nice-v2-dev`. No hubo modificación de mensajes existentes, y se mantuvieron todas las tablas de chat/fotos anteriores.
-- Backend de laboratorio `havana-nice-v2-dev` actualizado `f0aa367e2f194598b1b6affe9fc5ab81`. Conserva `DB` y `CHAT_ROOMS`, y media sigue bloqueada. Se corrigió regex de Bearer para rutas media gated y texto de estado del bridge privado HAVANA CLOUD.
-- V2 PWA sigue desplegándose exclusivamente en `havana-nice-v2-dev.pages.dev`; compilación firmada Android desde CI reproducible. Prueba real de los nuevos eventos entre dos teléfonos todavía pendiente.
-- APK única PUBLICADA: `HAVANA-NICE-V2-CHAT-FULL-UPDATE-20261025.apk`, Gradle release `40216856225` SUCCESS (commit `ce1dd644db0db611effee81a8a6dad482893c028`), distribución `40216893788` SUCCESS (archivo HTTP 200). Tamaño 75,189,707 bytes, SHA-256 `9f497b9b808053dbb3d88401af73e5ad7473662615b76ea65b756bc6138cdd7a`. Branch de binarios `havana-nice-v2-apk-downloads` commit `84013b03450ebacf9e255f8deeb9b246630af44d`. APK anterior conservado. Nunca inventar un enlace antes de que esté públicamente HTTP 200.
+Cuenta, nombre, dispositivos aprobados, preferencias, permisos, diagnóstico, versión web/nativa, políticas de datos y cierre de sesión. Los ajustes visuales se publican en la PWA; acciones del SO se invocan por el puente.
 
-### Lo que **NO** se puede marcar como terminado
-- CHAT 6 fotos/audio/video: aún **no** se permite transferir multimedia; puente HAVANA CLOUD–V2 existe solo como diagnóstico en rama experimental, está apagado y no desplegado en Cloud producción. Para integrarlo hacen falta subida/lectura privada segura, exclusión de la galería CLOUD, cuotas, garantías de no facturación, pruebas.
-- Push Android/iPhone bloqueados: requieren configuración/consentimiento de FCM/APNs/Web Push; no afirmar que funcionan al bloquear/cerrar el teléfono. El plan 0 MXN prohíbe contratar niveles pagados.
-- No hay todavía control completo de identidad permanente, múltiples conversaciones privadas o grupos por usuario: sigue siendo un chat de laboratorio con clave y sesiones de 12 horas. No afirmar equivalencia a WhatsApp.
-- No cerrar el paquete sin instalación física y pruebas de envío cruzado, búsqueda, editar/eliminar, lectura, reconexión, offline tras cierre y paginación en ambos clientes.
+# 11. ADMINISTRADOR V2
 
-### Distribución obligatoria
-Entregar siempre el APK verificado mediante **[Descarga directa alternativa](https://raw.githubusercontent.com/Abnernoa97/havana-nice-pwa/havana-nice-v2-apk-downloads/HAVANA-NICE-V2-CHAT-FULL-UPDATE-20261025.apk)**, nunca solo con botón o sandbox. Solo compartirlo al usuario después de SUCCESS, SHA-256 y HTTP 200 del workflow. Mantener el APK anterior en rama de descargas como rollback.
+Administrador utiliza la **misma arquitectura** visual PWA y el mismo Worker, con rutas y permisos propios. No compartir una sesión de Admin con una sesión de músico sin autorización explícita.
 
-## Validación física — PWA → Android (2026-10-25, 11:45 hora de capturas)
-- El usuario compartió capturas de dos clientes de la versión `HAVANA-NICE-V2-CHAT-FULL-UPDATE-20261025.apk`/PWA: el mensaje exacto de prueba `Ggg` figura **enviado** a las 11:45 a. m. en PWA (burbuja propia, estado enviado) y aparece también en **Android nativo** como burbuja remitida por `iPhone` a las 11:45 a. m. Ambos muestran `en vivo` y el historial y contadores de reacciones coinciden. Esto confirma físicamente PWA → Android y persistencia/recepción visibles.
-- La captura Android presenta indicador `2 en línea` y la de PWA `1 en línea`, pero los relojes y el estado de conexión pueden corresponder a momentos distintos; no inferir defecto en presencia sin prueba simultánea.
-- Controles de búsqueda, responder, editar, eliminar y reacciones visibles. No confundir visibilidad con verificación funcional completa: faltan pruebas específicas de búsqueda, editar/borrar sincronizados, `leído` real con ambos clientes, cola tras cierre forzoso y sentido Android → PWA en esta versión.
-- No se necesita modificar la APK ni crear otra versión solamente por esta confirmación. Mantener pendiente CHAT 6 media y push.
+Responsabilidades:
 
-## Corrección urgente UX gestual — 2026-10-25 (WhatsApp-like, diseño propio)
-- El usuario probó físicamente edición y eliminación: **Editar sí se sincroniza entre Android y PWA**, pero Eliminar devolvía **«Delivery failed»**. Además, los botones permanentes `Responder / Editar / Eliminar / ❤️ / 😂 / 👍` debajo de cada mensaje se consideran un defecto de UX. Solicita funcionamiento estilo WhatsApp, especialmente **deslizar burbuja a la derecha para responder**.
-- **Causa del fallo identificada y reproducida:** tabla D1 `chat_messages` tiene `CHECK(length(body) BETWEEN 1 AND 2000)`, mientras `chat.delete` intentaba `body=''`, violando CHECK. Solución: `UPDATE ... SET body='[mensaje eliminado]',deleted_at=?`; el mapeo de API sigue ofreciendo texto vacío + `deletedAt`, las interfaces muestran `Mensaje eliminado`. No borrar filas: las respuestas y recibos/orden permanecen. Verificación con fila QA en la base V2: registro creado, tombstone escrito, `tombstoned=1`, limpiado tras prueba. Editar conserva límite de 15 minutos; eliminar para todos se permite hasta 48 h, solo para mensajes propios. No copiar comportamiento de identidad/branding de WhatsApp ni asumir equivalencia de funciones.
-- **Android (laboratorio V2):** `SwipeableBubble.tsx` usa PanResponder horizontal con umbral y animación para swipe a la derecha; `App.tsx` retiró controles de texto permanentes en la burbuja. Mantener pulsado abre menú modal con emojis / Responder / Editar / Eliminar para todos (según propiedad y ventana). Contadores de reacciones se muestran de forma compacta solo si las hay. Confirmación explícita antes de eliminar.
-- **PWA V2:** `SwipeMessage.tsx` implementa deslizamiento horizontal a la derecha y pulsación larga, conservando el scroll vertical y menú contextual accesible desde mouse/teclado. `App.tsx` usa menú modal flotante, elimina botones permanentes y muestra únicamente reacciones ya existentes; `styles.css` mantiene identidad HAVANA NICE.
-- **Worker V2** `havana-nice-v2-dev` desplegado con cambio de tombstone y ventanas de edición/borrado (deployment `fa6ad70c50eb4b78ae15565bf4d220d5`), conservando `CHAT_ROOMS`, `DB`, `HAVANA_ENV` y multimedia bloqueada. No se modificaron `main`, app oficial ni HAVANA CLOUD.
-- CI V2 `40219270768` SUCCESS — typecheck, build PWA, pruebas backend. Android Gradle release `40219075030` **SUCCESS** para commit `7ea2d0eae78a0685d1f13accfcdffa84ceea1a02` (incluye `SwipeableBubble` y `App.tsx`); firmada con JS integrado. GitHub distribución `40219457427` **SUCCESS**, subida exclusiva a `havana-nice-v2-apk-downloads` y descarga URL HTTP 200 verificada. APK `HAVANA-NICE-V2-CHAT-SWIPE-REPLY-DELETE-FIX.apk` de **75,193,543 bytes**, SHA-256 `482624a3bb744feb6f53acb88ee0041bad461beb68aa157ad01d3c4475f7e8d8`, rama binarios commit `5c4a220154c1517d4ccdeaade7edb0fda3b5ce93`. [Descarga directa alternativa](https://raw.githubusercontent.com/Abnernoa97/havana-nice-pwa/havana-nice-v2-apk-downloads/HAVANA-NICE-V2-CHAT-SWIPE-REPLY-DELETE-FIX.apk).
-- PENDIENTE: prueba física de swipe y menú en Android/PWA, borrado sincronizado, confirmación de eliminación, scroll vertical fluido y que edición siga intacta.
-- ENTREGA OBLIGATORIA: usar enlace Markdown `[Descarga directa alternativa]` a APK directo, no ZIP ni sandbox. $0 MXN; rama `havana-nice-v2-foundation` aislada.
+1. Crear/autorizar/desactivar nombres; gestionar dispositivos pendientes, activos, bloqueados y revocados.
+2. Administración de calendario, destinatarios, shows, horarios y edición flexible.
+3. Administración del repertorio general y repertorios por evento; sincronizar en vivo con las tarjetas de músico.
+4. Crear notificaciones, gestionar Chat, contenidos y preferencias permitidas.
+5. Consultar actividad, errores, diagnósticos, sincronización y cuotas sin revelar tokens.
+6. Registro auditable de cambios sensibles y revocaciones.
 
-## 2026-10-26 — Registro por nombre y acceso recordado (decisión del propietario)
-**Requisito literal:** cada músico escribe su nombre UNA vez, insensible a mayúsculas/minúsculas, y las siguientes aperturas en ese dispositivo saltan directamente al chat. No pedir clave temporal ni una contraseña adicional. Administración definitiva de altas/bajas se construirá después; no incorporar todavía módulos de administrador en V2. Referencia leída SIN MODIFICAR: production `main/musician-device-access-v1.js` (`login_by_username`, validación RPC del dispositivo) y `main/session-memory-v2.js` (restaurar último músico solo tras validación servidor).
+**Prioridad de seguridad antes de invitar a todo el equipo:** aprobación de dispositivo, revocación de tokens y sockets, listado de dispositivos y permisos por rol. Los nombres sencillos continúan siendo la UX oficial, pero no se consideran por sí solos prueba fuerte de identidad.
 
-**Datos V2 habilitados:** migración exclusiva `v2/cloudflare/migrations/0007_named_musician_access.sql`: `chat_members` (username normalizado, actor_id estable, display_name, active). Aplicada/verificada en **D1 V2**. Lista inicial expresa: Orly, Andy, Jali, Rafa, Noa y Fer, todos `active=1`. No usar personas de producción ni otra base de datos. No exponer una lista pública de usuarios al cliente.
+# 12. CACHÉ, OFFLINE Y SINCRONIZACIÓN LOCAL
 
-**Acceso técnico nuevo:** `POST /api/chat/session` comprueba `chat_members.active=1` usando username normalizado; no admite nombres ajenos. `GET /api/chat/session` verifica la credencial local contra la tabla de miembros activa, devuelve sesión actual y detecta revocaciones. El servidor crea token impredecible de 256 bits, conserva solo el hash SHA-256 en `chat_sessions` y entrega `actorId` estable por nombre (permite editar entre plataformas). Las sesiones generadas con la clave antigua quedan sin autorización por no pertenecer a `chat_members`. Para no exigir reingreso periódico en este sistema doméstico, caducidad técnica larga (2100), **pero NO es una contraseña real ni factor fuerte**: cualquiera que conozca un nombre autorizado podría registrarse desde otro dispositivo. Está pendiente un control de aprobación de primer dispositivo vinculado al administrador antes de permitir despliegue general al personal. La revocación de nombre mediante `chat_members.active=0` invalida tokens existentes en HTTP y WebSocket al iniciar acción; la UI revalida al reabrir/volver al frente. Las sesiones ya abiertas y totalmente inactivas pueden tardar hasta su próximo evento/refresco en cerrar: mejorar en el módulo Admin con notificación inmediata de DO.
-  
-**Android y PWA:** formularios de primer acceso reducidos a nombre, sin campo de contraseña temporal. Token guardado en la persistencia local ya existente; al abrir, se valida por HTTPS y se entra directamente si permanece autorizado. Sin red, se conserva caché/sesión para recuperarse después, sin borrar credenciales por errores de conexión. Si se revoca, se limpia el acceso guardado y se solicita autorización. **No desinstalar APK para aplicar actualización**; observar compatibilidad de firma y datos. La PWA usa IndexedDB; Android continúa usando almacenamiento local de V2, pendiente de migrar token de SQLite a almacén cifrado.
-  
-**Evidencia verificada:** migración D1 con las seis filas autorizadas y 18 mensajes históricos intactos; Worker V2 desplegado `f2b4b25b8b41482193b68286d8a82f85` (100 %), bindings `CHAT_ROOMS`, `DB`, `HAVANA_ENV` preservados. GitHub CI `40281936272` SUCCESS: typecheck, PWA build, bundle Android, autorización inicial con `oRlY` → `Orly`, REST recuperación 200, historia 200, cierre de token y rechazo 401 al reutilizarlo, usuario desconocido bloqueado con 403. Android standalone build `40281423889` SUCCESS para `8a4b77e3b209be428f9ac28e4d6f1c2973c74c33`; distribución `40282353132` SUCCESS: nueva APK `HAVANA-NICE-V2-ACCESO-POR-NOMBRE-20261026.apk`, tamaño 75,196,063 B, SHA-256 `dd6c6320d1521e61731efe6a746a3c1ed91c6e4912588ef5333ba94e5a695ce4`, rama binaria commit `a6cc009835d96f98a6532f74ce2c68a8e59b96d0`, enlace externo HTTPS verificado HTTP 200. [Descarga directa alternativa](https://raw.githubusercontent.com/Abnernoa97/havana-nice-pwa/havana-nice-v2-apk-downloads/HAVANA-NICE-V2-ACCESO-POR-NOMBRE-20261026.apk). **Pendiente:** prueba física primera entrada y reapertura PWA/Android, actualizar sobre APK previa sin perder datos, desconexión, revocación de nombre en tiempo real, sincronización bidireccional. No declarar cerrada hasta validación física. No marcar cerrado sin pruebas físicas. El control de altas/bajas desde interfaz Administrador permanece **futuro** y NO está disponible todavía en V2. Coste cero; production `main`, HAVANA CLOUD y Supabase de HAVANA NICE actual estrictamente intactos.
+- **PWA (ambos teléfonos):** Service Worker cachea exclusivamente shell y assets públicos del mismo origen; no guarda respuestas autenticadas ni APIs. IndexedDB para datos locales permitidos, borradores, cola y estado web. No borrar caché útil por actualización estética.
+- **Android nativo:** almacenamiento seguro de credenciales y datos/archivos cuando corresponda; bridge coordinado con el estado web; no mantener dos motores activos publicando duplicados.
+- **Actualización PWA:** network-first para recursos cuando haya red, versión estable anterior como fallback, cache versionada, migraciones IndexedDB compatibles. No aplicar cambio que borre cola o reemplace pantalla mientras el músico escribe.
+- **Chat offline:** mismo ID de mensaje durante reintentos, FIFO, confirmación de backend, reconciliación, prioridad a no perder contenido, límites de cola y errores visibles.
+- **Conectividad:** sin internet se visualiza lo que se tiene; recuperación automática al volver la red; toda operación bloqueada por permisos se explica y nunca se reintenta indefinidamente.
+- **Desinstalación:** sí destruye la caché y pendientes locales, incluso si los mensajes confirmados persisten en D1. **Evitar desinstalación** como método de actualización.
 
-## AUDITORÍAS PREVENTIVAS — 2026-10-26 / Auditoría técnica #1
+# 13. SEGURIDAD Y PRIVACIDAD
 
-**Objetivo:** detectar deuda técnica temprano y eliminar exclusivamente lo que esté demostrado como obsoleto; no borrar producción, backups, datos de chat, links APK publicados, cuentas ni secretos. Realizar revisión periódica del código + plataformas + Cloudflare + D1 + coste + QA Android/iPhone.
+- Validación de permisos y propiedad de mensajes siempre en el Worker; SQL parametrizado.
+- Credenciales impredecibles y revocables; identidad de músico validada contra allowlist y dispositivo aprobado.
+- Un WebView remoto tiene superficie de riesgo: puente JS↔nativo con lista de operaciones y origen verificado, sin JavaScript arbitrario con privilegios.
+- No guardar secretos de nube, OAuth, tokens administrativos o Cloudflare en assets, logs de CI, repositorio ni páginas.
+- Exponer en iPhone y Android solamente los datos autorizados por rol.
+- No permitir que cambiar un texto HTML desbloquee funciones nativas o permisos de servidor.
+- Cifrado/almacenamiento protegido para sesiones Android; seguridad web equivalente razonable en PWA.
+- No activar enlaces de multimedia públicos por conveniencia.
+- Medir y limitar solicitudes de login, dispositivos y media; registrar acciones sensibles sin contenido privado innecesario.
+- Separar infraestructura V2 de producción en todo momento.
 
-### Inventario comprobado antes de depurar
-- Rama `havana-nice-v2-foundation`: 45 archivos dentro de `v2/` en el primer corte, ~0.83 MB de contenido fuente (incluye ~297 KB lockfile, ~278 KB icono 512 y ~82 KB Plan Maestro). **Código razonablemente pequeño; no hay una copia completa de producción dentro de V2**.
-- Repo compartido con la PWA actual: 41 ramas totales, pero solo dos dedicadas explícitamente a V2 (`havana-nice-v2-foundation` y `havana-nice-v2-apk-downloads`). Las demás pertenecen principalmente a checkpoints/experimentos de la aplicación existente; **NO eliminarlas desde el alcance V2**.
-- Tres workflows de V2: foundation check, Android APK, distribuidor directo; sin PR abiertos al momento de auditoría. Último CI anterior a auditoría `40282550494` SUCCESS. La PWA dev estaba desplegada en Pages exitosamente; Worker V2 conservaba bindings `DB`, `CHAT_ROOMS` y `HAVANA_ENV`.
-- Rama de binarios V2: **nueve APK, ~617 MiB activos en la punta**, cada uno ocupa ~65–72 MiB. No borrarlos todavía: varios son enlaces previamente compartidos y posibles respaldos. La historia Git retiene blobs incluso cuando se borren del árbol actual. Reducir futuras copias y evaluar una distribución de APK sin crecimiento indefinido antes de liberar al equipo.
-- D1 aislada: **20 mensajes, 6 miembros autorizados, 20 sesiones (18 caducadas), 5 recibos de lectura, 4 reacciones**. Las tablas multimedia existen por migraciones históricas pero CHAT 6 permanece **inactivo**; R2 no está enlazado al Worker.
+# 14. COSTO Y LÍMITES
 
-### Depuración efectiva y conservadora
-1. **PWA caché:** corregido `v2/apps/pwa/public/sw.js`: ya no intercepta ni almacena respuestas de API/Worker, tokens, peticiones con Authorization ni tráfico cross-origin. Solo cachea shell y activos públicos del origen V2. La activación retira la vieja caché `havana-nice-v2-foundation-v1`. Cinco pruebas reales de Service Worker añadidas a `v2/apps/pwa/tests/sw.test.mjs` y exigidas por CI.
-2. **D1:** retiradas exactamente las 18 filas de `chat_sessions` cuyo `expires_at` había vencido; se conservaron dos sesiones vigentes y los 20 mensajes. No borrados los registros de historial, miembros, lecturas o reacciones.
-3. **D1 índices:** eliminada la estructura redundante `chat_messages_created_seq`, porque `chat_messages.seq` ya es `INTEGER PRIMARY KEY AUTOINCREMENT` y SQLite indexa el rowid internamente. Migración reproducible `0008_audit_redundant_index.sql`. Consulta verificó índice ausente y 20 mensajes conservados.
-4. **GitHub Actions:** reducida la retención de los próximos APK temporales de 30 a **1 día**. Evitada compilación Android por cambios exclusivos en distribuidor y scripts generales del monorepo; distribución ahora exige compilación exitosa de **la misma revisión Git**, con nombre APK identificable por hash y checksum relativo, evitando publicar APK fija anterior. No cambiar nombre ni eliminar las nueve APK previamente entregadas.
-5. **Documentación:** `v2/README.md` corregido: FASE 0 cerrada; CHAT 6 multimedia y push todavía no están listos; **R2 no es destino autorizado**. `v2/scripts/audit-guard.mjs`, llamado por `npm run audit:guard` y CI, impide reintroducir clave de laboratorio, caché API, R2, artefactos de 30 días y distribuidor anclado a corrida vieja.
-6. **CI no innecesario:** limitar `v2-foundation-check.yml` a cambios reales de apps, backend, shared, scripts, tests y paquetes, no dispararlo por edición de documentación exclusivamente. Cloudflare Pages puede seguir haciendo builds por cada push del branch; optimizar su filtro solo después de validar el cambio específico del proyecto DEV sin tocar el proyecto oficial `havana-nice-pwa`.
+**0 MXN adicionales, sin excepción automática.** Antes de activar integraciones, verificar costos reales y límites actuales: Cloudflare Worker/CPU, D1 lecturas/escrituras/bytes, Durable Objects/WebSockets, Pages/Builds, notificaciones, Google Drive/cuotas y herramientas de CI.
 
-### Auditoría de conservación / riesgo
-- **CONSERVAR:** Worker/API, Durable Object, D1, migraciones históricas, `chat_messages`, `chat_members`, contratos shared, cola offline, IndexedDB/SQLite, la PWA y APK nativas, pruebas de medios cerrados y controles de acceso actuales.
-- **CONGELAR hasta módulo CHAT 6:** `cloudflare/src/drive-media.js` (adaptador OAuth aislado experimental) y `havana-cloud-bridge-client.js` (borrador de puente, todavía sin importar/activar). Actualmente hay **dos rutas conceptuales de almacenamiento** de fotos; la decisión vigente es puente privado, cero coste, sin reutilizar credenciales por el navegador. No activar el código OAuth alternativo ni eliminar migraciones antes de sustituirlo correctamente.
-- **ALTO RIESGO ANTES DE DAR ACCESO MASIVO:** registro solo por nombre permite suplantación desde otro teléfono si alguien conoce un nombre activo. Falta aprobación real de dispositivo desde Admin V2, controles de sesión por dispositivo, cierre proactivo de sockets revocados y mitigación de intentos. En Android la credencial todavía se guarda mediante SQLite KV; evaluar `SecureStore` cifrado. En iPhone PWA guardado IndexedDB: minimizar exposición y endurecer CSP/seguridad de sesión. La caducidad técnica de token hasta 2100 **no es una estrategia de seguridad madura**, aunque evita pedir login al usuario; se sustituirá por credencial de dispositivo revocable y rotación transparente, sin reingresos.
-- **CALIDAD:** `cloudflare/src/index.ts` conserva `// @ts-nocheck`, por lo que el typecheck no detecta errores internos del Worker. `App.tsx` Android y PWA concentran UI y lógica de estado WebSocket: refactorizar por módulos solo tras pruebas funcionales. `v2/tests/cross-platform/` es todavía un checklist, no una suite E2E en teléfonos. Falta suite para respuesta gestual, borrado/reacciones, reconexión, simultaneidad y reinicio.
-- **NO LISTO:** push Android/iPhone, fotos, videos, audio, Admin V2, dispositivo aprobado, otras secciones de calendario/repertorio/familia. Nunca afirmar que ya existen porque haya documentos o migraciones.
-- **PROTECCIONES INNEGOCIABLES:** no editar rama `main`, `havana-nice-pwa.pages.dev` oficial, Supabase actual, `havana-nice-cloud`, otros Workers, datos de artistas, tokens ni facturación. No borrar ramas o APK antiguas sin saber quién las usa.
+- Sin R2 ni checkout habilitado para V2.
+- Sin Workers Paid ni facturación variable.
+- Sin cuentas Apple Developer de pago para esta etapa; iPhone usa PWA.
+- Sin prometer fotografías/video sin límite ni disponibilidad garantizada sobre tiers gratis.
+- Si se alcanza el máximo de cuota, mostrar error claro, suspender subidas nuevas y preservar los datos existentes.
+- Cero gasto nuevo prevalece sobre características aspiracionales o rendimiento marginal.
+- Optimizar compilaciones y duración de artefactos GitHub Actions; no generar APK por cada edición CSS.
 
-### Próximas auditorías
-- **Revisión rápida semanal:** CI, builds, fecha último éxito, errores, SHA del APK vigente, sesión/mensajería D1 con conteos, cuota/coste, seguridad, cambios desde auditoría anterior.
-- **Revisión profunda cada cuatro semanas o antes de un módulo nuevo:** imports y archivos realmente sin uso, dependencias, flujos duplicados, índices/consultas, llamadas API, PWA offline, tamaño de APK, tests E2E, plan vs realidad, compatibilidad de actualización.
-- Cada cambio se etiqueta **CONSERVAR / CORREGIR / RETIRAR PROBADO / PENDIENTE**, con evidencia y rollback. Siempre cerrar CI y pruebas físicas antes de dar por terminada una capacidad.
+# 15. CALIDAD, RENDIMIENTO Y PRUEBAS
 
-## En curso
-ACCESO POR NOMBRE V2 IMPLEMENTADO, D1 y backend desplegados, CI, PWA y APK Android nueva verificadas. Primera entrada por nombre y posterior apertura directa automáticas, pendientes de confirmación física en ambos dispositivos. Administrador de nombres y aprobación de nuevos dispositivos sigue PENDIENTE; no confundir nombre sencillo con contraseña segura. La prioridad CHAT 1 continúa abierta por QA física.
-FASE 0 cerrada; CHAT 1 aprobado y CHAT 2–5 con validación de envío y edición física entre dispositivos. Corregida en Worker V2 la eliminación con tombstone, comprobada por D1. UX de gestos tipo mensajería ya implementada y publicada en Android APK/PWA (CI+Gradle+HTTP 200 aprobados), pendiente validación física de swipe, long press y eliminar en ambos dispositivos. Deben probarse swipe/long-press y eliminar para todos físicamente. Incluye historial paginado, búsqueda, edición/eliminación propia, receipts de lectura y cola local, además de funciones anteriores. Backend V2/D1/DO desplegado. APK y enlace directo verificados HTTP 200 y SHA-256. CHAT 6 fotos y push continúan DESACTIVADOS; HAVANA CLOUD sin cambios. Producción y ramas main intactos.
+Las medidas deben basarse en teléfonos reales. El usuario valora apertura rápida, escritura fluida y disponibilidad sin interrupciones.
 
-## Siguiente paso exacto
-1. Marcar paquete CHAT 2/3/4/5 como validado visualmente en los dos clientes; NO cerrar pruebas de mensajes offline, respuestas funcionales, typing y sesiones caducadas sin evidencia.
-2. **NO activar R2 ni completar ningún checkout/suscripción de Cloudflare.** El nivel gratuito de R2 admite facturación de excedentes y no cumple la política 0 MXN estricta.
-3. NO crear OAuth duplicado. Terminar bridge privado y limitado en rama de laboratorio HAVANA CLOUD que reusa sus cuentas ya autorizadas. Excluir fotos V2 del catálogo normal, verificar cuotas Free, y enlazar `havana-nice-v2-dev` por Service Binding autenticado sin pasar cookies ni secretos Google.
-4. Mantener el repositorio `Abnernoa97/havana-nice-cloud`, su producción, catálogos, tokens, archivos originales y backups **solo lectura** durante esta integración.
-5. Validar fotos en ambos sentidos, varios archivos, red lenta, compresión, vista previa, reconexión y acceso privado antes de declarar CHAT 6 terminado.
-6. Entregar próximas APK siempre con enlace Markdown exacto **[Descarga directa alternativa]** verificado HTTP 200, manteniendo `main` y producción intactos.
+**Indicadores a observar:** tiempo desde tocar icono hasta primera interfaz utilizable, tiempo hasta primer mensaje de caché, FPS/fluidez de scroll y gesto, latencia de escritura/teclado, latencia de ACK y recepción cruzada, recuperación tras cambio de red, uso de memoria, comportamiento con 100+ mensajes y consumo de datos.
 
-R2 NO se activa para V2; CHAT 6 se implementará solo si cabe en recursos gratuitos y límites estrictos.
+Pruebas obligatorias por funcionalidad:
 
-## Primer módulo después de FASE 0
-CHAT 1 — TEXTO BÁSICO aprobado para continuidad. CHAT 2 — ESTADOS Y RECONEXIÓN EN CURSO.
+- Android WebView PWA y iPhone PWA ven la misma versión visual.
+- Android→iPhone e iPhone→Android; mensajes simultáneos y ausencia de duplicados.
+- Cierre/reapertura, pantalla bloqueada, Wi-Fi↔datos, conexión lenta, modo avión, proceso Android reiniciado.
+- Borradores y cola preservados en cambios de pantalla y actualización PWA.
+- Long-press y swipe realmente funcionan en ambas plataformas; overlay contextual junto a la burbuja.
+- Teclado Android e iPhone sin saltos ni tapar el composer; botón Atrás correcto.
+- Reacciones/edición/borrado presentes tras sincronización y resync.
+- Revocación de un usuario desde servidor impide leer y escribir, incluso si conserva la app.
+- Push con app abierta, cerrada y bloqueada únicamente cuando su módulo exista.
+- Media segura sin fuga a catálogo HAVANA CLOUD únicamente cuando se habilite.
+- Actualización APK sobre una instalación existente preserva datos **con misma firma**; no forzar reinstalación.
 
----
+Checks automáticos actuales: `v2-foundation-check.yml`, `audit:guard`, pruebas de media cerrado y protección de Service Worker, build PWA, export Android, tests de sesión/Worker y health. Complementarlos con pruebas WebView de puente, pruebas E2E del Chat y checks de versionado. **CI verde no equivale a prueba física completa.**
 
-# 22. DECISIONES DEFINITIVAS
+# 16. MIGRACIÓN ORDENADA A ANDROID HÍBRIDO
 
-- Android: nativo.
-- iPhone: PWA premium mientras costo objetivo sea 0 MXN.
-- Backend V2: Cloudflare.
-- API: Worker.
-- Datos: D1.
-- Realtime Chat: Durable Objects + WebSockets.
-- Fotos: capacidad gratuita de Google Drive ya autorizada por HAVANA CLOUD; V2 accede únicamente mediante un puente privado Worker-a-Worker, con permisos y carpeta de Chat aislados, jamás usando OAuth propio duplicado ni copiando tokens. Bridge experimental todavía inactivo; SIN R2, checkout, costos o alteración de la nube actual.
-- Videos y audios: buscar alternativa estrictamente 0 MXN, o no desplegar el módulo si implica posible facturación.
-- Android push: FCM.
-- iPhone push: Web Push.
-- Auth/permisos: sistema propio pequeño, server-side.
-- GitHub: fuente de verdad del código.
-- Un solo plan maestro.
-- Desarrollo vertical Android + PWA.
-- Producción actual: intocable.
-- FAMILIA NOA: independiente.
-- No depender de infraestructura de las apps actuales.
-- Cloudflare oficial conectado a ChatGPT es la vía principal de administración de infraestructura.
-- GitHub Actions queda como automatización reproducible de builds/deploys.
-- El usuario no realiza trabajo técnico manual: pide el resultado y ChatGPT ejecuta el ciclo completo.
-- Solo se pide intervención humana cuando una plataforma la exige obligatoriamente y no existe vía API/herramienta conectada.
-- Siempre preferir entregar un resultado listo antes que instrucciones para que el usuario lo construya.
+**El estado actual aún renderiza Chat con React Native en Android; esto es provisional.** No marcar la arquitectura final como desplegada hasta efectuar los pasos siguientes.
+
+### Etapa H1 — Línea base y protección de datos
+
+1. Identificar APK V2 instalada, `com.havananice.v2`, versión, firma y almacenamiento existente.
+2. Registrar estado y formato de `expo-sqlite/kv-store` para sesión, borrador y cola; localizar datos que NO pueden perderse.
+3. Guardar evidencia de rendimiento/gestos actuales como referencia.
+4. Mantener APK existente operativa y rama `main` intacta. Nunca pedir desinstalación por migrar tecnología visual.
+
+### Etapa H2 — Contenedor híbrido mínimo
+
+1. Incorporar WebView al proyecto Expo/React Native **manteniendo package ID y firma**; crear shell y fallback local para arranque sin red.
+2. Mostrar la PWA V2 de Pages dentro del contenedor, con navegación y back correctos.
+3. Definir handshake/versión de bridge, lista de origen permitido, permisos y fallback web.
+4. Comprobar acceso por nombre, carga, reconexión, scroll, teclado, caché y retorno en Android, sin tocar producción.
+5. No habilitar todavía cámaras, FCM o bridge de archivos si no se necesita para cerrar la prueba.
+
+### Etapa H3 — Sesión y caché sin pérdida
+
+1. Migrar de forma segura el token de SQLite actual al nuevo modelo de credencial protegida/dispositivo autorizado; evitar que la PWA se registre como otra persona por perder sesión.
+2. Migrar o reconciliar borrador/cola pendientes, conservando los IDs y evitando envíos duplicados.
+3. Hacer que una única capa sea propietaria del socket del Chat; no ejecutar simultáneamente el viejo Chat RN y el nuevo Chat PWA.
+4. Probar actualización sobre app instalada, apagado total del proceso, retorno, pérdida de conexión y permiso revocado.
+5. Confirmar con el usuario funcionamiento idéntico en Android e iPhone antes de retirar el código visual nativo antiguo.
+
+### Etapa H4 — Chat PWA como única interfaz
+
+1. Afinar gestos de Chat PWA sobre WebView e iPhone: swipe reply, long press, emojis, editar/borrar y viewer.
+2. Igualar apariencia, teclado, accesibilidad, safe areas y rendimiento con pruebas físicas.
+3. Eliminar **solo después de confirmar equivalencia** `App.tsx`/componentes RN de renderizado de mensajes que queden obsoletos; conservar shell, módulos Android y migrador de datos si aún se necesitan.
+4. Mantener la versión anterior recuperable durante el periodo de comprobación.
+5. Reorganizar módulos visuales en la PWA y profundizar en Admin, Calendario y Repertorio sin duplicación.
+
+### Etapa H5 — Núcleo Android especializado
+
+Añadir progresivamente FCM y servicios nativos de cámara/archivos/seguridad cuando cada módulo los requiera, documentando claramente por qué una función no puede resolverse con las capacidades web existentes. Estas mejoras sí pueden necesitar una APK nueva, en paquetes planificados y no por retoques estéticos.
+
+# 17. PLAN DE IMPLEMENTACIÓN DE MÓDULOS
+
+El orden vigente evita extender una arquitectura temporal:
+
+1. **Fundación V2** — cerrada.
+2. **Chat de texto y sesiones** — conservar estado actual de funcionamiento; pruebas finales de gestos/reconexión/borrado.
+3. **Arquitectura híbrida H1–H4** — siguiente frente prioritario; una UI PWA compartida también en Chat Android, sin sacrificar historial ni datos.
+4. **Seguridad de acceso** — aprobación y revocación de dispositivos/roles, primero API y después pantalla Admin compartida.
+5. **Chat fotografías** — solo al tener puente privado de almacenamiento probado con costo 0.
+6. **Chat videos/audio + viewers** — por capacidades separadas, siempre dentro de cuotas.
+7. **Push Android e iPhone** — una lógica de eventos y dos transportes del sistema.
+8. **Home y ajustes** — PWA compartida.
+9. **Calendario y repertorios generales/por evento** — PWA compartida, sincronización con Admin.
+10. **Notificaciones internas, perfiles/Familia HAVANA NICE, Admin completo** — PWA con permisos por rol.
+11. **Pulido final, auditoría de integridad y pruebas extremo a extremo**.
+12. **Migración gradual desde la app actual solo cuando V2 esté aprobada**, con respaldos y sin cortar el servicio de producción.
+
+No abrir capacidades que compliquen la arquitectura mientras H1–H4 no estén estables. Se puede investigar sin desplegar, pero se integra verticalmente y se valida antes de pasar al siguiente módulo.
+
+# 18. ESTADO REAL VERIFICADO — 26 DE OCTUBRE DE 2026
+
+## 18.1 Código y plataformas
+
+- La rama V2 contiene app Android Expo/React Native que **todavía dibuja Chat nativo de laboratorio** y una PWA React que **dibuja Chat web**. El unificado visual Android WebView está **aprobado como arquitectura, NO implementado**.
+- Android usa almacenamiento `expo-sqlite/kv-store`; PWA usa IndexedDB. Existe cola offline y conservación de borrador por dispositivo. La migración al contenedor debe preservar el acceso ya instalado.
+- El usuario confirmó recientemente que el acceso por nombre quedó funcionando. Son seis nombres iniciales. El módulo visual de autorizaciones de Admin V2 no existe.
+- Chat texto, realtime, reply, reacciones, edición/borrado, búsqueda e historial paginado están programados y se probaron parcialmente con ambos clientes. UI gestual contextual y reconexión cruzada completas requieren pruebas específicas tras la migración.
+- FASE 0 aprobada con arranque autónomo Android; problemas iniciales de Metro y WebSocket fueron corregidos en iteraciones previas. No volver a usar debug APK sin bundle.
+- Fotografías reales, video/audio, push, Home avanzado, calendario, repertorio y Admin V2 no están completos.
+
+## 18.2 Servidor
+
+- Worker `havana-nice-v2-dev`, D1 V2 y Durable Object `ChatRoom` desplegados. El Worker controla autenticación, operaciones de Chat y sincronización; Pages PWA se publica en `havana-nice-v2-dev.pages.dev`.
+- Migraciones D1 `0001`–`0008`; primera auditoría retiró un índice duplicado y 18 sesiones caducadas del laboratorio. En ese corte se conservaron 20 mensajes y seis miembros.
+- Media: código y tablas preparadas pero upload apagado; sin R2 y sin bridge productivo HAVANA CLOUD.
+- Registro de sesión por nombre con validación case-insensitive y revocación de token en backend probado por CI, **aprobación nueva de dispositivo pendiente**.
+
+## 18.3 Última comprobación de compilaciones
+
+- CI de Fundación/auditoría en SHA `7c29a4f900b8dc2955e9fb97d3e5bc74e9066e3a`: GitHub Actions `40284736856` **SUCCESS**.
+- Build Android en ese mismo SHA: `40284736888` **SUCCESS**.
+- Distribuidor de APK en ese mismo SHA: `40284736854` **SUCCESS**.
+- PWA V2 se había desplegado correctamente en Cloudflare Pages. Git HEAD cambia al actualizar este documento; el estado de ejecución futuro debe verificarse nuevamente, no asumirse.
+- Para las instalaciones Android existentes, conservar como versión de referencia confirmada por el usuario la APK de **acceso por nombre**, publicada en la rama binaria V2. Una APK posterior debe tener evidencia de firma, nombre, commit, SHA-256, disponibilidad HTTP 200 y prueba de actualización sin pérdida de datos.
+
+## 18.4 Entrega de APK
+
+Cuando un cambio nativo obligue a producir APK:
+
+- Compilar `assembleRelease` con bundle JavaScript incorporado; verificar `apksigner`, identificador `com.havananice.v2`, versionCode, firma estable y contenido APK.
+- Publicar exclusivamente en `havana-nice-v2-apk-downloads`, nunca en `main`.
+- Entregar enlace externo directo HTTPS verificado, con texto **[Descarga directa alternativa]** y archivo APK real (sin navegación intermedia GitHub ni ZIP temporal).
+- No desinstalar ni borrar datos para probar una nueva versión. Si hay incompatibilidad de firma, diagnosticar antes de recomendar acciones sobre el teléfono.
+- Los cambios solo de PWA se publican por Pages y **no ejecutan un build nativo**.
+
+# 19. AUDITORÍAS PREVENTIVAS Y LIMPIEZA DEL PROYECTO
+
+La deuda técnica se combate desde el desarrollo. Revisión rápida semanal y auditoría profunda cada cuatro semanas o antes de cambiar de arquitectura/módulo principal.
+
+### Auditoría 1 — 26/10/2026
+
+Hallazgos y acciones documentados:
+
+- Fuente V2 inicial: 45 archivos y ~0.83 MB en `v2/`; sin clon completo de producción dentro de esa carpeta. Los archivos añadidos posteriormente son pruebas, scripts de auditoría y migración.
+- Repositorio compartido: muchas ramas históricas pertenecen a la aplicación actual. **No borrarlas** durante una limpieza V2.
+- Rama de descargas: nueve APK iniciales (~617 MiB) antes de nuevas entregas. No borrar enlaces previamente dados; decidir una política de versiones/retención que no invalide respaldos.
+- PWA: Service Worker corregido para **no cachear APIs ni respuestas de usuario**; cinco pruebas de regresión añadidas.
+- D1: **18 sesiones vencidas eliminadas** y **índice extra en `chat_messages.seq` retirado**. Mensajes y miembros preservados.
+- GitHub Actions: retención de artefactos Android reducida a **1 día**; distribuidor de APK validado por commit exacto y firma; nuevas compilaciones solo cuando cambia código que lo requiere. El historial de Git y binarios distribuidos no se borran sin una estrategia segura.
+- README de V2 actualizado para indicar multimedia apagada, R2 descartado y push pendiente.
+- Añadido `v2/scripts/audit-guard.mjs` a CI para evitar reintroducir clave temporal, caché privada, R2 y distribuidor con APK fija.
+- Deuda pendiente: el Worker principal tiene un `// @ts-nocheck`; revisar tipos al refactorizar; modularizar lógica de clientes; añadir E2E WebView y dispositivos físicos; endurecer aprobaciones y credenciales.
+- El prototipo OAuth independiente `drive-media.js` y el cliente del bridge HAVANA CLOUD quedan congelados hasta que una única integración sea segura. No borrar los esquemas sin analizar dependencias.
+
+### Procedimiento permanente
+
+1. Leer este plan y el HEAD de `havana-nice-v2-foundation`.
+2. Identificar cambios desde la auditoría previa, pruebas verdes/rojas, errores y deuda acumulada.
+3. Medir consumo, sesiones caducadas, índices duplicados, rutas/módulos obsoletos, llamadas redundantes, dependencias y tamaño de APK.
+4. Confirmar por referencias/imports/uso real que un archivo o dato sobra antes de eliminarlo.
+5. Mantener un punto de restauración y comprobar compatibilidad con PWA/Android existentes.
+6. Depurar solo en V2, ejecutar regresiones, verificar Worker/Pages/APK y actualizar directamente esta sección.
+7. No eliminar conversaciones, identidades, datos del personal, respaldos o descargas públicas sin autorización y prueba de que ya no se necesitan.
+
+# 20. MODO DE TRABAJO Y LÍMITES DE ACTUACIÓN
+
+**Modelo de entrega llave en mano:** el propietario pide el resultado y ChatGPT realiza, mediante las herramientas conectadas disponibles, diseño, edición del repositorio, tests, Cloudflare V2, diagnósticos y publicaciones permitidas. No enviar al propietario a editar código, SQL, Actions o DNS si puede realizarse directamente.
+
+Solo se requiere intervención humana para instalación física, aprobación de OAuth/permisos personales y comprobaciones reales de dispositivos que las herramientas no puedan ejecutar. Nunca afirmar acciones hechas si no se verificaron.
+
+Cada trabajo:
+
+1. Leer este Plan Maestro único y comprobar estado real en GitHub/Cloudflare.
+2. Elegir una capacidad pequeña y vertical; preservar producción.
+3. Preparar migraciones retrocompatibles si cambian esquemas/almacenamiento.
+4. Implementar una sola solución reutilizable; verificar seguridad y 0 MXN.
+5. Ejecutar pruebas de código, endpoint, PWA y, cuando corresponda, APK/bridge Android.
+6. Actualizar una versión sin perder sesión, cola, historial ni formato de datos.
+7. Obtener confirmación física de Android/iPhone cuando sea indispensable.
+8. Consolidar los resultados **editando este mismo documento**, sin notas contradictorias, “planes alternos”, listas paralelas de decisiones ni anexos duplicados.
+
+## Punto de continuación actual
+
+**El siguiente paso de desarrollo es H1 → H2: preparar un contenedor Android WebView de la PWA de V2 sin perder la sesión, la cola offline ni la firma de la app actual.** Mantener intacta la última APK que funciona hasta contar con una alternativa validada. Después completar H3 → H4 y continuar con la seguridad del módulo Admin.
+
+Esta es la arquitectura única desde la cual se deben interpretar todas las tareas siguientes. Las decisiones anteriores incompatibles —dos interfaces visuales paralelas, Chat con UI nativa permanente en Android, R2, claves temporales de laboratorio y construcción de una APK por cambios estéticos— quedan sustituidas por lo aquí definido. Su registro histórico permanece accesible mediante los commits de Git, pero **no son instrucciones vigentes**.
