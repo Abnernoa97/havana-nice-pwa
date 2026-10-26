@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   fetchBackendHealth, getChatSnapshot, getOlderChatMessages, searchChatMessages, lastReadByOther, messageDeliveryLabel, newClientMessageId,
   openChatSocket, reconcileChatMessages, startNamedChatSession, restoreNamedChatSession,
+  DeviceApprovalRequiredError, requestChatDeviceEnrollment, checkChatDeviceEnrollment, type PendingChatDeviceEnrollment,
   type BackendHealth, type ChatMessage, type ChatServerEvent, type ChatSession,
   reconcileReactions, reconcileUpdatedMessage, type ChatReaction, type ChatEmoji, type ChatReadReceipt,
 } from '@havana/shared';
@@ -18,6 +19,8 @@ export default function App() {
   const [connection, setConnection] = useState('desconectado');
   const [error, setError] = useState('');
   const [joining, setJoining] = useState(false);
+  const [enrollment,setEnrollment]=useState<PendingChatDeviceEnrollment|null>(null);
+  const [checkingEnrollment,setCheckingEnrollment]=useState(false);
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [reactions, setReactions] = useState<ChatReaction[]>([]);
   const [onlineUsers, setOnlineUsers] = useState(0);
@@ -443,31 +446,46 @@ export default function App() {
     bottom.current?.scrollIntoView({ block: 'end', behavior: 'smooth' });
   }, [messages.length]);
 
-  async function join() {
-    if (!name.trim() || joining) return;
-    setJoining(true);
-    setError('');
-    try {
-      const next = await startNamedChatSession(name.trim());
-      editingSnapshot.current=null;
-      beforeEdit.current=null;
-      setEditing(null);
-      setMessages([]);
-      setReceipts([]);
-      setSearchResults(null);
-      setHasMore(false);
-      outbox.current.clear();
-      setSession(next);
-      activeSession.current = next;
-      persist();
-      retryCount.current = 0;
-      reconnect(next);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'No se pudo entrar');
-    } finally {
-      setJoining(false);
-    }
+  function acceptApprovedSession(next:ChatSession){
+    editingSnapshot.current=null;
+    beforeEdit.current=null;
+    setEditing(null);
+    setMessages([]);
+    setReceipts([]);
+    setSearchResults(null);
+    setHasMore(false);
+    outbox.current.clear();
+    setEnrollment(null);
+    setSession(next);
+    activeSession.current=next;
+    persist();
+    retryCount.current=0;
+    reconnect(next);
   }
+  async function join(){
+    if(!name.trim()||joining)return;
+    setJoining(true);setError('');
+    try{
+      const next=await startNamedChatSession(name.trim());
+      acceptApprovedSession(next);
+    }catch(reason){
+      if(reason instanceof DeviceApprovalRequiredError){
+        try{setEnrollment(await requestChatDeviceEnrollment(name.trim(),'iPhone · HAVANA NICE V2'));}
+        catch(e){setError(e instanceof Error?e.message:'No se pudo solicitar acceso');}
+      } else setError(reason instanceof Error?reason.message:'No se pudo entrar');
+    }finally{setJoining(false);}
+  }
+  async function checkEnrollment(){
+    if(!enrollment||checkingEnrollment)return;
+    setCheckingEnrollment(true);setError('');
+    try{
+      const checked=await checkChatDeviceEnrollment(enrollment);
+      if('token' in checked)acceptApprovedSession(checked);
+      else setError('La solicitud todavía está pendiente de aprobación.');
+    }catch(e){setError(e instanceof Error?e.message:'No se pudo revisar la autorización');}
+    finally{setCheckingEnrollment(false);}
+  }
+
   function send() {
     const text = draft.trim();
     if(editing){
@@ -577,6 +595,15 @@ export default function App() {
       {restoringAccess ? <section className="join-panel"><p>Abriendo HAVANA NICE…</p></section> : !session ? (
         <section className="join-panel">
           <span className="overline">ACCESO HAVANA NICE</span>
+          {enrollment ? <>
+            <h2>Esperando autorización</h2>
+            <p>El administrador debe aprobar el teléfono de {enrollment.displayName} desde HAVANA NICE V2.</p>
+            <button type="button" onClick={()=>void checkEnrollment()} disabled={checkingEnrollment}>
+              {checkingEnrollment?'Comprobando…':'Comprobar autorización'}
+            </button>
+            <button type="button" onClick={()=>{setEnrollment(null);setError('');}}>Cancelar solicitud</button>
+            {error&&<p className="chat-error" role="alert">{error}</p>}
+          </> : <>
           <h2>Bienvenido.</h2>
           <p>Escribe tu nombre autorizado la primera vez. Después entrarás directamente desde este dispositivo.</p>
           <form onSubmit={event => { event.preventDefault(); void join(); }}>
@@ -586,6 +613,7 @@ export default function App() {
           </form>
           {error && <p className="chat-error" role="alert">{error}</p>}
           <small>Solo pueden entrar los integrantes autorizados por Administrador.</small>
+          </>}
         </section>
       ) : (
         <>

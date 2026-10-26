@@ -302,7 +302,7 @@ export default {
       return handleDeviceApprovalApi(request,env,url,origin,respond,normalizeMusicianName,ROOM);
     }
     if (url.pathname === '/api/chat/session' && request.method === 'POST') {
-      if (deviceGateEnabled(env)) return respond({ error: 'Este dispositivo necesita autorización. Actualiza HAVANA NICE V2 para solicitar acceso.' }, 403, origin);
+      if (deviceGateEnabled(env)) return respond({ code:'device_approval_required', error: 'Este dispositivo necesita autorización. Solicita acceso desde este teléfono.' }, 403, origin);
       let payload;
       try { payload = await request.json(); } catch { return respond({ error: 'Solicitud inválida' }, 400, origin); }
       const username = normalizeMusicianName(payload?.displayName);
