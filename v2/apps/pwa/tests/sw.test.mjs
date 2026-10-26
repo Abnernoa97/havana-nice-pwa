@@ -100,10 +100,23 @@ test('offline navigation falls back only to the static app shell',async()=>{
 
 test('separate visual WebView shell never falls back to Chat HTML while offline',async()=>{
   const sw=serviceWorkerHarness(async()=>{throw Error('offline');});
-  const cache=await sw.caches.open('havana-nice-v2-static-v3');
+  const cache=await sw.caches.open('havana-nice-v2-static-v4');
   await cache.addAll(['/','/visual.html']);
   const result=await sw.dispatch({url:ORIGIN+'/visual.html',mode:'navigate'});
   assert.equal(result.handled,true);
   assert.equal(result.result.ok,true);
   assert.equal(sw.writes.length,0);
+});
+
+test('installed Administrator HTML is never cached or intercepted, including offline',async()=>{
+ const sw=serviceWorkerHarness(async()=>{throw Error('offline');});
+ const res=await sw.dispatch({url:ORIGIN+'/admin.html',mode:'navigate'});
+ assert.equal(res.handled,false);
+ assert.equal(sw.writes.length,0);
+});
+test('Administrator manifest is public static data and cache eligible',async()=>{
+ const sw=serviceWorkerHarness();
+ const res=await sw.dispatch({url:ORIGIN+'/admin.webmanifest'});
+ assert.equal(res.handled,true);
+ assert.equal(sw.writes.length,1);
 });
