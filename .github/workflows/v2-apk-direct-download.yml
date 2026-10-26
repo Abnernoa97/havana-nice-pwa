@@ -70,7 +70,7 @@ jobs:
           cp "/tmp/havana-v2-apk/$APK_NAME" "$APK_NAME"
           cat /tmp/havana-v2-apk/SHA256SUMS.txt >> SHA256SUMS.txt
           git add "$APK_NAME" SHA256SUMS.txt
-          git commit -m "Publish verified V2 musician-name access APK for $EXPECTED_SHA"
+          git commit -m "Publish verified V2 musician-name access APK from 40281423889"
           git -c http.postBuffer=524288000 push origin "HEAD:refs/heads/$DEST_BRANCH"
 
       - name: Verify direct download URL returns HTTP 200
