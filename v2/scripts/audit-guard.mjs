@@ -80,6 +80,9 @@ present(pwa,/className="chat-typing-indicator"/,'PWA typing indicator must appea
 present(pwaStyles,/\.chat-typing-indicator\{/,'PWA styling for the typing indicator');
 absent(android,/typing \|\| `\$\{connection\}/,'Android header must only show connection state');
 absent(pwa,/typing \|\| `\$\{connection\}/,'PWA header must only show connection state');
+// C04: presence counts from a disconnected socket are stale and must be hidden.
+present(android,/connection === 'en vivo' \? ` ·/,'Android must hide online count when disconnected');
+present(pwa,/connection === 'en vivo' \? ` ·/,'PWA must hide online count when disconnected');
 present(android,/Responder/,'Native contextual menu must provide a reply action');
 absent(android,/whatsappPlus|whatsappPlusText/,'Remove inert extra-reaction button on Android');
 present(webBubble,/getBoundingClientRect\(\)/,'PWA Chat must measure held message');

@@ -538,7 +538,7 @@ export default function App() {
         <div className="header-actions">
           <div className="header-status">
             <span className={connection === 'en vivo' ? 'online-dot' : 'offline-dot'} />
-            {session ? `${connection} · ${onlineUsers} en línea` : health?.ok ? 'API conectada' : 'Laboratorio'}
+            {session ? `${connection}${connection === 'en vivo' ? ` · ${onlineUsers} en línea` : ''}` : health?.ok ? 'API conectada' : 'Laboratorio'}
           </div>
           {session&&<button className="search-toggle" type="button" aria-label="Buscar mensajes"
             aria-expanded={searchOpen} onClick={()=>{

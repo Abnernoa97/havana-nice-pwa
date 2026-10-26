@@ -610,7 +610,7 @@ export default function App() {
           </View>
           <View style={styles.headerActions}>
             <Text style={styles.connection}>
-              {session ? `${connection} · ${onlineCount} en línea` : `API ${apiState}`}
+              {session ? `${connection}${connection === 'en vivo' ? ` · ${onlineCount} en línea` : ''}` : `API ${apiState}`}
             </Text>
             {session ? <Pressable accessibilityRole="button" accessibilityLabel="Buscar mensajes"
               accessibilityState={{expanded:searchOpen}}
