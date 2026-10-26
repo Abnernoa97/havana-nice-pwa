@@ -14,7 +14,7 @@ test('admin never bundles secrets or produces fake privileged API calls',()=>{
  }
  assert.match(read('../src/AdminChatAccess.tsx'),/adminDeviceAction/);
  assert.match(read('../src/AdminChatAccess.tsx'),/adminDeviceRequests/);
- assert.match(ui,/disabled>Administrar acceso/);
+ assert.doesNotMatch(ui,/Permisos de músicos protegidos/);
 });
 test('admin HTML uses network-only navigation and does not register worker',()=>{
  assert.match(read('../public/sw.js'),/navigation && path === '\/admin\.html'\) return/);
@@ -64,4 +64,11 @@ test('member information is retrieved only through administrator-verified API',(
  assert.match(adminApi,/adminMembers\(token:string\)/);
  assert.match(memberUi,/Sesiones activas/);
  assert.doesNotMatch(backend,/SELECT\s+\*\s+FROM\s+chat_admin_sessions/);
+});
+
+test('one connected members panel; no contradictory duplicate placeholder',()=>{
+ const ui=read('../src/AdminApp.tsx');
+ const component=read('../src/AdminChatAccess.tsx');
+ assert.doesNotMatch(ui,/Permisos de músicos protegidos|Integrantes del Chat/);
+ assert.match(component,/Músicos de HAVANA NICE V2/);
 });

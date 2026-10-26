@@ -13,9 +13,6 @@ const tabs:{id:Tab;name:string;icon:string;description:string}[]=[
   {id:'members',name:'Músicos',icon:'♫',description:'Integrantes y permisos del Chat'},
   {id:'security',name:'Seguridad',icon:'◇',description:'Sesiones y protección del Chat'},
 ];
-function Empty({title,text}:{title:string;text:string}) {
- return <div className="a-empty"><span aria-hidden="true">◎</span><h3>{title}</h3><p>{text}</p></div>;
-}
 export default function AdminApp(){
  const [tab,setTab]=useState<Tab>('overview');
  const [health,setHealth]=useState<Health>({phase:'checking',data:null,at:null});
@@ -91,10 +88,7 @@ export default function AdminApp(){
      </section>
     </>}
     <AdminChatAccess section={tab}/>
-    {tab==='members'&&<section className="a-panel"><h2>Integrantes del Chat</h2>
-     <Empty title="Permisos de músicos protegidos" text="La lista real solo estará disponible con una sesión administrativa autorizada por Cloudflare."/>
-     <div className="a-actions"><button type="button" disabled>Administrar acceso</button></div>
-    </section>}
+
     {tab==='security'&&<section className="a-panel"><h2>Seguridad de acceso</h2><div className="a-security">{[
       ['Identidad independiente','El nombre de un músico nunca concede privilegios administrativos.'],
       ['Dispositivos nuevos','Necesitan aprobación explícita antes de obtener acceso al Chat.'],
