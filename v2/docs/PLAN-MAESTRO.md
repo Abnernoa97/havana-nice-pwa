@@ -11,6 +11,66 @@
 
 ---
 
+# 0. TABLERO DE AVANCE — CHECKLIST VIVA
+
+**Actualizado:** 26 de octubre de 2026. **Avance certificado: 4 de 27 hitos**; los otros 23 requieren implementación y/o validación. Este conteo representa hitos cerrados, **no porcentaje de funciones o tiempo restante**. La prioridad de trabajo actual está en **C01–C05: terminar y probar el Chat Android nativo ↔ Chat iPhone PWA**.
+
+**Cómo se usa:** `[x]` y texto tachado = terminado y confirmado; `[ ]` = todavía abierto. `EN REVISIÓN` significa que existe código o alguna prueba pero **no** está cerrado físicamente. Cuando el propietario confirme «ya quedó» y exista evidencia aplicable (CI, pruebas reales y control de regresión), cambiar **solo** la tarea correspondiente a `[x] ~~...~~` en este tablero, actualizar su evidencia y continuar. No marcar toda una fase por aprobar una captura aislada. Este tablero es la **lista única de progreso** y las secciones siguientes explican sus requisitos, sin crear planes paralelos.
+
+## A. Base ya confirmada — 4/4
+
+- [x] ~~**B01 · Fundación V2 aislada** — Android, iPhone PWA, Worker, D1 y WebSocket; se corrigió arranque Android sin Metro.~~ Confirmación del propietario el 24/10 y CI posteriores.
+- [x] ~~**B02 · Chat básico de texto** — envío/recepción Android ↔ PWA, mensajes en vivo, teclado Android usable.~~ Confirmación física inicial el 25/10. No implica cierre del Chat avanzado.
+- [x] ~~**B03 · Entrada por nombre persistente** — Orly, Andy, Jali, Rafa, Noa y Fer, sin distinguir mayúsculas; reapertura sin clave temporal.~~ Usuario confirmó «Ya quedó» el 26/10. **La aprobación segura de nuevos dispositivos sigue pendiente en S01.**
+- [x] ~~**B04 · Auditoría preventiva #1** — corrección de caché PWA, limpieza de 18 sesiones vencidas, índice redundante D1 y controles de CI.~~ Ver sección 19. Auditorías futuras seguirán periódicamente.
+
+## B. PRIORIDAD ACTUAL — Chat completo y estable — 0/5
+
+- [ ] **C01 · Menú de interacción estilo WhatsApp.** **EN REVISIÓN:** pulsación prolongada, emojis junto a burbuja, acciones Editar/Borrar, menú bien posicionado; quitar o resolver el botón `+` que solo cierra el menú. Probar Android nativo e iPhone PWA.
+- [ ] **C02 · Borrar y editar mensajes.** **EN REVISIÓN:** tombstone y permisos de servidor implementados; comprobar borrado propio, plazos, sincronización instantánea, replies a borrados y ausencia de acciones indebidas en ambos dispositivos.
+- [ ] **C03 · Deslizar para responder.** **EN REVISIÓN:** gesto derecho implementado en los dos clientes; probar respuesta, preview, teclado, conflicto con scroll vertical y llegada al otro dispositivo.
+- [ ] **C04 · Reconexión y offline.** **EN REVISIÓN:** reconexión y colas implementadas; probar pantalla bloqueada, salir/regresar, cierre forzoso, modo avión, alternar Wi-Fi/datos, guardar borrador, FIFO sin duplicados.
+- [ ] **C05 · Sincronización bidireccional completa.** **EN REVISIÓN:** confirmar presencialmente Android nativo ↔ iPhone PWA con envío simultáneo, reacciones, edición, borrado, orden, recibos y sesiones restauradas.
+
+**Puerta para tachar C01–C05:** CI y backend válidos cuando aplique **más prueba física específica**. No cerrar por existir código o APK publicada. Agrupar cambios de Chat Android y entregar una sola APK verificada, sin desinstalar la anterior.
+
+## C. Android nativo + interfaz PWA para lo demás — 0/4
+
+- [ ] **H01 · Proteger y congelar línea base del Chat Android 100 % nativo.** Registrar identidad/firma de APK, SQLite, sesión, cola y rendimiento; no perder datos ni duplicar motores.
+- [ ] **H02 · WebView de secciones NO-Chat.** Android abre Home/Calendario/Repertorio/Admin como PWA; al pulsar Chat cambia al **Chat React Native**, sin Chat PWA oculto en Android.
+- [ ] **H03 · Navegación y sesión coordinadas.** Compartir identidad de forma protegida, sin segundo login, botón Atrás por nivel, sin pantallas blancas offline ni sesiones duplicadas.
+- [ ] **H04 · Cambios visuales PWA sin APK.** Confirmar con prueba real que texto/color/estructura de Home/Repertorio/Admin se actualizan en Android WebView e iPhone PWA sin reinstalar.
+
+## D. Seguridad y Administración de accesos — 0/2
+
+- [ ] **S01 · Alta y aprobación de nombres/dispositivos desde Administrador.** El músico ingresa solo su nombre la primera vez, pero un teléfono nuevo necesita autorización segura; permitir dar/quitar acceso.
+- [ ] **S02 · Revocación efectiva y sesiones seguras.** Bloquear token y WebSockets, registrar dispositivos, renovar credenciales sin exigir ingreso frecuente y proteger almacenamiento nativo.
+
+## E. Chat multimedia y avisos del sistema — 0/5
+
+- [ ] **M01 · Fotografías privadas.** Selector, compresión, miniatura, progreso y envío cruzado; puente HAVANA CLOUD→Drive con separación absoluta de galería y costo 0 MXN probado. **Aún apagado.**
+- [ ] **M02 · Video.** Subida controlada, poster/duración, reproducción fluida y vuelta al Chat; cuota gratuita verificada.
+- [ ] **M03 · Audio.** Grabación, envío y reproducción Android nativo ↔ iPhone PWA.
+- [ ] **M04 · Visor multimedia.** Foto/video fullscreen, zoom, gestos, Atrás y conservación de posición del Chat.
+- [ ] **M05 · Push real.** Android FCM nativo e iPhone Web Push, con app cerrada/bloqueada y navegación al Chat correcto.
+
+## F. Pantallas PWA compartidas — 0/5
+
+- [ ] **P01 · Home, navegación y Ajustes visuales.** PWA única dentro de Android WebView y PWA iPhone.
+- [ ] **P02 · Calendario.** Eventos, destinatarios, horario de texto libre, Llegar/Vestuario/Notas/Llamadas/Show y repertorio dentro de tarjeta de evento.
+- [ ] **P03 · Repertorio.** General + por evento, checklist, contador, enlaces, canciones nuevas, selección múltiple y reordenación Admin.
+- [ ] **P04 · Administrador completo.** Dashboard, músicos/dispositivos, calendario, repertorios y notificaciones; permisos en Worker.
+- [ ] **P05 · Avisos, perfiles y módulos de información.** Leído/no leído, enlaces, preferencias e integración sin duplicar pantallas.
+
+## G. Cierre de proyecto — 0/2
+
+- [ ] **Q01 · QA integral / auditoría final.** Seguridad, costo 0, rendimiento, pruebas multiusuario, actualizaciones APK sobre instalada, offline, no duplicados y respaldo; sin regresiones Android/iPhone.
+- [ ] **Q02 · Transición gradual desde HAVANA NICE actual.** Únicamente con aprobación expresa y backups, sin romper producción ni perder datos del equipo.
+
+**Reglas de mantenimiento del tablero:** cada confirmación se tacha aquí con fecha/evidencia, se revisan contadores de hitos, y se conserva §main§/producción y HAVANA CLOUD. No eliminar tareas porque aún no estén implementadas; se tachan al cerrarlas o se sustituyen solo por una decisión explícita. Prioridad inmediata: **C01 → C02 → C03 → C04 → C05**, sin migrar el Chat Android a WebView.
+
+---
+
 # 1. PROPÓSITO Y EXPERIENCIA FINAL
 
 HAVANA NICE V2 es una aplicación privada de HAVANA NICE para músicos y administrador: Chat, calendario, repertorio de eventos, repertorio general, avisos, perfiles, ajustes y gestión de accesos. Debe sentirse rápida, profesional y sencilla en Android y iPhone, manteniendo estrictamente separados V2 y la aplicación oficial actual.
@@ -255,7 +315,7 @@ Roles:
 10. **CHAT 10 · Push:** FCM Android, Web Push iPhone, rutas profundas, permisos, duplicados y app cerrada/bloqueada. No implementado de extremo a extremo.
 11. **CHAT 11 · Pulido final:** animaciones, agrupación, scroll, grandes historiales, tiempos y accesibilidad. Solo al finalizar estabilidad.
 
-**Puerta de cierre:** la fase no está concluida por compilar o por un simulador. Requiere funcionamiento del Chat PWA dentro del Android híbrido, PWA iPhone y confirmación física cuando aplique.
+**Puerta de cierre:** la fase no está concluida por compilar o por un simulador. Requiere Chat **React Native en Android** y Chat **PWA en iPhone**, sincronizados y confirmados físicamente cuando aplique. La WebView Android se reserva exclusivamente para pantallas no-Chat.
 
 # 8. ARCHIVOS Y MULTIMEDIA — COSTO CERO
 
