@@ -40,6 +40,11 @@ export default function App() {
   const socket = useRef<WebSocket | null>(null);
   const scroll = useRef<React.ElementRef<typeof ScrollView> | null>(null);
   const autoScroll = useRef(true);
+  // Initial load and reopening land at the most recent message, without a long animated scroll.
+  const initialHistoryPending = useRef(true);
+  const initialHistoryLoaded = useRef(false);
+  const initialBottomTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const userHasScrolled = useRef(false);
   const activeSession = useRef<ChatSession | null>(null);
   const appLifecycle = useRef(AppState.currentState);
   const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -68,6 +73,32 @@ export default function App() {
     const hide=Keyboard.addListener('keyboardDidHide',()=>setKeyboardOpen(false));
     return ()=>{show.remove();hide.remove();};
   },[]);
+
+  function scheduleInitialBottom() {
+    if (!initialHistoryPending.current || !initialHistoryLoaded.current || userHasScrolled.current) return;
+    scroll.current?.scrollToEnd({animated:false});
+    if (initialBottomTimer.current) clearTimeout(initialBottomTimer.current);
+    initialBottomTimer.current = setTimeout(() => {
+      initialBottomTimer.current = null;
+      if (initialHistoryPending.current && !userHasScrolled.current) {
+        scroll.current?.scrollToEnd({animated:false});
+        initialHistoryPending.current = false;
+      }
+    }, 220);
+  }
+  function beginFreshChatViewport() {
+    if (initialBottomTimer.current) clearTimeout(initialBottomTimer.current);
+    initialBottomTimer.current=null;
+    initialHistoryPending.current=true;
+    initialHistoryLoaded.current=false;
+    userHasScrolled.current=false;
+    autoScroll.current=true;
+  }
+  function trackUserScroll(event:{nativeEvent:{contentOffset:{y:number};contentSize:{height:number};layoutMeasurement:{height:number}}}) {
+    const {contentOffset,contentSize,layoutMeasurement}=event.nativeEvent;
+    const gap=contentSize.height-contentOffset.y-layoutMeasurement.height;
+    autoScroll.current=gap<90;
+  }
 
   function toggleSearch() {
     setSearchOpen(open=>!open);
@@ -255,11 +286,13 @@ export default function App() {
     void getChatSnapshot(next)
       .then(({ messages:history, reactions:historyReactions, receipts:readHistory,hasMore:more }) => {
         if (!disposed.current && activeSession.current?.actorId === next.actorId) {
+          if(initialHistoryPending.current)initialHistoryLoaded.current=true;
           history.forEach(confirmMessage);
           setReactions(historyReactions);
           setReceipts(readHistory);
           setHasMore(more);
           setMessages(before => reconcileChatMessages(before, history));
+          if(initialHistoryPending.current)requestAnimationFrame(scheduleInitialBottom);
           sendReadReceipt(Math.max(0,...history.map(m=>m.seq)));
           flushOutbox();
         }
@@ -357,7 +390,6 @@ export default function App() {
           if (item.actorId !== next.actorId) {
             setTyping(item.active ? item.senderName + ' está escribiendo…' : '');
             if (typingTimer.current) clearTimeout(typingTimer.current);
-      if (draftTimer.current) clearTimeout(draftTimer.current);
             if (item.active) typingTimer.current = setTimeout(() => setTyping(''), 4300);
           }
         } else if (item.type === 'chat.updated') {
@@ -435,6 +467,7 @@ export default function App() {
         return;
       }
       activeSession.current = approved;
+      beginFreshChatViewport();
       outbox.current = new Map(saved.outbox.map(m => [m.clientMessageId,{...m,pending:true,deliveryStatus:'queued' as const}]));
       setMessages([...outbox.current.values()]);
       setSession(approved);
@@ -451,6 +484,7 @@ export default function App() {
       appLifecycle.current = state;
       const currentSession = activeSession.current;
       if (state === 'active' && currentSession) {
+        beginFreshChatViewport();
         void restoreNamedChatSession(currentSession).then(valid => {
           if (disposed.current || activeSession.current?.token !== currentSession.token) return;
           if (!valid) {revokeCurrentAccess();return;}
@@ -479,6 +513,7 @@ export default function App() {
       socket.current?.close();
       socket.current = null;
       if (typingTimer.current) clearTimeout(typingTimer.current);
+      if (initialBottomTimer.current) clearTimeout(initialBottomTimer.current);
       resetEditTimeout();
     };
   }, []);
@@ -498,6 +533,7 @@ export default function App() {
     setError('');
     try {
       const next = await startNamedChatSession(name.trim());
+      beginFreshChatViewport();
       setMessages([]);
       setReceipts([]);
       setResults(null);
@@ -653,7 +689,24 @@ export default function App() {
             <ScrollView
               ref={scroll} style={styles.messageList} contentContainerStyle={styles.messages}
               keyboardShouldPersistTaps="handled"
-              onContentSizeChange={() => {if(autoScroll.current)scroll.current?.scrollToEnd({animated:true});}}
+              onContentSizeChange={() => {
+                if(initialHistoryPending.current) {
+                  scheduleInitialBottom();
+                } else if(autoScroll.current) {
+                  scroll.current?.scrollToEnd({animated:false});
+                }
+              }}
+              onLayout={() => {if(initialHistoryPending.current)scheduleInitialBottom();}}
+              onScrollBeginDrag={() => {
+                userHasScrolled.current=true;
+                initialHistoryPending.current=false;
+                if(initialBottomTimer.current)clearTimeout(initialBottomTimer.current);
+                initialBottomTimer.current=null;
+              }}
+              onScroll={event=>{if(userHasScrolled.current)trackUserScroll(event);}}
+              onScrollEndDrag={trackUserScroll}
+              onMomentumScrollEnd={trackUserScroll}
+              scrollEventThrottle={16}
             >
               {results===null&&hasMore ? <Pressable style={styles.loadMore} disabled={loadingOlder}
                 onPress={()=>void loadOlder()}><Text style={styles.loadMoreText}>{loadingOlder?'Cargando…':'Cargar mensajes anteriores'}</Text></Pressable>:null}

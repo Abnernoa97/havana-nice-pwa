@@ -83,6 +83,13 @@ absent(pwa,/typing \|\| `\$\{connection\}/,'PWA header must only show connection
 // C04: presence counts from a disconnected socket are stale and must be hidden.
 present(android,/connection === 'en vivo' \? ` ·/,'Android must hide online count when disconnected');
 present(pwa,/connection === 'en vivo' \? ` ·/,'PWA must hide online count when disconnected');
+// Android initial history should land on the latest message and respect manual scrolling.
+present(android,/initialHistoryPending = useRef\(true\)/,'Native chat must track initial bottom placement');
+present(android,/requestAnimationFrame\(scheduleInitialBottom\)/,'Native chat must wait for initial snapshot layout');
+present(android,/scrollToEnd\(\{animated:false\}\)/,'Native chat must avoid animated initial scrolling');
+present(android,/onScrollBeginDrag=/,'Native chat must respect manual scroll');
+absent(android,/onContentSizeChange=\{\(\) => \{if\(autoScroll\.current\)scroll\.current\?\.scrollToEnd\(\{animated:true\}\);\}\}/,
+  'Native chat must not animate every content size change');
 present(android,/Responder/,'Native contextual menu must provide a reply action');
 absent(android,/whatsappPlus|whatsappPlusText/,'Remove inert extra-reaction button on Android');
 present(webBubble,/getBoundingClientRect\(\)/,'PWA Chat must measure held message');
