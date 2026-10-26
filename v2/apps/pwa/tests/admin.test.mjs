@@ -62,7 +62,7 @@ test('member information is retrieved only through administrator-verified API',(
  assert.match(backend,/url\.pathname === '\/api\/chat\/admin\/members'/);
  assert.match(backend,/if \(!await verifyAdminSession\(request,env\)\)/);
  assert.match(adminApi,/adminMembers\(token:string\)/);
- assert.match(memberUi,/Sesiones activas/);
+ assert.match(memberUi,/Credenciales vigentes/);
  assert.doesNotMatch(backend,/SELECT\s+\*\s+FROM\s+chat_admin_sessions/);
 });
 
