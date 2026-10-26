@@ -55,6 +55,11 @@ export default function App() {
   const latestDraft = useRef('');
   const restoredStorage = useRef(false);
   const draftTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // C02: preserve the previous composer draft and wait for the server update.
+  const beforeEdit = useRef<{draft:string;replyTo:ChatMessage|null}|null>(null);
+  const editPending = useRef<{seq:number;text:string}|null>(null);
+  const editTimeout = useRef<ReturnType<typeof setTimeout>|null>(null);
+  const [savingEdit,setSavingEdit] = useState(false);
 
   // Android 16: keep the legacy navigation padding only when the IME is hidden.
   // The keyboard avoidance wrapper is responsible for lifting the composer.
@@ -121,6 +126,29 @@ export default function App() {
     catch(e){setError(e instanceof Error?e.message:'No se pudo buscar');}
     finally{setSearching(false);}
   }
+
+  function resetEditTimeout(){
+    if(editTimeout.current){clearTimeout(editTimeout.current);editTimeout.current=null;}
+  }
+  function finishEditing(){
+    resetEditTimeout();
+    editPending.current=null;
+    setSavingEdit(false);
+    setEditing(null);
+    const previous=beforeEdit.current;
+    beforeEdit.current=null;
+    setDraft(previous?.draft??'');
+    setReplyTo(previous?.replyTo??null);
+    setError('');
+  }
+  function abandonPendingEdit(reason:string){
+    if(!editPending.current)return;
+    editPending.current=null;
+    resetEditTimeout();
+    setSavingEdit(false);
+    setError(reason);
+    // Editing text stays in the composer for an explicit retry or cancel.
+  }
   function replyToMessage(message:ChatMessage) {
     if(message.seq<1 || message.deletedAt)return;
     setMenuMessage(null);
@@ -138,9 +166,19 @@ export default function App() {
     if(Date.now()-Date.parse(message.sentAt)>(deleting?48*60*60*1000:900000)){
       setError(deleting?'El plazo para eliminar terminó':'El plazo de edición de 15 minutos terminó');return;
     }
-    if(!deleting){setReplyTo(null);setEditing(message);setDraft(message.text);return;}
+    if(!deleting){
+      if(!beforeEdit.current)beforeEdit.current={draft,replyTo};
+      setReplyTo(null);setEditing(message);setDraft(message.text);setError('');
+      return;
+    }
     setError('');
-    socket.current?.send(JSON.stringify({type:'chat.delete',seq:message.seq}));
+    const ws=socket.current;
+    if(ws?.readyState!==WebSocket.OPEN){
+      setError('No se pudo borrar: sin conexión. Reintenta cuando vuelva Internet.');
+      return;
+    }
+    try{ws.send(JSON.stringify({type:'chat.delete',seq:message.seq}));}
+    catch{setError('No se pudo borrar. Reintenta cuando vuelva Internet.');}
   }
   function clearAck(id: string) {
     const timer = acknowledgementTimers.current.get(id);
@@ -324,6 +362,12 @@ export default function App() {
           }
         } else if (item.type === 'chat.updated') {
           setMessages(before=>reconcileUpdatedMessage(before,item.message));
+          // Only finish the editor after receiving the server's confirmed update.
+          if(editPending.current?.seq===item.message.seq){
+            if(!item.message.deletedAt && item.message.text===editPending.current.text)
+              finishEditing();
+            else abandonPendingEdit('La edición no coincidió con el servidor. Revisa el mensaje antes de reintentar.');
+          }
           if(item.message.deletedAt){
             setReactions(before=>before.filter(r=>r.messageSeq!==item.message.seq));
             setMenuMessage(current=>current?.seq===item.message.seq?null:current);
@@ -343,6 +387,7 @@ export default function App() {
         } else if (item.type === 'chat.revoked') {
           revokeCurrentAccess();
         } else if (item.type === 'chat.error') {
+          abandonPendingEdit(item.error);
           setError(item.error);
         }
       } catch {
@@ -351,10 +396,12 @@ export default function App() {
     };
     ws.onerror = () => {
       if (disposed.current || socket.current !== ws) return;
+      abandonPendingEdit('Conexión interrumpida. El texto editado sigue disponible.');
       retry();
     };
     ws.onclose = event => {
       if (disposed.current || socket.current !== ws) return;
+      abandonPendingEdit('Conexión interrumpida. El texto editado sigue disponible.');
       pauseOutgoing();
       if (appLifecycle.current === 'active') {
         retry();
@@ -432,6 +479,7 @@ export default function App() {
       socket.current?.close();
       socket.current = null;
       if (typingTimer.current) clearTimeout(typingTimer.current);
+      resetEditTimeout();
     };
   }, []);
 
@@ -482,11 +530,31 @@ export default function App() {
 
   function send() {
     const text = draft.trim();
-    if(editing) {
-      if(socket.current?.readyState===WebSocket.OPEN && text && text!==editing.text) {
-        socket.current.send(JSON.stringify({type:'chat.edit',seq:editing.seq,text}));
+    if(editing){
+      if(editPending.current)return;
+      if(!text){setError('El mensaje editado no puede quedar vacío.');return;}
+      if(text===editing.text){finishEditing();return;}
+      if(Date.now()-Date.parse(editing.sentAt)>15*60*1000){
+        setError('El plazo de edición de 15 minutos terminó. El texto sigue aquí para copiarlo.');
+        return;
       }
-      setEditing(null);setDraft('');
+      const ws=socket.current;
+      if(connection!=='en vivo'||ws?.readyState!==WebSocket.OPEN){
+        setError('Sin conexión. No se perdió el texto editado; reintenta cuando vuelva Internet.');
+        return;
+      }
+      editPending.current={seq:editing.seq,text};
+      setSavingEdit(true);
+      try{
+        ws.send(JSON.stringify({type:'chat.edit',seq:editing.seq,text}));
+        resetEditTimeout();
+        editTimeout.current=setTimeout(()=>{
+          abandonPendingEdit('No se confirmó la edición. Comprueba el mensaje y reintenta.');
+        },10000);
+        setError('');
+      }catch{
+        abandonPendingEdit('Error de conexión. El texto editado sigue disponible.');
+      }
       return;
     }
     if (!session || !text) return;
@@ -604,7 +672,7 @@ export default function App() {
                     {!mine && <Text style={styles.sender}>{message.senderName}</Text>}
                     {message.replyToSeq ? (
                       <Text style={[styles.replyLabel,mine && styles.mineMeta]}>
-                        ↪ {messages.find(m=>m.seq===message.replyToSeq)?.text.slice(0,70)||'Mensaje anterior'}
+                        ↪ {(messages.find(m=>m.seq===message.replyToSeq)?.deletedAt ? 'Mensaje eliminado' : (messages.find(m=>m.seq===message.replyToSeq)?.text.slice(0,70)||'Mensaje anterior'))}
                       </Text>
                     ) : null}
                     <Text style={[styles.bubbleText,mine && styles.mineText,message.deletedAt && styles.deletedText]}>
@@ -680,7 +748,7 @@ export default function App() {
             ) : null}
             {editing ? <View style={styles.replyPreview}>
               <Text style={styles.replyPreviewText}>Editando mensaje</Text>
-              <Pressable onPress={()=>{setEditing(null);setDraft('');}}>
+              <Pressable disabled={savingEdit} onPress={finishEditing}>
                 <Text style={styles.replyCancel}>Cancelar</Text>
               </Pressable>
             </View>:null}
@@ -693,11 +761,11 @@ export default function App() {
             <View style={styles.composer}>
               <TextInput
                 accessibilityLabel="Escribir mensaje" style={styles.draft} value={draft}
-                onChangeText={typeText} maxLength={2000} multiline
+                onChangeText={typeText} editable={!savingEdit} maxLength={2000} multiline
                 placeholder={connection === 'en vivo' ? 'Escribe un mensaje…' : 'Sin conexión: se enviará después…'} placeholderTextColor="#888"
               />
-              <Pressable onPress={send} disabled={!draft.trim()} style={styles.sendButton}>
-                <Text style={styles.sendText}>{editing?'Guardar':'Enviar'}</Text>
+              <Pressable onPress={send} disabled={!draft.trim()||savingEdit} style={styles.sendButton}>
+                <Text style={styles.sendText}>{savingEdit?'Guardando…':editing?'Guardar':'Enviar'}</Text>
               </Pressable>
             </View>
           </>

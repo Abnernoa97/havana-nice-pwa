@@ -81,6 +81,13 @@ present(pwa,/onLongPress=\{anchor=>showMessageMenu\(message,anchor\)\}/,
   'PWA Chat must show its contextual menu for the held message');
 present(pwa,/aria-modal="true"/,'PWA contextual menu must be a dialog');
 present(pwa,/Responder/,'PWA contextual menu must provide a reply action');
+// C02: edit must not lose its text when offline or on server rejection.
+present(android,/editPending\.current=\{seq:editing\.seq,text\}/,'Android must await edit confirmation');
+present(pwa,/editPending\.current=\{seq:editing\.seq,text\}/,'PWA must await edit confirmation');
+present(android,/Conexión interrumpida\. El texto editado sigue disponible/,'Android must retain edit on disconnect');
+present(pwa,/Conexión interrumpida\. El texto editado sigue disponible/,'PWA must retain edit on disconnect');
+present(worker,/own\.sender_id !== senderId/,'Server must restrict edit/delete to sender');
+present(worker,/\[mensaje eliminado\]/,'Server must leave tombstones on delete');
 absent(pwa,/Cerrar reacciones|>＋<\/button>/,'Remove inert extra-reaction button in PWA');
 present(pwaStyles,/\.whatsapp-context\{position:absolute;/,
   'PWA menu must be anchored instead of centered');
