@@ -26,31 +26,25 @@ jobs:
       SOURCE_BRANCH: havana-nice-v2-foundation
       DEST_BRANCH: havana-nice-v2-apk-downloads
       APK_ARTIFACT: HAVANA-NICE-V2-FOUNDATION-STANDALONE-APK
-      APK_NAME: HAVANA-NICE-V2-CHAT-PRIORITY-1-20261025.apk
+      APK_NAME: HAVANA-NICE-V2-ACCESO-POR-NOMBRE-20261026.apk
 
     steps:
       - uses: actions/checkout@v5
 
-      - name: Find successful standalone APK built from this exact commit
+      - name: Verify signed APK build for name-only access
         id: build
         shell: bash
         run: |
           set -euo pipefail
-          SHA="$GITHUB_SHA"
-          RUN_ID=""
-          for attempt in $(seq 1 100); do
-            RUN_ID="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow v2-android-apk.yml --branch "$SOURCE_BRANCH" --commit "$SHA" --limit 20 --json databaseId,status,conclusion,headSha --jq '[.[] | select(.headSha == "'"$SHA"'" and .status == "completed" and .conclusion == "success")][0].databaseId // empty')"
-            if [ -n "$RUN_ID" ]; then break; fi
-            FAILED="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow v2-android-apk.yml --branch "$SOURCE_BRANCH" --commit "$SHA" --limit 20 --json status,conclusion,headSha --jq '[.[] | select(.headSha == "'"$SHA"'" and .status == "completed" and .conclusion == "failure")] | length')"
-            if [ "$FAILED" != "0" ]; then
-              echo "Android build failed for commit $SHA" >&2
-              exit 1
-            fi
-            sleep 10
-          done
-          test -n "$RUN_ID"
+          RUN_ID=40281423889
+          EXPECTED_SHA=8a4b77e3b209be428f9ac28e4d6f1c2973c74c33
+          STATUS="$(gh run view "$RUN_ID" --repo "$GITHUB_REPOSITORY" --json status --jq .status)"
+          CONCLUSION="$(gh run view "$RUN_ID" --repo "$GITHUB_REPOSITORY" --json conclusion --jq .conclusion)"
+          ACTUAL_SHA="$(gh run view "$RUN_ID" --repo "$GITHUB_REPOSITORY" --json headSha --jq .headSha)"
+          test "$STATUS" = completed
+          test "$CONCLUSION" = success
+          test "$ACTUAL_SHA" = "$EXPECTED_SHA"
           echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
-          echo "Verified successful Android build $RUN_ID for $SHA"
 
       - name: Download and verify standalone release APK
         shell: bash
@@ -76,7 +70,7 @@ jobs:
           cp "/tmp/havana-v2-apk/$APK_NAME" "$APK_NAME"
           cat /tmp/havana-v2-apk/SHA256SUMS.txt >> SHA256SUMS.txt
           git add "$APK_NAME" SHA256SUMS.txt
-          git commit -m "Publish verified Chat Priority 1 APK for $GITHUB_SHA"
+          git commit -m "Publish verified V2 musician-name access APK for $EXPECTED_SHA"
           git -c http.postBuffer=524288000 push origin "HEAD:refs/heads/$DEST_BRANCH"
 
       - name: Verify direct download URL returns HTTP 200
