@@ -81,7 +81,10 @@ jobs:
           STATUS=$(curl --silent --show-error -o /tmp/v2-chat-denied.json -w '%{http_code}' \
             -X POST "$BASE/api/chat/session" \
             -H 'Content-Type: application/json' \
-            --data '{"displayName":"CI validation","accessCode":"not-a-valid-code"}')
+            --data '{"displayName":"ci_unapproved_account"}')
+          test "$STATUS" = "403"
+          grep -q 'administrador' /tmp/v2-chat-denied.json
+          STATUS=$(curl --silent --show-error -o /tmp/v2-chat-session-unauthorized.json -w '%{http_code}' "$BASE/api/chat/session")
           test "$STATUS" = "401"
 
       - name: Verify live private media endpoint is closed without independent Google OAuth
