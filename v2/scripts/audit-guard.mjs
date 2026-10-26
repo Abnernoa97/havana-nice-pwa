@@ -55,9 +55,9 @@ assert.equal(androidConfig.expo.android.package,'com.havananice.v2',
 assert.ok(Number.isInteger(androidConfig.expo.android.versionCode) && androidConfig.expo.android.versionCode >= 2,
   'H01: release APK needs explicit Android versionCode');
 present(distributor,/previous_signer/,'H01: verify previous signing certificate before release');
-present(distributor,/test "\\$current_signer" = "\\$previous_signer"/,
+assert.ok(distributor.includes('test "$current_signer" = "$previous_signer"'),
   'H01: block distribution if signature changes');
-present(distributor,/test "\\$current_code" -gt "\\$previous_code"/,
+assert.ok(distributor.includes('test "$current_code" -gt "$previous_code"'),
   'H01: block non-monotonic Android versionCode');
 present(distributor,/sha256sum -c -/,'H01: verify hash of preceding released APK');
 
