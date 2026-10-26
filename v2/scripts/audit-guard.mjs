@@ -56,6 +56,12 @@ present(nativeBubble,/measureInWindow\(/,'Native Chat must measure held bubble')
 present(android,/onLongPress=\{\(anchor\) => showMessageMenu\(message,anchor\)\}/,
   'Native Chat must show the contextual menu for the measured message');
 present(android,/menuTop/,'Native contextual menu must calculate a bounded top coordinate');
+// Android 16 / Expo edge-to-edge: the composer must move above the IME.
+// A layout that relies only on adjustResize left the input behind the keyboard.
+present(android,/behavior=\{Platform\.OS === 'ios' \? 'padding' : 'height'\}/,
+  'Native Android Chat must avoid IME with explicit height behavior');
+present(android,/keyboardVerticalOffset=\{0\}/,
+  'Native Chat keyboard offset must be predictable');
 present(android,/Responder/,'Native contextual menu must provide a reply action');
 absent(android,/whatsappPlus|whatsappPlusText/,'Remove inert extra-reaction button on Android');
 present(webBubble,/getBoundingClientRect\(\)/,'PWA Chat must measure held message');
