@@ -36,6 +36,7 @@ h1 span { font-weight:400; }
 .bubble.theirs { border-bottom-left-radius:5px; }
 .sender { display:block; font-size:12px; font-weight:800; margin-bottom:5px; }
 .message-meta { display:block; margin-top:5px; text-align:right; font-size:10px; opacity:.58; }
+.chat-typing-indicator{padding:5px 17px 6px;background:#f3eddf;color:#69675e;font-size:12px;flex-shrink:0}
 .chat-composer { display:flex; gap:8px; padding:11px 15px 14px; border-top:1px solid #ded3c4; align-items:center; background:#f3eddf; }
 .chat-composer input { flex:1; min-width:0; padding:14px; border:1px solid #dfd4c7; background:#fffaf4; border-radius:24px; color:#171713; font-size:16px; outline:none; }
 .chat-composer button { border:0; background:#252621; color:#fff; border-radius:22px; padding:13px 15px; font-size:14px; font-weight:700; }

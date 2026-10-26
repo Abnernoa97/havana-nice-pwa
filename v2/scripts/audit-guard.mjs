@@ -74,6 +74,12 @@ absent(pwa,/<div className="room-title">/,
   'PWA Chat must not show the duplicated room banner');
 present(pwa,/\{searchOpen&&<div className="chat-search">/,
   'PWA Chat search must be collapsible');
+// Typing presence should follow the composer rather than occupy the fixed header.
+present(android,/styles\.typingIndicator/,'Android typing indicator must appear above the composer');
+present(pwa,/className="chat-typing-indicator"/,'PWA typing indicator must appear above the composer');
+present(pwaStyles,/\.chat-typing-indicator\{/,'PWA styling for the typing indicator');
+absent(android,/typing \|\| `\$\{connection\}/,'Android header must only show connection state');
+absent(pwa,/typing \|\| `\$\{connection\}/,'PWA header must only show connection state');
 present(android,/Responder/,'Native contextual menu must provide a reply action');
 absent(android,/whatsappPlus|whatsappPlusText/,'Remove inert extra-reaction button on Android');
 present(webBubble,/getBoundingClientRect\(\)/,'PWA Chat must measure held message');

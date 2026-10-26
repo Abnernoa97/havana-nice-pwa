@@ -538,7 +538,7 @@ export default function App() {
         <div className="header-actions">
           <div className="header-status">
             <span className={connection === 'en vivo' ? 'online-dot' : 'offline-dot'} />
-            {session ? (typing || `${connection} · ${onlineUsers} en línea`) : health?.ok ? 'API conectada' : 'Laboratorio'}
+            {session ? `${connection} · ${onlineUsers} en línea` : health?.ok ? 'API conectada' : 'Laboratorio'}
           </div>
           {session&&<button className="search-toggle" type="button" aria-label="Buscar mensajes"
             aria-expanded={searchOpen} onClick={()=>{
@@ -638,6 +638,7 @@ export default function App() {
           {connection !== 'en vivo' && <button className="reconnect" onClick={() => reconnect(session)}>Reintentar conexión</button>}
           {editing && <div className="reply-preview">Editando mensaje <button type="button" onClick={finishEditing} disabled={savingEdit}>Cancelar</button></div>}
           {replyTo && !editing && <div className="reply-preview">Respondiendo a: {replyTo.text.slice(0,65)} <button type="button" onClick={() => setReplyTo(null)}>Cancelar</button></div>}
+          {typing && <div className="chat-typing-indicator" role="status" aria-live="polite">{typing}</div>}
           <form className="chat-composer" onSubmit={event => { event.preventDefault(); send(); }}>
             <input aria-label="Escribir mensaje" disabled={savingEdit} value={draft} maxLength={2000} onChange={event => typeText(event.target.value)} placeholder={connection === 'en vivo' ? 'Escribe un mensaje…' : 'Sin conexión: se enviará después…'} />
             <button aria-label="Enviar" disabled={!draft.trim()||savingEdit} type="submit">{savingEdit?'Guardando…':editing?'Guardar':'Enviar'}</button>

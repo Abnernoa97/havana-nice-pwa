@@ -610,7 +610,7 @@ export default function App() {
           </View>
           <View style={styles.headerActions}>
             <Text style={styles.connection}>
-              {session ? (typing || `${connection} · ${onlineCount} en línea`) : `API ${apiState}`}
+              {session ? `${connection} · ${onlineCount} en línea` : `API ${apiState}`}
             </Text>
             {session ? <Pressable accessibilityRole="button" accessibilityLabel="Buscar mensajes"
               accessibilityState={{expanded:searchOpen}}
@@ -758,7 +758,10 @@ export default function App() {
                 <Pressable onPress={() => setReplyTo(null)}><Text style={styles.replyCancel}>Cancelar</Text></Pressable>
               </View>
             ) : null}
-            <View style={styles.composer}>
+            {typing ? <View style={styles.typingIndicator} accessibilityLiveRegion="polite">
+               <Text style={styles.typingIndicatorText}>{typing}</Text>
+             </View> : null}
+             <View style={styles.composer}>
               <TextInput
                 accessibilityLabel="Escribir mensaje" style={styles.draft} value={draft}
                 onChangeText={typeText} editable={!savingEdit} maxLength={2000} multiline
@@ -848,5 +851,7 @@ const styles = StyleSheet.create({
   actionText: {fontSize:11,color:'#8d8b81'},
   replyPreview: {flexDirection:'row',justifyContent:'space-between',paddingHorizontal:18,paddingVertical:8,borderTopWidth:1,borderColor:'#d9cebd'},
   replyPreviewText: {fontSize:12,color:'#565247',flex:1},
+  typingIndicator: {paddingHorizontal:18,paddingTop:5,paddingBottom:5,backgroundColor:'#F3EDDF'},
+  typingIndicatorText: {color:'#69675e',fontSize:12},
   replyCancel: {fontSize:12,color:'#8a5a3c',fontWeight:'700'},
 });
