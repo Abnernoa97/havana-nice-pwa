@@ -1,4 +1,4 @@
-import {useCallback,useEffect,useState} from 'react';
+import {useCallback,useEffect,useState,type FormEvent} from 'react';
 import {adminAvailability,adminDeviceAction,adminDeviceRequests,adminLogin,adminLogout,adminVerify,
  type AdminDeviceRequest,type AdminSession} from './admin-api';
 
@@ -40,7 +40,7 @@ export default function AdminChatAccess({section}:{section:Section}){
     setSession(null);setError('La sesión administrativa venció o fue revocada.');
   });
  },[session,refresh]);
- async function login(e:React.FormEvent){
+ async function login(e:FormEvent){
   e.preventDefault();if(processing||!password)return;
   setProcessing(true);setError('');
   try{

@@ -12,8 +12,8 @@ test('admin never bundles secrets or produces fake privileged API calls',()=>{
  for(const content of [ui,main,read('../admin.html')]){
    assert.doesNotMatch(content,/V2_DEVICE_ADMIN_SECRET|Authorization:\s*Bearer|localStorage\.|sessionStorage\.|requestSecret|api\/chat\/admin/);
  }
- assert.match(ui,/disabled type="button">Aprobar/);
- assert.match(ui,/disabled>Revocar dispositivo/);
+ assert.match(read('../src/AdminChatAccess.tsx'),/adminDeviceAction/);
+ assert.match(read('../src/AdminChatAccess.tsx'),/adminDeviceRequests/);
  assert.match(ui,/disabled>Administrar acceso/);
 });
 test('admin HTML uses network-only navigation and does not register worker',()=>{
@@ -42,4 +42,15 @@ test('installed Administrator refreshes from network-only HTML, without new APK'
  assert.match(main,/fetch\('\/admin\.html',\{cache:'no-store'\}\)/);
  assert.match(main,/window\.location\.reload\(\)/);
  assert.match(read('../public/sw.js'),/navigation && path === '\/admin\.html'\) return/);
+});
+
+test('privileged controls require separate login, never musician identity',()=>{
+ const component=read('../src/AdminChatAccess.tsx');
+ const api=read('../src/admin-api.ts');
+ assert.match(component,/if\(!session\)return/);
+ assert.match(component,/adminLogin\(password\)/);
+ assert.match(component,/adminLogout\(value\)/);
+ assert.match(component,/adminDeviceAction\(session\.token/);
+ assert.match(component,/adminAvailability\(\)/);
+ assert.doesNotMatch(component+api,/localStorage\.|sessionStorage\.|indexedDB\.|V2_ADMIN_LOGIN_SECRET/);
 });

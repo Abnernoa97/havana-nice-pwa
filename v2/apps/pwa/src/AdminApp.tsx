@@ -1,5 +1,6 @@
 import {useCallback,useEffect,useState} from 'react';
 import {fetchBackendHealth,type BackendHealth} from '@havana/shared';
+import AdminChatAccess from './AdminChatAccess';
 
 // The single Administrator PWA grows by module. Chat is the current workstream.
 // Personal data and privileged actions are NEVER exposed without server-side auth.
@@ -89,18 +90,7 @@ export default function AdminApp(){
       </div>
      </section>
     </>}
-    {tab!=='overview'&&<div className="a-warning" role="status"><span aria-hidden="true">◈</span>
-     <div><strong>Acciones administrativas protegidas</strong><p>La autenticación de administrador aún no está habilitada. Ningún teléfono se puede aprobar o revocar sin verificar sus permisos en el servidor.</p></div>
-    </div>}
-    {tab==='requests'&&<section className="a-panel"><h2>Solicitudes de teléfonos nuevos</h2>
-     <p className="a-detail">El músico solicita acceso desde Android o iPhone y el Administrador decide autorizarlo.</p>
-     <Empty title="Autenticación pendiente" text="Aquí aparecerán solicitudes reales de acceso. No se muestran registros inventados ni información privada."/>
-     <div className="a-actions"><button disabled type="button">Aprobar</button><button disabled type="button">Rechazar</button></div>
-    </section>}
-    {tab==='devices'&&<section className="a-panel"><h2>Dispositivos vinculados</h2>
-     <Empty title="Dispositivos protegidos" text="Se mostrará qué teléfonos están autorizados y se podrá revocar uno sin desconectar los demás."/>
-     <div className="a-actions"><button type="button" disabled>Revocar dispositivo</button></div>
-    </section>}
+    <AdminChatAccess section={tab}/>
     {tab==='members'&&<section className="a-panel"><h2>Integrantes del Chat</h2>
      <Empty title="Permisos de músicos protegidos" text="La lista real solo estará disponible con una sesión administrativa autorizada por Cloudflare."/>
      <div className="a-actions"><button type="button" disabled>Administrar acceso</button></div>
