@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Alert, AppState, KeyboardAvoidingView, Modal, Platform, Pressable, SafeAreaView, ScrollView,
-  StatusBar, StyleSheet, Text, TextInput, View,
+  StatusBar, StyleSheet, Text, TextInput, View, useWindowDimensions,
 } from 'react-native';
 import {
   HAVANA_V2_DEV_API_BASE_URL, fetchBackendHealth, getChatSnapshot, getOlderChatMessages, searchChatMessages, lastReadByOther, messageDeliveryLabel, newClientMessageId,
@@ -9,9 +9,10 @@ import {
   type ChatMessage, type ChatServerEvent, type ChatSession, type ChatReaction, type ChatEmoji, type ChatReadReceipt,
 } from '@havana/shared';
 import { loadNativeLocalChat, saveNativeLocalChat } from './chatStorage';
-import SwipeableBubble from './SwipeableBubble';
+import SwipeableBubble, {type BubbleAnchor} from './SwipeableBubble';
 
 export default function App() {
+  const {width: viewportWidth, height: viewportHeight} = useWindowDimensions();
   const [apiState, setApiState] = useState('conectando…');
   const [name, setName] = useState('');
   const [session, setSession] = useState<ChatSession | null>(null);
@@ -33,6 +34,7 @@ export default function App() {
   const [searching,setSearching] = useState(false);
   const [editing,setEditing] = useState<ChatMessage | null>(null);
   const [menuMessage,setMenuMessage] = useState<ChatMessage | null>(null);
+  const [menuAnchor,setMenuAnchor] = useState<BubbleAnchor | null>(null);
   const socket = useRef<WebSocket | null>(null);
   const scroll = useRef<React.ElementRef<typeof ScrollView> | null>(null);
   const autoScroll = useRef(true);
@@ -109,8 +111,10 @@ export default function App() {
     setEditing(null);
     setReplyTo(message);
   }
-  function showMessageMenu(message:ChatMessage) {
-    if(!message.deletedAt)setMenuMessage(message);
+  function showMessageMenu(message:ChatMessage,anchor:BubbleAnchor) {
+    if(message.seq<=0 || message.deletedAt)return;
+    setMenuAnchor(anchor);
+    setMenuMessage(message);
   }
   function manageOwn(message:ChatMessage,deleting=false){
     if(!session||message.senderId!==session.actorId||message.seq<1||
@@ -304,7 +308,10 @@ export default function App() {
           }
         } else if (item.type === 'chat.updated') {
           setMessages(before=>reconcileUpdatedMessage(before,item.message));
-          if(item.message.deletedAt)setReactions(before=>before.filter(r=>r.messageSeq!==item.message.seq));
+          if(item.message.deletedAt){
+            setReactions(before=>before.filter(r=>r.messageSeq!==item.message.seq));
+            setMenuMessage(current=>current?.seq===item.message.seq?null:current);
+          }
           setError('');
         } else if (item.type === 'chat.read') {
           setReceipts(before=>[...before.filter(x=>x.actorId!==item.actorId),
@@ -485,6 +492,24 @@ export default function App() {
     flushOutbox();
   }
 
+  // The menu is positioned beside the touched bubble, clamped to the visible
+  // Android window. On short screens it moves below the bubble if needed.
+  const menuWidth=Math.min(288,Math.max(180,viewportWidth-24));
+  const menuOwn=!!menuMessage && menuMessage.senderId===session?.actorId && !menuMessage.pending;
+  const menuAge=menuMessage ? Date.now()-Date.parse(menuMessage.sentAt) : Infinity;
+  const allowDelete=menuOwn && connection==='en vivo' && menuAge<48*60*60*1000;
+  const allowEdit=menuOwn && connection==='en vivo' && menuAge<15*60*1000;
+  const menuHeight=118;
+  const preferredTop=menuAnchor && menuAnchor.y>menuHeight+16
+    ? menuAnchor.y-menuHeight-8
+    : (menuAnchor?.y??(viewportHeight-menuHeight)/2)+(menuAnchor?.height??0)+8;
+  const menuTop=Math.max((StatusBar.currentHeight??0)+8,
+    Math.min(preferredTop,viewportHeight-menuHeight-14));
+  const preferredLeft=menuAnchor
+    ? (menuOwn ? menuAnchor.x+menuAnchor.width-menuWidth : menuAnchor.x)
+    : (viewportWidth-menuWidth)/2;
+  const menuLeft=Math.max(12,Math.min(preferredLeft,viewportWidth-menuWidth-12));
+
   return (
     <SafeAreaView style={styles.screen}>
       <StatusBar barStyle="dark-content" />
@@ -547,7 +572,7 @@ export default function App() {
                     key={message.senderId + ':' + message.clientMessageId}
                     style={[styles.bubble, mine ? styles.mine : styles.theirs]}
                     onReply={() => replyToMessage(message)}
-                    onLongPress={() => showMessageMenu(message)}
+                    onLongPress={(anchor) => showMessageMenu(message,anchor)}
                     onPress={() => {if(mine && message.pending && message.deliveryStatus==='error')retryOutgoing(message.clientMessageId);}}
                   >
                     {!mine && <Text style={styles.sender}>{message.senderName}</Text>}
@@ -578,38 +603,46 @@ export default function App() {
                 );
               })}
             </ScrollView>
-            <Modal animationType="fade" transparent visible={!!menuMessage}
+            <Modal animationType="fade" transparent statusBarTranslucent visible={!!menuMessage}
               onRequestClose={()=>setMenuMessage(null)}>
               <Pressable style={styles.whatsappBackdrop} onPress={()=>setMenuMessage(null)}>
-                {menuMessage ? <Pressable style={styles.whatsappContext} onPress={()=>{}}>
+                {menuMessage ? <Pressable
+                    accessibilityLabel="Opciones del mensaje"
+                    style={[styles.whatsappContext,{
+                      left:menuLeft,top:menuTop,width:menuWidth,
+                    }]} onPress={()=>{}}>
                   <View style={styles.whatsappEmojiBar}>
                     {(['👍','❤️','😂'] as ChatEmoji[]).map(emoji=>(
-                      <Pressable key={emoji} style={styles.whatsappEmoji} onPress={()=>{
-                        react(menuMessage.seq,emoji);setMenuMessage(null);
-                      }}><Text style={styles.whatsappEmojiText}>{emoji}</Text></Pressable>
+                      <Pressable key={emoji} accessibilityRole="button" accessibilityLabel={emoji}
+                        disabled={connection!=='en vivo'}
+                        style={[styles.whatsappEmoji,connection!=='en vivo'&&styles.disabledMenuAction,
+                          reactions.some(r=>r.messageSeq===menuMessage.seq&&r.actorId===session.actorId&&r.emoji===emoji)
+                            &&styles.selectedMenuReaction]}
+                        onPress={()=>{react(menuMessage.seq,emoji);setMenuMessage(null);}}>
+                        <Text style={styles.whatsappEmojiText}>{emoji}</Text>
+                      </Pressable>
                     ))}
-                    <Pressable style={styles.whatsappPlus} onPress={()=>setMenuMessage(null)}>
-                      <Text style={styles.whatsappPlusText}>＋</Text>
-                    </Pressable>
                   </View>
-                  {menuMessage.senderId===session.actorId && !menuMessage.pending ? (
-                    <View style={styles.whatsappActionBar}>
-                      {Date.now()-Date.parse(menuMessage.sentAt)<48*60*60*1000 ? (
-                        <Pressable style={styles.whatsappAction} onPress={()=>{
-                          const m=menuMessage;setMenuMessage(null);
-                          Alert.alert('Borrar mensaje','¿Borrar este mensaje para todos?',[
-                            {text:'Cancelar',style:'cancel'},
-                            {text:'Borrar',style:'destructive',onPress:()=>manageOwn(m,true)},
-                          ]);
-                        }}><Text style={styles.whatsappDeleteText}>Borrar</Text></Pressable>
-                      ):null}
-                      {Date.now()-Date.parse(menuMessage.sentAt)<900000 ? (
-                        <Pressable style={styles.whatsappAction} onPress={()=>{
-                          const m=menuMessage;setMenuMessage(null);manageOwn(m);
-                        }}><Text style={styles.whatsappActionText}>Editar</Text></Pressable>
-                      ):null}
-                    </View>
-                  ):null}
+                  <View style={styles.whatsappActionBar}>
+                    <Pressable accessibilityRole="button" style={styles.whatsappAction}
+                      onPress={()=>replyToMessage(menuMessage)}>
+                      <Text style={styles.whatsappActionText}>Responder</Text>
+                    </Pressable>
+                    {allowEdit ? <Pressable accessibilityRole="button" style={styles.whatsappAction}
+                      onPress={()=>{const m=menuMessage;setMenuMessage(null);manageOwn(m);}}>
+                      <Text style={styles.whatsappActionText}>Editar</Text>
+                    </Pressable> : null}
+                    {allowDelete ? <Pressable accessibilityRole="button" style={styles.whatsappAction}
+                      onPress={()=>{
+                        const m=menuMessage;setMenuMessage(null);
+                        Alert.alert('Borrar mensaje','¿Borrar este mensaje para todos?',[
+                          {text:'Cancelar',style:'cancel'},
+                          {text:'Borrar',style:'destructive',onPress:()=>manageOwn(m,true)},
+                        ]);
+                      }}>
+                      <Text style={styles.whatsappDeleteText}>Borrar</Text>
+                    </Pressable> : null}
+                  </View>
                 </Pressable>:null}
               </Pressable>
             </Modal>
@@ -698,17 +731,19 @@ const styles = StyleSheet.create({
   deletedText:{fontStyle:'italic',opacity:.72},
   reactionBadges:{flexDirection:'row',gap:4,alignSelf:'flex-end',marginTop:5},
   reactionBadge:{fontSize:11,color:'#403c34',backgroundColor:'#e8e5dc',paddingHorizontal:5,paddingVertical:1,borderRadius:9,overflow:'hidden'},
-  whatsappBackdrop:{flex:1,backgroundColor:'rgba(20,19,16,.16)',justifyContent:'center',paddingHorizontal:8},
-  whatsappContext:{width:'100%',alignItems:'stretch',gap:10},
-  whatsappEmojiBar:{flexDirection:'row',alignItems:'center',justifyContent:'space-around',backgroundColor:'#fff',borderRadius:40,paddingHorizontal:5,paddingVertical:7,elevation:8},
-  whatsappEmoji:{paddingHorizontal:3,paddingVertical:7},
+  whatsappBackdrop:{flex:1,backgroundColor:'rgba(20,19,16,.16)'},
+  whatsappContext:{position:'absolute',alignItems:'stretch',gap:8},
+  whatsappEmojiBar:{flexDirection:'row',alignItems:'center',justifyContent:'space-evenly',
+    backgroundColor:'#fff',borderRadius:32,paddingHorizontal:7,minHeight:54,elevation:8},
+  whatsappEmoji:{width:64,minHeight:46,borderRadius:25,alignItems:'center',justifyContent:'center'},
   whatsappEmojiText:{fontSize:27},
-  whatsappPlus:{width:38,height:38,borderRadius:19,backgroundColor:'#e8e8e8',alignItems:'center',justifyContent:'center'},
-  whatsappPlusText:{fontSize:25,color:'#555'},
-  whatsappActionBar:{alignSelf:'flex-end',flexDirection:'row',alignItems:'center',backgroundColor:'#fff',borderRadius:13,paddingHorizontal:5,elevation:8},
-  whatsappAction:{paddingHorizontal:17,paddingVertical:14},
-  whatsappActionText:{fontSize:16,fontWeight:'600',color:'#25251f'},
-  whatsappDeleteText:{fontSize:16,fontWeight:'600',color:'#b3261e'},
+  disabledMenuAction:{opacity:.35},
+  selectedMenuReaction:{backgroundColor:'#e3eee5'},
+  whatsappActionBar:{flexDirection:'row',alignItems:'center',justifyContent:'space-evenly',
+    backgroundColor:'#fff',borderRadius:15,minHeight:55,elevation:8},
+  whatsappAction:{paddingHorizontal:7,paddingVertical:14,alignItems:'center',justifyContent:'center'},
+  whatsappActionText:{fontSize:14,fontWeight:'600',color:'#25251f'},
+  whatsappDeleteText:{fontSize:14,fontWeight:'600',color:'#b3261e'},
   replyLabel: {fontSize:12,color:'#686b66',marginBottom:5},
   actions: { flexDirection:'row',alignItems:'center',gap:5,marginTop:6 },
   actionButton: {paddingVertical:5,paddingHorizontal:3},
