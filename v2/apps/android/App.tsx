@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Alert, AppState, KeyboardAvoidingView, Modal, Platform, Pressable, SafeAreaView, ScrollView,
+  Alert, AppState, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, SafeAreaView, ScrollView,
   StatusBar, StyleSheet, Text, TextInput, View, useWindowDimensions,
 } from 'react-native';
 import {
@@ -30,6 +30,8 @@ export default function App() {
   const [hasMore,setHasMore] = useState(false);
   const [loadingOlder,setLoadingOlder] = useState(false);
   const [searchText,setSearchText] = useState('');
+  const [searchOpen,setSearchOpen] = useState(false);
+  const [keyboardOpen,setKeyboardOpen] = useState(false);
   const [results,setResults] = useState<ChatMessage[] | null>(null);
   const [searching,setSearching] = useState(false);
   const [editing,setEditing] = useState<ChatMessage | null>(null);
@@ -53,6 +55,20 @@ export default function App() {
   const latestDraft = useRef('');
   const restoredStorage = useRef(false);
   const draftTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Android 16: keep the legacy navigation padding only when the IME is hidden.
+  // The keyboard avoidance wrapper is responsible for lifting the composer.
+  useEffect(() => {
+    const show=Keyboard.addListener('keyboardDidShow',()=>setKeyboardOpen(true));
+    const hide=Keyboard.addListener('keyboardDidHide',()=>setKeyboardOpen(false));
+    return ()=>{show.remove();hide.remove();};
+  },[]);
+
+  function toggleSearch() {
+    setSearchOpen(open=>!open);
+    setSearchText('');
+    setResults(null);
+  }
 
   function revokeCurrentAccess() {
     const previous = socket.current;
@@ -511,7 +527,7 @@ export default function App() {
   const menuLeft=Math.max(12,Math.min(preferredLeft,viewportWidth-menuWidth-12));
 
   return (
-    <SafeAreaView style={styles.screen}>
+    <SafeAreaView style={[styles.screen,keyboardOpen && styles.screenKeyboard]}>
       <StatusBar barStyle="dark-content" />
       {/* Android 16 edge-to-edge can draw the composer behind the IME even with
             adjustResize. Height mode keeps the native chat input and Enviar
@@ -524,7 +540,16 @@ export default function App() {
             <Text style={styles.brand}>HAVANA NICE</Text>
             <Text style={styles.title}>Chat V2</Text>
           </View>
-          <Text style={styles.connection}>{session ? connection : `API ${apiState}`}</Text>
+          <View style={styles.headerActions}>
+            <Text style={styles.connection}>
+              {session ? (typing || `${connection} · ${onlineCount} en línea`) : `API ${apiState}`}
+            </Text>
+            {session ? <Pressable accessibilityRole="button" accessibilityLabel="Buscar mensajes"
+              accessibilityState={{expanded:searchOpen}}
+              onPress={toggleSearch} style={styles.headerSearchButton}>
+              <Text style={styles.headerSearchText}>{searchOpen?'Cerrar':'Buscar'}</Text>
+            </Pressable> : null}
+          </View>
         </View>
 
         {restoringAccess ? <View style={styles.login}><Text style={styles.description}>Abriendo HAVANA NICE…</Text></View> : !session ? (
@@ -545,11 +570,7 @@ export default function App() {
           </View>
         ) : (
           <>
-            <View style={styles.room}>
-              <Text style={styles.roomTitle}>HAVANA NICE · Chat</Text>
-              <Text style={styles.roomUser}>{typing || `${onlineCount} en línea · ${session.displayName}`}</Text>
-            </View>
-            <View style={styles.searchRow}>
+            {searchOpen ? <View style={styles.searchRow}>
               <TextInput accessibilityLabel="Buscar mensajes" style={styles.searchInput}
                 value={searchText} onChangeText={value=>{setSearchText(value);if(!value.trim())setResults(null);}}
                 placeholder="Buscar mensajes…" onSubmitEditing={()=>void searchHistory()} returnKeyType="search"
@@ -560,7 +581,7 @@ export default function App() {
               {results!==null ? <Pressable onPress={()=>{setResults(null);setSearchText('');}}>
                 <Text style={styles.searchAction}>Cerrar</Text>
               </Pressable> : null}
-            </View>
+            </View> : null}
             <ScrollView
               ref={scroll} style={styles.messageList} contentContainerStyle={styles.messages}
               keyboardShouldPersistTaps="handled"
@@ -691,10 +712,14 @@ const styles = StyleSheet.create({
   // RN SafeAreaView does not include Android's bottom navigation safe area.
   // Reserve room for three-button navigation even with Android 16 edge-to-edge.
   screen: { flex: 1, backgroundColor: '#F3EDDF', paddingBottom: Platform.OS === 'android' ? 42 : 0 },
+  screenKeyboard: {paddingBottom:0},
   header: { paddingHorizontal: 22, paddingTop: 24, paddingBottom: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#d6cab9' },
   brand: { fontSize: 11, fontWeight: '800', letterSpacing: 3 },
   title: { fontSize: 29, fontWeight: '700', marginTop: 7 },
   connection: { fontSize: 12, color: '#69675e' },
+  headerActions: {alignItems:'flex-end',gap:7,maxWidth:'58%'},
+  headerSearchButton: {paddingHorizontal:9,paddingVertical:5,borderRadius:12,borderWidth:1,borderColor:'#d6cbbc'},
+  headerSearchText: {fontSize:12,color:'#79563f',fontWeight:'700'},
   login: { flex: 1, justifyContent: 'center', paddingHorizontal: 26 },
   overline: { fontSize: 11, fontWeight: '700', letterSpacing: 1.1 },
   loginTitle: { fontSize: 40, fontWeight: '700', marginTop: 12 },
