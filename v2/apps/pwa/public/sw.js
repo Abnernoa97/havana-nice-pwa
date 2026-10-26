@@ -1,8 +1,8 @@
 // HAVANA NICE V2 — static shell only. Never intercept/cache private chat,
 // credentials, cross-origin Worker requests, media, or dynamic endpoints.
-const CACHE = 'havana-nice-v2-static-v2';
+const CACHE = 'havana-nice-v2-static-v3';
 const PREFIX = 'havana-nice-v2-';
-const APP_SHELL = ['/', '/manifest.webmanifest'];
+const APP_SHELL = ['/', '/visual.html', '/manifest.webmanifest'];
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(APP_SHELL)));
@@ -29,12 +29,14 @@ self.addEventListener('fetch', event => {
     path === '/manifest.webmanifest';
   if (!navigation && !staticAsset) return;
 
+  // Keep the visual WebView route isolated: never fall back to the Chat page.
+  const shellKey = navigation && path === '/visual.html' ? '/visual.html' : '/';
   event.respondWith(
     fetch(req).then(response => {
       if (response.ok && response.type === 'basic') {
         // Only app shell/static assets, never private responses.
         event.waitUntil(caches.open(CACHE).then(cache => cache.put(
-          navigation ? '/' : req, response.clone()
+          navigation ? shellKey : req, response.clone()
         )).catch(() => {}));
       }
       return response;

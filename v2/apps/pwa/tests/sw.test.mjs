@@ -97,3 +97,13 @@ test('offline navigation falls back only to the static app shell',async()=>{
   const b=await sw.dispatch({url:ORIGIN+'/api/chat/messages'});
   assert.equal(b.handled,false);
 });
+
+test('separate visual WebView shell never falls back to Chat HTML while offline',async()=>{
+  const sw=serviceWorkerHarness(async()=>{throw Error('offline');});
+  const cache=await sw.caches.open('havana-nice-v2-static-v3');
+  await cache.addAll(['/','/visual.html']);
+  const result=await sw.dispatch({url:ORIGIN+'/visual.html',mode:'navigate'});
+  assert.equal(result.handled,true);
+  assert.equal(result.result.ok,true);
+  assert.equal(sw.writes.length,0);
+});
