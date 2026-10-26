@@ -62,6 +62,10 @@ jobs:
           SDK_BUILD_TOOLS="$(find "${ANDROID_HOME:-$ANDROID_SDK_ROOT}/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
           "$SDK_BUILD_TOOLS/apksigner" verify --verbose "$APK"
           "$SDK_BUILD_TOOLS/aapt" dump badging "$APK" | grep -F "package: name='com.havananice.v2'"
+          EXPECTED_CODE="$(node -p "require('./v2/apps/android/app.json').expo.android.versionCode")"
+          test -n "$EXPECTED_CODE"
+          "$SDK_BUILD_TOOLS/aapt" dump badging "$APK" | grep -F "versionCode='$EXPECTED_CODE'"
+          echo "H01 Android APK package/versionCode check PASS (code $EXPECTED_CODE)"
           sha256sum "$APK"
 
       - name: Rename APK
