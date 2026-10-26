@@ -103,6 +103,7 @@ export type ChatServerEvent =
   | { type: 'chat.ready'; at: string; users?: ChatOnlineUser[] }
   | { type: 'chat.message'; message: ChatMessage }
   | { type: 'chat.error'; error: string }
+  | { type: 'chat.revoked'; error: string }
   | { type: 'chat.presence'; users: ChatOnlineUser[] }
   | { type: 'chat.typing'; actorId: string; senderName: string; active: boolean; expiresAt: number }
   | { type: 'chat.reaction'; messageSeq: number; actorId: string; emoji: ChatEmoji; active: boolean }
@@ -162,6 +163,18 @@ export async function startNamedChatSession(
   const data = await response.json() as ChatSession & { error?: string };
   if (!response.ok) throw new Error(data.error || 'Could not join the lab chat');
   return data;
+}
+
+export async function restoreNamedChatSession(
+  saved: ChatSession,
+  apiBaseUrl = HAVANA_V2_DEV_API_BASE_URL,
+): Promise<ChatSession | null> {
+  const response = await fetch(`${apiBaseUrl}/api/chat/session`, {
+    headers: { Authorization: `Bearer ${saved.token}` },
+  });
+  if (response.status === 401 || response.status === 403) return null;
+  if (!response.ok) throw new Error(`Session validation failed: ${response.status}`);
+  return response.json() as Promise<ChatSession>;
 }
 
 export async function getChatMessages(
