@@ -43,6 +43,9 @@ jobs:
       - name: Verify zero-billing Drive adapter safety
         run: npm run test:media -w @havana/cloudflare
 
+      - name: Prevent private API caching in iPhone PWA
+        run: npm run test:sw -w @havana/pwa
+
       - name: Build iPhone PWA
         run: npm run build:pwa
 
