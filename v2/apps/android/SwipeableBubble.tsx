@@ -1,11 +1,13 @@
 import React, {useRef} from 'react';
-import {Animated, PanResponder, Pressable, StyleProp, ViewStyle} from 'react-native';
+import {Animated, PanResponder, Pressable, StyleProp, View, ViewStyle} from 'react-native';
+
+export type BubbleAnchor = { x: number; y: number; width: number; height: number };
 
 type Props = {
   children: React.ReactNode;
   style?: StyleProp<ViewStyle>;
   onReply: () => void;
-  onLongPress: () => void;
+  onLongPress: (anchor: BubbleAnchor) => void;
   onPress?: () => void;
 };
 
@@ -15,6 +17,7 @@ export default function SwipeableBubble({children,style,onReply,onLongPress,onPr
   const callbacks = useRef({onReply,onLongPress,onPress});
   callbacks.current={onReply,onLongPress,onPress};
   const translation=useRef(new Animated.Value(0)).current;
+  const pressableRef=useRef<View|null>(null);
   const pan=useRef(PanResponder.create({
     onStartShouldSetPanResponder:()=>false,
     onMoveShouldSetPanResponder:(_,gesture)=>
@@ -33,8 +36,14 @@ export default function SwipeableBubble({children,style,onReply,onLongPress,onPr
   })).current;
   return (
     <Animated.View {...pan.panHandlers} style={[style,{transform:[{translateX:translation}]}]}>
-      <Pressable accessibilityHint="Desliza a la derecha para responder; mantén pulsado para más opciones"
-        onLongPress={()=>callbacks.current.onLongPress()} delayLongPress={380}
+      <Pressable ref={pressableRef}
+        accessibilityHint="Desliza a la derecha para responder; mantén pulsado para más opciones"
+        onLongPress={()=>{
+          // Anchor the menu to the actual bubble; never to the screen center.
+          pressableRef.current?.measureInWindow((x,y,width,height)=>{
+            callbacks.current.onLongPress({x,y,width,height});
+          });
+        }} delayLongPress={380}
         onPress={()=>callbacks.current.onPress?.()}>
         {children}
       </Pressable>
