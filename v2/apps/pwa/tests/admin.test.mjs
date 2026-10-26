@@ -20,3 +20,25 @@ test('admin HTML uses network-only navigation and does not register worker',()=>
  assert.match(read('../public/sw.js'),/navigation && path === '\/admin\.html'\) return/);
  assert.doesNotMatch(main,/serviceWorker\.register/);
 });
+
+test('the one Administrator is independently installable on Android and iPhone',()=>{
+ const manifest=JSON.parse(read('../public/admin.webmanifest'));
+ assert.equal(manifest.start_url,'/admin.html');
+ assert.equal(manifest.display,'standalone');
+ assert.equal(manifest.id,'/havana-nice-v2-administrador');
+ assert.equal(manifest.icons.length,2);
+ assert.match(read('../admin.html'),/href="\/admin.webmanifest"/);
+ assert.match(read('../admin.html'),/apple-touch-icon/);
+});
+test('Chat panel reads real Worker health and keeps private actions disabled',()=>{
+ assert.match(ui,/fetchBackendHealth/);
+ assert.match(ui,/data\.database==='ok'/);
+ assert.match(ui,/setTab\('requests'\)/);
+ assert.doesNotMatch(ui,/const fakeMembers|demoRequests|mockSessions/);
+});
+test('installed Administrator refreshes from network-only HTML, without new APK',()=>{
+ assert.match(main,/serviceWorker\.register\('\/sw\.js'/);
+ assert.match(main,/fetch\('\/admin\.html',\{cache:'no-store'\}\)/);
+ assert.match(main,/window\.location\.reload\(\)/);
+ assert.match(read('../public/sw.js'),/navigation && path === '\/admin\.html'\) return/);
+});
