@@ -79,43 +79,13 @@ jobs:
             -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
           "$SDK_BUILD_TOOLS/apksigner" verify "/tmp/havana-v2-apk/$APK_NAME"
 
-          # H01: refuse upgrades that would require uninstalling and losing local data.
-          # Compare with the latest *published* V2 binary, not merely this build.
+          # H01: verify compatibility with the *last published V2 APK* before release.
           git fetch origin "$DEST_BRANCH"
-          read -r PREVIOUS_SHA PREVIOUS_NAME < <(git show FETCH_HEAD:SHA256SUMS.txt | grep -E '^[0-9a-f]{64}  HAVANA-NICE-V2-ANDROID-[0-9a-f]{12}\\.apk
-
-      - name: Publish ONLY in the dedicated V2 binary branch
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name "havana-nice-v2-automation"
-          git config user.email "actions@users.noreply.github.com"
-          git fetch origin "$DEST_BRANCH"
-          git switch -C "$DEST_BRANCH" FETCH_HEAD
-          cp "/tmp/havana-v2-apk/$APK_NAME" "$APK_NAME"
-          cat /tmp/havana-v2-apk/SHA256SUMS.txt >> SHA256SUMS.txt
-          git add "$APK_NAME" SHA256SUMS.txt
-          git commit -m "Publish verified V2 Android APK built from $GITHUB_SHA"
-          git -c http.postBuffer=524288000 push origin "HEAD:refs/heads/$DEST_BRANCH"
-
-      - name: Verify direct Android download responds HTTP 200
-        shell: bash
-        run: |
-          set -euo pipefail
-          URL="https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$DEST_BRANCH/$APK_NAME"
-          for attempt in $(seq 1 12); do
-            HTTP="$(curl -L -s -o /dev/null -w '%{http_code}' -I "$URL")"
-            if [ "$HTTP" = 200 ]; then
-              echo "DIRECT_APK_URL=$URL"
-              exit 0
-            fi
-            sleep 5
-          done
-          echo "Direct APK URL failed availability check" >&2
-          exit 1
- | tail -n 1)
+          PREVIOUS_RECORD="$(git show FETCH_HEAD:SHA256SUMS.txt | grep -E '^[0-9a-f]{64}  HAVANA-NICE-V2-ANDROID-[0-9a-f]{12}\.apk$' | tail -n 1)"
+          test -n "$PREVIOUS_RECORD"
+          read -r PREVIOUS_SHA PREVIOUS_NAME <<< "$PREVIOUS_RECORD"
           [[ "$PREVIOUS_SHA" =~ ^[0-9a-f]{64}$ ]]
-          [[ "$PREVIOUS_NAME" =~ ^HAVANA-NICE-V2-ANDROID-[0-9a-f]{12}\\.apk$ ]]
+          [[ "$PREVIOUS_NAME" =~ ^HAVANA-NICE-V2-ANDROID-[0-9a-f]{12}\.apk$ ]]
           PREVIOUS_APK=/tmp/havana-v2-apk/previous-installed.apk
           git show "FETCH_HEAD:$PREVIOUS_NAME" > "$PREVIOUS_APK"
           echo "$PREVIOUS_SHA  $PREVIOUS_APK" | sha256sum -c -
@@ -132,7 +102,7 @@ jobs:
 
           version_code() {
             "$SDK_BUILD_TOOLS/aapt" dump badging "$1" |
-              sed -nE "s/.*versionCode='([0-9]+)'.*/\\1/p" | head -n 1
+              sed -nE "s/.*versionCode='([0-9]+)'.*/\1/p" | head -n 1
           }
           previous_code="$(version_code "$PREVIOUS_APK")"
           current_code="$(version_code "/tmp/havana-v2-apk/$APK_NAME")"
@@ -140,7 +110,7 @@ jobs:
           [[ "$current_code" =~ ^[0-9]+$ ]]
           test "$current_code" -gt "$previous_code"
           "$SDK_BUILD_TOOLS/aapt" dump badging "/tmp/havana-v2-apk/$APK_NAME" |
-            grep -Fq "package: name='com.havananice.v2'"
+            grep -F "package: name='com.havananice.v2'" > /dev/null
           echo "H01 upgrade guard PASS: certificate preserved, package unchanged, versionCode $previous_code -> $current_code"
           (cd /tmp/havana-v2-apk && sha256sum "$APK_NAME") | tee /tmp/havana-v2-apk/SHA256SUMS.txt
 
