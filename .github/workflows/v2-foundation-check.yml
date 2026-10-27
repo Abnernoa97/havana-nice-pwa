@@ -112,6 +112,9 @@ jobs:
           grep -q 'No autorizado' /tmp/v2-admin-close-others-denied.json
           STATUS="$(curl --silent --show-error --output /tmp/v2-admin-history-denied.json --write-out '%{http_code}' "$BASE/api/chat/admin/member-history?actorId=member%3Aorly")"
           test "$STATUS" = "401"
+          STATUS="$(curl --silent --show-error --output /tmp/v2-admin-preview-denied.json --write-out '%{http_code}' "$BASE/api/chat/admin/member-delete-preview?actorId=member%3Aorly")"
+          test "$STATUS" = "401"
+          grep -q 'No autorizado' /tmp/v2-admin-preview-denied.json
           STATUS="$(curl --silent --show-error --output /tmp/v2-admin-delete-denied.json --write-out '%{http_code}' \
             --header 'Content-Type: application/json' --data '{"actorId":"member:orly","confirmName":"Orly"}' "$BASE/api/chat/admin/remove-member")"
           test "$STATUS" = "401"
