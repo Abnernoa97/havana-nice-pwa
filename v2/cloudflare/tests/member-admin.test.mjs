@@ -7,7 +7,7 @@ const token='Q'.repeat(43),actor='member:orly';
 const digest=async value=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value)))]
   .map(x=>x.toString(16).padStart(2,'0')).join('');
 class FakeDB{
- constructor(){this.members=new Map([[actor,{actor_id:actor,display_name:'Orly'}]]);this.statements=[];this.sessionHash='';this.revoked=false;}
+ constructor(){this.members=new Map([[actor,{actor_id:actor,display_name:'Orly'}]]);this.statements=[];this.sessionHash='';this.revoked=false;this.mediaAssets=0;}
  prepare(sql){
   return {bind:(...args)=>({
     first:async()=>{
@@ -15,6 +15,10 @@ class FakeDB{
       if(sql.startsWith('SELECT actor_id,display_name FROM chat_members'))return this.members.get(args[0])||null;
       if(sql.startsWith('SELECT actor_id FROM chat_members'))return this.members.get(args[0])||null;
       if(sql.startsWith('SELECT COUNT(*) AS entries'))return {entries:2};
+      if(sql.includes('AS mediaAssets') && sql.includes('FROM v2_media_assets')){
+        return {sessions:2,messages:3,reactions:1,receipts:1,deviceRequests:0,
+          firstClaims:1,historyEvents:4,mediaAssets:this.mediaAssets};
+      }
       throw Error('Unexpected first: '+sql);
     },
     all:async()=>{
@@ -160,4 +164,44 @@ test('reduced Chromium Android UA does not report false OS version or model',()=
  assert.equal(reduced.operatingSystem,'Android (versión no disponible)');
  assert.equal(reduced.model,null);
  assert.equal(reduced.deviceName,'Teléfono Android');
+});
+
+test('member delete preview requires Admin auth and never mutates data',async()=>{
+ const e=await env();
+ const path='/api/chat/admin/member-delete-preview?actorId='+encodeURIComponent(actor);
+ const denied=await handler(e,'GET',path,null,false);
+ assert.equal(denied.status,401);
+ const result=await handler(e,'GET',path);
+ assert.equal(result.status,200);
+ assert.equal(result.body.displayName,'Orly');
+ assert.equal(result.body.canDelete,true);
+ assert.deepEqual(result.body.counts,{
+  sessions:2,messages:3,reactions:1,receipts:1,deviceRequests:0,
+  firstClaims:1,historyEvents:4,mediaAssets:0
+ });
+ assert.equal(e.DB.statements.length,0);
+ assert.equal(e.DB.members.size,1);
+});
+
+test('member deletion is blocked when remote multimedia cannot yet be cleaned',async()=>{
+ const e=await env();e.DB.mediaAssets=2;
+ const preview=await handler(e,'GET','/api/chat/admin/member-delete-preview?actorId='+encodeURIComponent(actor));
+ assert.equal(preview.status,200);
+ assert.equal(preview.body.canDelete,false);
+ assert.equal(preview.body.counts.mediaAssets,2);
+ const refused=await handler(e,'POST','/api/chat/admin/remove-member',{actorId:actor,confirmName:'Orly'});
+ assert.equal(refused.status,409);
+ assert.match(refused.body.error,/archivos multimedia/);
+ assert.equal(e.DB.members.size,1);
+ assert.equal(e.DB.statements.length,0,'D1 must stay completely unchanged');
+ assert.equal(e.events.length,0,'No device may be expelled after a refused deletion');
+});
+
+test('member deletion preview rejects invalid or absent members',async()=>{
+ const e=await env();
+ const invalid=await handler(e,'GET','/api/chat/admin/member-delete-preview?actorId=bad');
+ const missing=await handler(e,'GET','/api/chat/admin/member-delete-preview?actorId=member%3Aabsent');
+ assert.equal(invalid.status,400);
+ assert.equal(missing.status,404);
+ assert.equal(e.DB.statements.length,0);
 });
