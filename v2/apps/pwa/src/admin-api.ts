@@ -58,6 +58,16 @@ export type AdminMemberHistory={
 export function adminMemberHistory(token:string,actorId:string){
  return api<AdminMemberHistory>('/api/chat/admin/member-history?actorId='+encodeURIComponent(actorId),authenticated(token));
 }
+export type AdminDeletionImpact={
+ sessions:number;messages:number;reactions:number;receipts:number;
+ deviceRequests:number;firstClaims:number;historyEvents:number;mediaAssets:number;
+};
+export type AdminDeletionPreview={displayName:string;counts:AdminDeletionImpact;canDelete:boolean};
+export function adminDeletionPreview(token:string,actorId:string){
+ return api<AdminDeletionPreview>(
+  '/api/chat/admin/member-delete-preview?actorId='+encodeURIComponent(actorId),
+  authenticated(token));
+}
 export function adminRemoveMember(token:string,actorId:string,confirmName:string){
  return api<{ok:boolean;deleted:boolean}>('/api/chat/admin/remove-member',
   authenticated(token,{method:'POST',body:JSON.stringify({actorId,confirmName})}));
