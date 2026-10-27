@@ -1,5 +1,5 @@
 import {useCallback,useEffect,useState,type FormEvent} from 'react';
-import {adminAvailability,adminLogin,adminLogout,adminVerify,adminMembers,adminCreateMember,adminMemberHistory,adminRemoveMember,openAdminRealtime,
+import {adminAvailability,adminLogin,adminLogout,adminVerify,adminOtherSessions,adminRevokeOtherSessions,adminMembers,adminCreateMember,adminMemberHistory,adminRemoveMember,openAdminRealtime,
  type AdminSession,type AdminMember,type AdminMemberHistory} from './admin-api';
 
 type Section='access'|'chat'|'repertoire'|'calendar'|'more';
@@ -19,6 +19,8 @@ export default function AdminChatAccess({section}:{section:Section}){
  const [history,setHistory]=useState<Record<string,AdminMemberHistory>>({});
  const [historyLoading,setHistoryLoading]=useState('');
  const [removing,setRemoving]=useState('');
+ const [otherSessions,setOtherSessions]=useState<number|null>(null);
+ const [sessionsBusy,setSessionsBusy]=useState(false);
  const [realtime,setRealtime]=useState<'waiting'|'connected'|'reconnecting'>('waiting');
  // Prevent frontend updates from interrupting authorized admin sessions.
  // The marker contains no credential; actual tokens stay in React memory only.
@@ -42,8 +44,11 @@ export default function AdminChatAccess({section}:{section:Section}){
    if(!session)return;
    const expiry=Date.parse(session.expiresAt);
    if(!Number.isFinite(expiry)||expiry<=Date.now()){setSession(null);return;}
-   void adminVerify(session.token).then(()=>void refreshMembers(session.token))
-     .catch(()=>{setSession(null);setError('Tu sesión de Administrador expiró.');});
+   void adminVerify(session.token).then(()=>{
+     void refreshMembers(session.token);
+     void adminOtherSessions(session.token).then(data=>setOtherSessions(data.others))
+       .catch(()=>setOtherSessions(null));
+   }).catch(()=>{setSession(null);setError('Tu sesión de Administrador expiró.');});
  },[session,refreshMembers]);
  useEffect(()=>{
    if(!session){setRealtime('waiting');return;}
@@ -99,7 +104,7 @@ export default function AdminChatAccess({section}:{section:Section}){
  async function logout(){
    if(!session)return;
    const token=session.token;
-   setSession(null);setMembers([]);setLoaded(false);setError('');setNotice('');setName('');
+   setSession(null);setMembers([]);setLoaded(false);setError('');setNotice('');setName('');setOtherSessions(null);
    try{await adminLogout(token);}catch{/* In-memory session is discarded even when offline. */}
  }
  async function toggleMember(person:AdminMember){
@@ -129,6 +134,17 @@ export default function AdminChatAccess({section}:{section:Section}){
      setNotice('Miembro eliminado definitivamente: '+person.display_name);
    }catch(e){setError(e instanceof Error?e.message:'No se pudo eliminar el miembro');}
    finally{setRemoving('');}
+ }
+ async function closeOtherSessions(){
+   if(!session||sessionsBusy||!otherSessions)return;
+   if(!window.confirm('¿Cerrar las otras '+otherSessions+' sesiones administrativas? Tu sesión actual seguirá abierta.'))return;
+   setSessionsBusy(true);setError('');setNotice('');
+   try{
+     const result=await adminRevokeOtherSessions(session.token);
+     setOtherSessions(0);
+     setNotice('Otras sesiones administrativas cerradas: '+result.revoked+'. Esta sesión continúa activa.');
+   }catch(e){setError(e instanceof Error?e.message:'No se pudieron cerrar otras sesiones');}
+   finally{setSessionsBusy(false);}
  }
  async function addMember(event:FormEvent){
    event.preventDefault();if(!session||busy||!name.trim())return;
@@ -168,6 +184,13 @@ export default function AdminChatAccess({section}:{section:Section}){
          <button type="button" onClick={()=>void refreshMembers(session.token)}>Actualizar</button>
          <button type="button" onClick={()=>void logout()}>Cerrar sesión</button>
        </div>
+     </div>
+     <div className="a-admin-session-security">
+       <span>Otras sesiones administrativas: <strong>{otherSessions===null?'Verificando…':otherSessions}</strong></span>
+       {otherSessions!==null&&otherSessions>0&&<button type="button"
+          disabled={sessionsBusy} onClick={()=>void closeOtherSessions()}>
+          {sessionsBusy?'Cerrando…':'Cerrar otras sesiones'}
+       </button>}
      </div>
    </section>
    <section className="a-panel a-member-add">
