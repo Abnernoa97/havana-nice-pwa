@@ -128,6 +128,8 @@ export async function handleAdminMemberManagement(request,env,url,origin,respond
    env.DB.prepare('DELETE FROM chat_device_requests WHERE actor_id=?').bind(actorId),
    env.DB.prepare('DELETE FROM chat_pwa_first_claims WHERE actor_id=?').bind(actorId),
    env.DB.prepare('DELETE FROM chat_access_events WHERE actor_id=?').bind(actorId),
+   env.DB.prepare('DELETE FROM chat_duplicate_login_alerts WHERE actor_id=?').bind(actorId),
+   env.DB.prepare('DELETE FROM chat_single_device_owners WHERE actor_id=?').bind(actorId),
    env.DB.prepare('DELETE FROM chat_members WHERE actor_id=? AND display_name=?').bind(actorId,confirmName),
  ];
  const result=await env.DB.batch(queries);
