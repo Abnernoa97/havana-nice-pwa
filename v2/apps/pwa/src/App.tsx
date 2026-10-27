@@ -463,15 +463,30 @@ export default function App() {
     retryCount.current=0;
     reconnect(next);
   }
+  // S01 observe: request permission explicitly from a NEW PWA browser/device,
+  // without requiring enforce or disrupting the existing named Chat sessions.
+  // The same enrollment flow is also used later when enforce rejects a login.
+  async function beginDeviceEnrollment(displayName:string){
+    const pending=await requestChatDeviceEnrollment(displayName,'PWA · HAVANA NICE V2');
+    await savePendingEnrollment(pending); // commit locally before changing screen
+    setEnrollment(pending);
+  }
+  async function requestDeviceEnrollment(){
+    if(!name.trim()||joining||enrollment)return;
+    setJoining(true);setError('');
+    try{await beginDeviceEnrollment(name.trim());}
+    catch(e){setError(e instanceof Error?e.message:'No se pudo solicitar acceso');}
+    finally{setJoining(false);}
+  }
   async function join(){
-    if(!name.trim()||joining)return;
+    if(!name.trim()||joining||enrollment)return;
     setJoining(true);setError('');
     try{
       const next=await startNamedChatSession(name.trim());
       acceptApprovedSession(next);
     }catch(reason){
       if(reason instanceof DeviceApprovalRequiredError){
-        try{const pending=await requestChatDeviceEnrollment(name.trim(),'iPhone · HAVANA NICE V2');await savePendingEnrollment(pending);setEnrollment(pending);}
+        try{await beginDeviceEnrollment(name.trim());}
         catch(e){setError(e instanceof Error?e.message:'No se pudo solicitar acceso');}
       } else setError(reason instanceof Error?reason.message:'No se pudo entrar');
     }finally{setJoining(false);}
@@ -601,7 +616,8 @@ export default function App() {
           <span className="overline">ACCESO HAVANA NICE</span>
           {enrollment ? <>
             <h2>Esperando autorización</h2>
-            <p>El administrador debe aprobar el teléfono de {enrollment.displayName} desde HAVANA NICE V2.</p>
+            <p>Solicitud registrada para {enrollment.displayName}. El Administrador debe aprobar este dispositivo desde la sección Solicitudes de HAVANA NICE V2.</p>
+            <small>Si cierras esta PWA, la solicitud pendiente se recuperará al volver a abrirla en este mismo navegador.</small>
             <button type="button" onClick={()=>void checkEnrollment()} disabled={checkingEnrollment}>
               {checkingEnrollment?'Comprobando…':'Comprobar autorización'}
             </button>
@@ -613,10 +629,18 @@ export default function App() {
           <form onSubmit={event => { event.preventDefault(); void join(); }}>
             <label htmlFor="chat-name">Tu nombre</label>
             <input id="chat-name" maxLength={28} autoComplete="nickname" autoCapitalize="none" value={name} onChange={event => setName(event.target.value)} placeholder="Tu nombre" />
-            <button disabled={joining || !name.trim()}>{joining ? 'Conectando…' : 'Entrar al chat'}</button>
+            <button type="submit" disabled={joining || !name.trim()}>{joining ? 'Conectando…' : 'Entrar al chat'}</button>
+            <div className="join-enrollment-trial">
+              <p>Prueba de teléfonos nuevos: solicita permiso antes de entrar. No bloquea los accesos existentes mientras el Administrador verifica el sistema.</p>
+              <button className="join-enrollment-request" type="button"
+                disabled={joining || !name.trim()}
+                onClick={()=>void requestDeviceEnrollment()}>
+                {joining?'Enviando solicitud…':'Solicitar autorización de este dispositivo (prueba)'}
+              </button>
+            </div>
           </form>
           {error && <p className="chat-error" role="alert">{error}</p>}
-          <small>Solo pueden entrar los integrantes autorizados por Administrador.</small>
+          <small>La solicitud de prueba debe aprobarse en el Administrador antes de entrar por esta vía.</small>
           </>}
         </section>
       ) : (

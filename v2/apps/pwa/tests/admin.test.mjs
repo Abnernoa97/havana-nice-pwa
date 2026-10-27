@@ -100,3 +100,21 @@ test('Admin Chat receives authenticated realtime changes without trusting push c
  assert.match(panel,/adminVerify\(session\.token\)/);
  assert.doesNotMatch(api,/localStorage\.|sessionStorage\.|indexedDB\./);
 });
+
+test('S01 observe enrollment is explicitly available only on logged-out PWA, without changing native Android',()=>{
+ const pwa=read('../src/App.tsx');
+ const android=read('../../android/App.tsx');
+ const styles=read('../src/styles.css');
+ assert.match(pwa,/async function requestDeviceEnrollment\(\)/);
+ assert.match(pwa,/await beginDeviceEnrollment\(name\.trim\(\)\)/);
+ assert.match(pwa,/const pending=await requestChatDeviceEnrollment\(displayName,'PWA · HAVANA NICE V2'\)/);
+ assert.match(pwa,/await savePendingEnrollment\(pending\)/);
+ assert.match(pwa,/type="button"[\s\S]{0,140}onClick=\{\(\)=>void requestDeviceEnrollment\(\)\}/);
+ assert.match(pwa,/Solicitar autorización de este dispositivo \(prueba\)/);
+ assert.match(pwa,/\!session \? \(/);
+ assert.match(pwa,/if\(!name\.trim\(\)\|\|joining\|\|enrollment\)return/);
+ assert.match(styles,/\.join-panel \.join-enrollment-request/);
+ // The installed native app keeps its original join and pending storage; no APK release.
+ assert.match(android,/loadNativePendingEnrollment/);
+ assert.doesNotMatch(android,/Solicitar autorización de este dispositivo \(prueba\)/);
+});
