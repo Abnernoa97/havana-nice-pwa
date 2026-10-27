@@ -1,6 +1,6 @@
 import {useCallback,useEffect,useState,type FormEvent} from 'react';
-import {adminAvailability,adminLogin,adminLogout,adminVerify,adminMembers,adminCreateMember,openAdminRealtime,
- type AdminSession,type AdminMember} from './admin-api';
+import {adminAvailability,adminLogin,adminLogout,adminVerify,adminMembers,adminCreateMember,adminMemberHistory,adminRemoveMember,openAdminRealtime,
+ type AdminSession,type AdminMember,type AdminMemberHistory} from './admin-api';
 
 type Section='access'|'chat'|'repertoire'|'calendar'|'more';
 type Readiness='loading'|'disabled'|'enabled'|'error';
@@ -15,6 +15,10 @@ export default function AdminChatAccess({section}:{section:Section}){
  const [notice,setNotice]=useState('');
  const [members,setMembers]=useState<AdminMember[]>([]);
  const [loaded,setLoaded]=useState(false);
+ const [expanded,setExpanded]=useState('');
+ const [history,setHistory]=useState<Record<string,AdminMemberHistory>>({});
+ const [historyLoading,setHistoryLoading]=useState('');
+ const [removing,setRemoving]=useState('');
  const [realtime,setRealtime]=useState<'waiting'|'connected'|'reconnecting'>('waiting');
 
  const refreshMembers=useCallback(async(token:string)=>{
@@ -91,6 +95,34 @@ export default function AdminChatAccess({section}:{section:Section}){
    setSession(null);setMembers([]);setLoaded(false);setError('');setNotice('');setName('');
    try{await adminLogout(token);}catch{/* In-memory session is discarded even when offline. */}
  }
+ async function toggleMember(person:AdminMember){
+   if(expanded===person.actor_id){setExpanded('');return;}
+   setExpanded(person.actor_id);
+   if(!session)return;
+   setHistoryLoading(person.actor_id);
+   setError('');
+   try{
+     const value=await adminMemberHistory(session.token,person.actor_id);
+     setHistory(previous=>({...previous,[person.actor_id]:value}));
+   }catch(e){setError(e instanceof Error?e.message:'No se pudo cargar el historial');}
+   finally{setHistoryLoading('');}
+ }
+ async function removeMember(person:AdminMember){
+   if(!session||removing||busy)return;
+   const confirmed=window.confirm(
+     '¿Eliminar DEFINITIVAMENTE a '+person.display_name+'?\\n\\nSe eliminarán su nombre, sesiones, mensajes propios, reacciones y registro de acceso. Se cerrarán sus dispositivos conectados. Esta acción no se puede deshacer.'
+   );
+   if(!confirmed)return;
+   setRemoving(person.actor_id);setError('');setNotice('');
+   try{
+     await adminRemoveMember(session.token,person.actor_id,person.display_name);
+     setHistory(previous=>{const next={...previous};delete next[person.actor_id];return next;});
+     if(expanded===person.actor_id)setExpanded('');
+     await refreshMembers(session.token);
+     setNotice('Miembro eliminado definitivamente: '+person.display_name);
+   }catch(e){setError(e instanceof Error?e.message:'No se pudo eliminar el miembro');}
+   finally{setRemoving('');}
+ }
  async function addMember(event:FormEvent){
    event.preventDefault();if(!session||busy||!name.trim())return;
    setBusy(true);setError('');setNotice('');
@@ -150,10 +182,41 @@ export default function AdminChatAccess({section}:{section:Section}){
      </div>
      {!loaded?<p className="a-detail">Cargando integrantes…</p>:
        members.length===0?<p className="a-detail">Todavía no hay miembros registrados. Añade el primero arriba.</p>:
-       <div className="a-member-rows">{members.map(person=><div className="a-member-row" key={person.actor_id}>
-         <div className="a-member-avatar" aria-hidden="true">{person.display_name.charAt(0).toUpperCase()}</div>
-         <div className="a-member-identity"><strong>{person.display_name}</strong><small>{person.active===1?'Autorizado':'Inactivo'}</small></div>
-         <span className={person.active===1?'a-member-status on':'a-member-status'}>{person.active===1?'Activo':'Inactivo'}</span>
+       <div className="a-member-rows">{members.map(person=><div className="a-member-group" key={person.actor_id}>
+         <div className="a-member-row">
+           <button type="button" className="a-member-expand" aria-expanded={expanded===person.actor_id}
+             onClick={()=>void toggleMember(person)}>
+             <span className="a-member-avatar" aria-hidden="true">{person.display_name.charAt(0).toUpperCase()}</span>
+             <span className="a-member-identity"><strong>{person.display_name}</strong><small>{person.active===1?'Autorizado':'Inactivo'}</small></span>
+             <span className="a-member-chevron" aria-hidden="true">{expanded===person.actor_id?'⌃':'⌄'}</span>
+           </button>
+           <span className={person.active===1?'a-member-status on':'a-member-status'}>{person.active===1?'Activo':'Inactivo'}</span>
+           <button type="button" className="a-member-delete" onClick={()=>void removeMember(person)}
+             disabled={!!removing||busy} title={'Eliminar definitivamente a '+person.display_name}
+             aria-label={'Eliminar definitivamente a '+person.display_name}>
+             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+               <path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m5 4v7m4-7v7"/>
+             </svg>
+           </button>
+         </div>
+         {expanded===person.actor_id&&<div className="a-member-history">
+           <h3>Historial de accesos</h3>
+           {historyLoading===person.actor_id?<p>Cargando datos desde Cloudflare…</p>:
+             !history[person.actor_id]?<p>Sin datos de historial disponibles.</p>:
+             <>
+               <p className="a-member-count">Entradas registradas: <strong>{history[person.actor_id].entries}</strong></p>
+               {history[person.actor_id].events.length===0?
+                 <p>Sin historial registrado. Las entradas anteriores a la activación de este registro no se pueden reconstruir.</p>:
+                 <div className="a-member-events">{history[person.actor_id].events.map((event,index)=>
+                   <div className="a-member-event" key={event.occurred_at+'-'+index}>
+                     <strong>{event.event_type==='login'?'Entrada':event.event_type==='connect'?'Conectó al Chat':'Desconectó del Chat'} · {new Date(event.occurred_at).toLocaleString('es-MX',{dateStyle:'medium',timeStyle:'short'})}</strong>
+                     <span>{event.platform} · {event.operating_system}</span>
+                     <span>{event.device_name}{event.device_model?' · Modelo: '+event.device_model:' · Modelo no disponible'}</span>
+                   </div>)}</div>}
+               <small>{history[person.actor_id].since}</small>
+             </>}
+         </div>}
        </div>)}</div>}
    </section>
  </div>;
