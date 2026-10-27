@@ -13,6 +13,9 @@ class FakeD1 {
  async first(sql,p){
   if(sql.startsWith('SELECT failures,window_start')) return this.attempts.get(p[0])||null;
   if(sql.startsWith('SELECT expires_at,revoked_at'))return this.sessions.get(p[0])||null;
+  if(sql.startsWith('SELECT COUNT(*) AS others FROM chat_admin_sessions')){
+    return {others:[...this.sessions.entries()].filter(([key,row])=>key!==p[1]&&row.revoked_at===null&&row.expires_at>p[0]).length};
+  }
   throw Error('Unexpected read '+sql);
  }
  async run(sql,p){
@@ -30,6 +33,15 @@ class FakeD1 {
     return {meta:{changes:1}};
   }
   if(sql.startsWith('UPDATE chat_admin_sessions')){
+    if(sql.includes('token_hash<>?')){
+      let changes=0;
+      for(const [key,row] of this.sessions){
+        if(key!==p[2]&&row.revoked_at===null&&row.expires_at>p[1]){
+          row.revoked_at=p[0];changes++;
+        }
+      }
+      return {meta:{changes}};
+    }
     const row=this.sessions.get(p[1]);if(row)row.revoked_at=p[0];
     return {meta:{changes:row?1:0}};
   }
@@ -120,4 +132,34 @@ test('Worker rechecks admin sessions for WebSocket; DO keeps admin sockets out o
  assert.match(worker,/verifyAdminSession\(adminTokenRequest\(token\),this\.env\)/);
  assert.match(worker,/this\.adminSockets = new Map/);
  assert.match(worker,/this\.members\.set\(server, \{actorId/);
+});
+
+test('Administrator can review and close ONLY other active sessions',async()=>{
+ const e=env();
+ const tokens=[];
+ for(let i=0;i<3;i++){
+   const signIn=await fetchAdmin(e,'POST','/api/chat/admin/auth/session',{password:adminPassword},
+     undefined,'192.0.2.'+(10+i));
+   assert.equal(signIn.status,200);
+   tokens.push(signIn.data.token);
+ }
+ assert.equal(e.DB.sessions.size,3);
+ const anonymous=await fetchAdmin(e,'GET','/api/chat/admin/auth/sessions');
+ assert.equal(anonymous.status,401);
+ const current=tokens[1];
+ assert.deepEqual(await fetchAdmin(e,'GET','/api/chat/admin/auth/sessions',undefined,current),
+   {status:200,data:{others:2}});
+ const rejected=await fetchAdmin(e,'POST','/api/chat/admin/auth/revoke-others');
+ assert.equal(rejected.status,401);
+ const revoked=await fetchAdmin(e,'POST','/api/chat/admin/auth/revoke-others',undefined,current);
+ assert.equal(revoked.status,200);
+ assert.deepEqual(revoked.data,{ok:true,revoked:2});
+ assert.equal(await verifyAdminSession(request('GET','/x',undefined,current),e),true);
+ assert.equal(await verifyAdminSession(request('GET','/x',undefined,tokens[0]),e),false);
+ assert.equal(await verifyAdminSession(request('GET','/x',undefined,tokens[2]),e),false);
+ assert.deepEqual(await fetchAdmin(e,'GET','/api/chat/admin/auth/sessions',undefined,current),
+   {status:200,data:{others:0}});
+ const repeat=await fetchAdmin(e,'POST','/api/chat/admin/auth/revoke-others',undefined,current);
+ assert.equal(repeat.status,200);
+ assert.equal(repeat.data.revoked,0);
 });
