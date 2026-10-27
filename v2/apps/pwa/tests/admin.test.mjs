@@ -77,11 +77,12 @@ test('musician PWA uses server allowlist instead of device experiments',()=>{
 });
 test('original musician offline storage and Chat remain intact',()=>{
  const pwa=read('../src/App.tsx'),android=read('../../android/App.tsx');
- assert.match(pwa,/loadPendingEnrollment\(\)/);
- assert.match(pwa,/savePendingEnrollment\(pending\)/);
- assert.match(read('../src/local.ts'),/pending-device-enrollment-v1/);
+ assert.match(pwa,/loadLocalChat\(\)/);
+ assert.match(read('../src/local.ts'),/offline-outbox-v1/);
  assert.match(read('../../android/chatStorage.ts'),/havana-v2-chat-local-v1/);
- assert.match(android,/loadNativePendingEnrollment/);
+ assert.match(android,/loadNativeLocalChat\(\)/);
+ assert.doesNotMatch(pwa,/Enrollment|device_approval_required|checkEnrollment/);
+ assert.doesNotMatch(android,/Enrollment|device_approval_required|checkEnrollment/);
 });
 
 test('Administrator can explicitly close other sessions but cannot clear the current one',()=>{
@@ -251,4 +252,17 @@ test('one-musician one-installation alerts never display bearer tokens and relea
  assert.match(worker,/code:'name_already_bound'/);
  assert.match(worker,/claimFirstInstallation/);
  assert.doesNotMatch(panel,/token_hash|installation_secret|cf-connecting-ip/i);
+});
+
+test('legacy device approval endpoints and UIs are permanently removed',()=>{
+ const worker=read('../../../cloudflare/src/index.ts');
+ const api=read('../../../packages/shared/src/index.ts');
+ const access=read('../src/AdminChatAccess.tsx');
+ for(const code of [worker,api,access]){
+  assert.doesNotMatch(code,/device_approval_required|PendingChatDeviceEnrollment|device\/request|device\/status|admin\/device-requests|chat\/pwa\/session/);
+ }
+ assert.match(worker,/claimFirstInstallation/);
+ assert.match(worker,/name_already_bound/);
+ assert.match(access,/Intentos de acceso duplicado/);
+ assert.match(access,/Liberar dispositivo/);
 });
