@@ -118,3 +118,17 @@ test('Admin retains an authorized session during network outages and retries on 
  assert.match(access,/conservamos la sesión y los datos cargados/);
  assert.doesNotMatch(access,/catch\(\(\)=>setSession\(null\)\)/);
 });
+
+test('Access to musicians uses only server-confirmed list changes and fresh history',()=>{
+ const access=read('../src/AdminChatAccess.tsx');
+ const deletion=access.indexOf('await adminRemoveMember(session.token,person.actor_id,person.display_name)');
+ const confirmedDelete=access.indexOf('setMembers(previous=>previous.filter(item=>item.actor_id!==person.actor_id))');
+ assert.ok(deletion>0&&confirmedDelete>deletion,'Do not remove a musician from UI before server confirmation');
+ const creation=access.indexOf('const result=await adminCreateMember(session.token,name.trim())');
+ const confirmedCreate=access.indexOf('setMembers(previous=>previous.some(item=>item.actor_id===result.member.actor_id)');
+ assert.ok(creation>0&&confirmedCreate>creation,'Do not display a created musician before D1 confirmed it');
+ assert.match(access,/setHistory\(previous=>\{const next=\{\.\.\.previous\};delete next\[person\.actor_id\];return next;\}\)/);
+ assert.match(access,/historyErrors\[person\.actor_id\]/);
+ assert.match(access,/No se pudo consultar el historial en Cloudflare/);
+ assert.match(access,/role="alert">\{historyErrors\[person\.actor_id\]\}/);
+});
