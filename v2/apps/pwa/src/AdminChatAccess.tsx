@@ -1,6 +1,6 @@
 import {useCallback,useEffect,useState,type FormEvent} from 'react';
 import {adminAvailability,adminLogin,adminLogout,adminVerify,adminOtherSessions,adminRevokeOtherSessions,adminMembers,adminCreateMember,adminMemberHistory,adminDeletionPreview,adminRemoveMember,openAdminRealtime,
- type AdminSession,type AdminMember,type AdminMemberHistory,isAdminUnauthorized} from './admin-api';
+ type AdminSession,type AdminMember,type AdminMemberHistory,type AdminDeletionPreview,isAdminUnauthorized} from './admin-api';
 
 type Section='access'|'chat'|'repertoire'|'calendar'|'more';
 type Readiness='loading'|'disabled'|'enabled'|'error';
@@ -19,6 +19,9 @@ export default function AdminChatAccess({section}:{section:Section}){
  const [history,setHistory]=useState<Record<string,AdminMemberHistory>>({});
  const [historyLoading,setHistoryLoading]=useState('');
  const [historyErrors,setHistoryErrors]=useState<Record<string,string>>({});
+ const [impact,setImpact]=useState<Record<string,AdminDeletionPreview>>({});
+ const [impactLoading,setImpactLoading]=useState('');
+ const [impactErrors,setImpactErrors]=useState<Record<string,string>>({});
  const [removing,setRemoving]=useState('');
  const [otherSessions,setOtherSessions]=useState<number|null>(null);
  const [sessionsBusy,setSessionsBusy]=useState(false);
@@ -152,6 +155,7 @@ export default function AdminChatAccess({section}:{section:Section}){
    if(!session)return;
    const token=session.token;
    setSession(null);setMembers([]);setLoaded(false);setError('');setNotice('');setName('');setOtherSessions(null);
+   setExpanded('');setHistory({});setHistoryErrors({});setImpact({});setImpactErrors({});
    try{await adminLogout(token);}catch{/* In-memory session is discarded even when offline. */}
  }
  async function toggleMember(person:AdminMember){
@@ -167,6 +171,24 @@ export default function AdminChatAccess({section}:{section:Section}){
    }catch{
      setHistoryErrors(previous=>({...previous,[person.actor_id]:'No se pudo consultar el historial en Cloudflare. Cierra y vuelve a abrir para reintentar.'}));
    }finally{setHistoryLoading(current=>current===person.actor_id?'':current);}
+ }
+ // A separate, strictly read-only audit: no trash action and no mutation.
+ // The Administrator can inspect real D1 counts without taking any risk.
+ async function inspectMemberData(person:AdminMember){
+   if(!session||impactLoading)return;
+   setImpactLoading(person.actor_id);
+   setImpact(previous=>{const next={...previous};delete next[person.actor_id];return next;});
+   setImpactErrors(previous=>{const next={...previous};delete next[person.actor_id];return next;});
+   try{
+     const value=await adminDeletionPreview(session.token,person.actor_id);
+     if(value.displayName!==person.display_name)throw new Error('El nombre cambió. Actualiza la lista.');
+     setImpact(previous=>({...previous,[person.actor_id]:value}));
+   }catch(reason){
+     setImpactErrors(previous=>({...previous,[person.actor_id]:isAdminUnauthorized(reason)
+       ?'La sesión expiró; vuelve a iniciar sesión.'
+       :'No se pudieron consultar los datos en Cloudflare. Vuelve a intentar.'}));
+     if(isAdminUnauthorized(reason))setSession(null);
+   }finally{setImpactLoading(current=>current===person.actor_id?'':current);}
  }
  async function removeMember(person:AdminMember){
    if(!session||removing||busy)return;
@@ -195,6 +217,7 @@ export default function AdminChatAccess({section}:{section:Section}){
      // Only after the server confirms deletion, update local roster.
      setMembers(previous=>previous.filter(item=>item.actor_id!==person.actor_id));
      setHistory(previous=>{const next={...previous};delete next[person.actor_id];return next;});
+     setImpact(previous=>{const next={...previous};delete next[person.actor_id];return next;});
      if(expanded===person.actor_id)setExpanded('');
      await refreshMembers(session.token);
      setNotice('Miembro eliminado definitivamente: '+person.display_name);
@@ -317,6 +340,31 @@ export default function AdminChatAccess({section}:{section:Section}){
                    </div>)}</div>}
                <small>{history[person.actor_id]?.since}</small>
              </>}
+           <div className="a-member-impact">
+             <button type="button" onClick={()=>void inspectMemberData(person)}
+               disabled={impactLoading===person.actor_id||!!removing}
+               aria-label={'Consultar datos asociados a '+person.display_name}>
+               {impactLoading===person.actor_id?'Consultando Cloudflare…':'Ver datos asociados'}
+             </button>
+             <small>Consulta de solo lectura. No elimina ni modifica información.</small>
+             {impactErrors[person.actor_id]&&<p className="a-admin-error" role="alert">{impactErrors[person.actor_id]}</p>}
+             {impact[person.actor_id]&&<div className="a-member-impact-summary" role="status">
+               <strong>Datos asociados a {person.display_name}</strong>
+               <dl>
+                 <div><dt>Sesiones</dt><dd>{impact[person.actor_id].counts.sessions}</dd></div>
+                 <div><dt>Mensajes</dt><dd>{impact[person.actor_id].counts.messages}</dd></div>
+                 <div><dt>Reacciones</dt><dd>{impact[person.actor_id].counts.reactions}</dd></div>
+                 <div><dt>Lecturas</dt><dd>{impact[person.actor_id].counts.receipts}</dd></div>
+                 <div><dt>Historial</dt><dd>{impact[person.actor_id].counts.historyEvents}</dd></div>
+                 <div><dt>Solicitudes antiguas</dt><dd>{impact[person.actor_id].counts.deviceRequests}</dd></div>
+                 <div><dt>Activaciones PWA antiguas</dt><dd>{impact[person.actor_id].counts.firstClaims}</dd></div>
+                 <div><dt>Archivos multimedia</dt><dd>{impact[person.actor_id].counts.mediaAssets}</dd></div>
+               </dl>
+               {impact[person.actor_id].canDelete?
+                 <small>Sin archivos multimedia pendientes de eliminación externa.</small>:
+                 <p className="a-admin-error">La eliminación está bloqueada para proteger los archivos multimedia externos.</p>}
+             </div>}
+           </div>
          </div>}
        </div>)}</div>}
    </section>
