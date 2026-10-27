@@ -2,11 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import {
   fetchBackendHealth, getChatSnapshot, getOlderChatMessages, searchChatMessages, lastReadByOther, messageDeliveryLabel, newClientMessageId,
   openChatSocket, reconcileChatMessages, startNamedChatSession, restoreNamedChatSession,
-  DeviceApprovalRequiredError, requestChatDeviceEnrollment, checkChatDeviceEnrollment, usablePendingChatEnrollment, type PendingChatDeviceEnrollment,
   type BackendHealth, type ChatMessage, type ChatServerEvent, type ChatSession,
   reconcileReactions, reconcileUpdatedMessage, type ChatReaction, type ChatEmoji, type ChatReadReceipt,
 } from '@havana/shared';
-import { loadLocalChat, saveLocalChat, loadPendingEnrollment, savePendingEnrollment } from './local';
+import { loadLocalChat, saveLocalChat } from './local';
 import SwipeMessage, {type MessageAnchor} from './SwipeMessage';
 
 export default function App() {
@@ -19,8 +18,6 @@ export default function App() {
   const [connection, setConnection] = useState('desconectado');
   const [error, setError] = useState('');
   const [joining, setJoining] = useState(false);
-  const [enrollment,setEnrollment]=useState<PendingChatDeviceEnrollment|null>(null);
-  const [checkingEnrollment,setCheckingEnrollment]=useState(false);
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [reactions, setReactions] = useState<ChatReaction[]>([]);
   const [onlineUsers, setOnlineUsers] = useState(0);
@@ -355,10 +352,10 @@ export default function App() {
 
   useEffect(() => {
     disposed.current = false;
-    void Promise.all([loadLocalChat(),loadPendingEnrollment()]).then(async ([saved,pending]) => {
+    void loadLocalChat().then(async (saved) => {
       if(disposed.current)return;
       if(activeSession.current){restoredStorage.current=true;persist();return;}
-      if (!saved || !saved.session || Date.parse(saved.session.expiresAt) <= Date.now()) {if(pending){setEnrollment(pending);setName(pending.displayName);}return;}
+      if (!saved || !saved.session || Date.parse(saved.session.expiresAt) <= Date.now()) return;
       let approved:ChatSession | null = saved.session;
       try {approved = await restoreNamedChatSession(saved.session);}
       catch {approved = saved.session;} // Offline: keep local chat pending reconnection
@@ -455,46 +452,21 @@ export default function App() {
     setSearchResults(null);
     setHasMore(false);
     outbox.current.clear();
-    setEnrollment(null);
-    void savePendingEnrollment(null);
     setSession(next);
     activeSession.current=next;
     persist();
     retryCount.current=0;
     reconnect(next);
   }
-  // Only the musician names approved by the Administrator may sign in here.
-  // Existing local sessions are preserved. Device approvals are out of scope.
-  async function beginDeviceEnrollment(displayName:string){
-    const pending=await requestChatDeviceEnrollment(displayName,'PWA · HAVANA NICE V2');
-    await savePendingEnrollment(pending); // commit locally before changing screen
-    setEnrollment(pending);
-  }
+  // The only login: Administrator-created name, one server-linked session.
   async function join(){
-    if(!name.trim()||joining||enrollment)return;
+    if(!name.trim()||joining)return;
     setJoining(true);setError('');
     try{
       const next=await startNamedChatSession(name.trim());
       acceptApprovedSession(next);
-    }catch(reason){
-      if(reason instanceof DeviceApprovalRequiredError){
-        try{await beginDeviceEnrollment(name.trim());}
-        catch(e){setError(e instanceof Error?e.message:'No se pudo solicitar acceso');}
-      } else setError(reason instanceof Error?reason.message:'No se pudo entrar');
-    }finally{setJoining(false);}
-  }
-  async function checkEnrollment(){
-    if(!enrollment||checkingEnrollment)return;
-    if(!usablePendingChatEnrollment(enrollment)){
-      setEnrollment(null);void savePendingEnrollment(null);setError('La solicitud venció. Puedes solicitar otra.');return;
-    }
-    setCheckingEnrollment(true);setError('');
-    try{
-      const checked=await checkChatDeviceEnrollment(enrollment);
-      if('token' in checked)acceptApprovedSession(checked);
-      else setError('La solicitud todavía está pendiente de aprobación.');
-    }catch(e){setError(e instanceof Error?e.message:'No se pudo revisar la autorización');}
-    finally{setCheckingEnrollment(false);}
+    }catch(reason){setError(reason instanceof Error?reason.message:'No se pudo entrar');}
+    finally{setJoining(false);}
   }
 
   function send() {
@@ -606,26 +578,15 @@ export default function App() {
       {restoringAccess ? <section className="join-panel"><p>Abriendo HAVANA NICE…</p></section> : !session ? (
         <section className="join-panel">
           <span className="overline">ACCESO HAVANA NICE</span>
-          {enrollment ? <>
-            <h2>Esperando autorización</h2>
-            <p>Solicitud registrada para {enrollment.displayName}. El Administrador debe aprobar este dispositivo desde la sección Solicitudes de HAVANA NICE V2.</p>
-            <small>Si cierras esta PWA, la solicitud pendiente se recuperará al volver a abrirla en este mismo navegador.</small>
-            <button type="button" onClick={()=>void checkEnrollment()} disabled={checkingEnrollment}>
-              {checkingEnrollment?'Comprobando…':'Comprobar autorización'}
-            </button>
-            <button type="button" onClick={()=>{setEnrollment(null);void savePendingEnrollment(null);setError('');}}>Cancelar solicitud</button>
-            {error&&<p className="chat-error" role="alert">{error}</p>}
-          </> : <>
           <h2>Bienvenido.</h2>
           <p>Introduce el nombre que el Administrador creó y autorizó para ti.</p>
           <form onSubmit={event => { event.preventDefault(); void join(); }}>
             <label htmlFor="chat-name">Tu nombre</label>
             <input id="chat-name" maxLength={28} autoComplete="nickname" autoCapitalize="none" value={name} onChange={event => setName(event.target.value)} placeholder="Tu nombre" />
-            <button type="submit" disabled={joining || !name.trim()}>{joining ? 'Verificando dispositivo…' : 'Continuar'}</button>
+            <button type="submit" disabled={joining || !name.trim()}>{joining ? 'Comprobando acceso…' : 'Continuar'}</button>
           </form>
           {error && <p className="chat-error" role="alert">{error}</p>}
           <small>Si tu nombre no está registrado por el Administrador, no podrás entrar.</small>
-          </>}
         </section>
       ) : (
         <>
