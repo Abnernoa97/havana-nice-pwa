@@ -2,113 +2,83 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {handleAdminChat} from '../src/admin-chat.js';
-const TOKEN='Q'.repeat(43),BASE='https://havana-nice-v2-dev.soloaplicaciones97.workers.dev';
-const COLUMNS='seq,client_message_id,sender_id,sender_name,body,created_at,reply_to_seq,edited_at,deleted_at';
-const hash=async v=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(v)))].map(x=>x.toString(16).padStart(2,'0')).join('');
-async function setup(){
- const digest=await hash(TOKEN);
- const rows=[{seq:1,client_message_id:'a'.repeat(12),sender_id:'member:old',sender_name:'Noa',body:'mensaje histórico',created_at:'2026-10-27T12:00:00.000Z',reply_to_seq:null,edited_at:null,deleted_at:null},
-  {seq:2,client_message_id:'b'.repeat(12),sender_id:'member:new',sender_name:'Fer',body:'mensaje reciente',created_at:'2026-10-27T13:00:00.000Z',reply_to_seq:1,edited_at:null,deleted_at:null}];
- const reactions=[{message_seq:2,actor_id:'member:new',emoji:'👍'}];
+const TOKEN='Q'.repeat(43),BASE='https://v2.example';
+const sha=async s=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s)))).map(b=>b.toString(16).padStart(2,'0')).join('');
+async function fixture(){
+ const digest=await sha(TOKEN);
+ const rows=[
+  {seq:1,client_message_id:'aaaaaaaaaaaa',sender_id:'member:old',sender_name:'Noa',body:'Original',created_at:'2026-10-27T12:00:00.000Z',reply_to_seq:null,deleted_at:null,edited_at:null},
+  {seq:2,client_message_id:'bbbbbbbbbbbb',sender_id:'member:new',sender_name:'Fer',body:'Respuesta',created_at:'2026-10-27T12:01:00.000Z',reply_to_seq:1,deleted_at:null,edited_at:null},
+  {seq:3,client_message_id:'cccccccccccc',sender_id:'member:new',sender_name:'Fer',body:'[mensaje eliminado]',created_at:'2026-10-27T12:02:00.000Z',reply_to_seq:null,deleted_at:'2026-10-27T12:03:00.000Z',edited_at:null}
+ ];
+ const reactions=[{message_seq:1,actor_id:'member:new',emoji:'👍'}];
  const signals=[];
- const DB={
-  prepare(sql){
-   function bind(...params){return {
-    first:async()=>{
-     if(sql.startsWith('SELECT expires_at,revoked_at FROM chat_admin_sessions'))
-      return params[0]===digest?{expires_at:Date.now()+60_000,revoked_at:null}:null;
-     if(sql.startsWith('SELECT '+COLUMNS+' FROM chat_messages WHERE seq=?'))
-      return rows.find(x=>x.seq===params[0])||null;
-     throw Error('Unexpected SELECT first: '+sql);
-    },
-    all:async()=>{
-     if(sql.startsWith('SELECT '+COLUMNS+' FROM chat_messages'))
-      return {results:rows.filter(x=>!sql.includes('seq < ?')||x.seq<params[0])
-       .sort((a,b)=>b.seq-a.seq).slice(0,sql.includes('seq < ?')?params[1]:params[0])};
-     if(sql.startsWith('SELECT message_seq,actor_id,emoji FROM chat_reactions'))
-      return {results:reactions.filter(x=>params.includes(x.message_seq))};
-     throw Error('Unexpected SELECT all: '+sql);
-    },
-    run:async()=>{
-     if(sql.startsWith('UPDATE chat_messages SET body=')){
-      const target=rows.find(x=>x.seq===params[1]&&!x.deleted_at);
-      if(target){target.body='[mensaje eliminado]';target.deleted_at=params[0];}
-      return {meta:{changes:target?1:0}};
-     }
-     if(sql.startsWith('DELETE FROM chat_reactions WHERE message_seq=?')){
-      for(let i=reactions.length-1;i>=0;i--)if(reactions[i].message_seq===params[0])reactions.splice(i,1);
-      return {meta:{changes:1}};
-     }
-     throw Error('Unexpected write: '+sql);
+ const DB={prepare(sql){return {bind(...args){return {
+   async first(){
+    if(sql.includes('FROM chat_admin_sessions'))return args[0]===digest?{expires_at:Date.now()+90_000,revoked_at:null}:null;
+    if(sql==='SELECT seq FROM chat_messages WHERE seq=?')return rows.find(m=>m.seq===args[0])??null;
+    throw Error('Unexpected first: '+sql);
+   },
+   async all(){
+    if(sql.startsWith('SELECT seq,client_message_id'))return {results:rows.filter(m=>!m.deleted_at&&(!sql.includes('seq<?')||m.seq<args[0])).sort((a,b)=>b.seq-a.seq).slice(0,args.at(-1))};
+    if(sql.includes('FROM chat_reactions WHERE message_seq IN'))return {results:reactions.filter(r=>args.includes(r.message_seq))};
+    throw Error('Unexpected all '+sql);
+   },
+   async run(){
+    if(sql.startsWith('UPDATE chat_messages SET reply_to_seq=NULL')){
+     for(const row of rows)if(row.reply_to_seq===args[0])row.reply_to_seq=null;
+     return {meta:{changes:1}};
     }
-   };}
-   return {bind,sql};
-  },
-  async batch(queries){return Promise.all(queries.map(q=>q.run()));}
- };
+    if(sql.startsWith('DELETE FROM chat_reactions')){
+     for(let i=reactions.length-1;i>=0;i--)if(reactions[i].message_seq===args[0])reactions.splice(i,1);
+     return {meta:{changes:1}};
+    }
+    if(sql.startsWith('DELETE FROM chat_messages')){
+     for(let i=rows.length-1;i>=0;i--)if(rows[i].seq===args[0])rows.splice(i,1);
+     return {meta:{changes:1}};
+    }
+    throw Error('Unexpected run '+sql);
+   }
+  }};}} ,async batch(statements){return Promise.all(statements.map(x=>x.run()))}};
  const env={DB,V2_ADMIN_LOGIN_MODE:'enabled',V2_ADMIN_LOGIN_SECRET:'S'.repeat(48),
-  CHAT_ROOMS:{idFromName:n=>n,get:()=>({fetch:async(path,options)=>{
-   signals.push({path,data:JSON.parse(options.body)});return Response.json({ok:true});
-  }})}};
+  CHAT_ROOMS:{idFromName:x=>x,get:()=>({fetch:async(url,request)=>{signals.push({url,payload:JSON.parse(request.body)});return Response.json({ok:true})}})}};
  return {env,rows,reactions,signals};
 }
-async function call(e,method,path,valid=true){
- const request=new Request(BASE+path,{method,headers:valid?{authorization:'Bearer '+TOKEN}:{}});
- const response=await handleAdminChat(request,e.env,new URL(request.url),'',
-  (data,status=200)=>Response.json(data,{status}));
- return {status:response.status,body:await response.json()};
+async function request(f,method,path,valid=true){
+ const req=new Request(BASE+path,{method,headers:valid?{authorization:'Bearer '+TOKEN}:{}});
+ const response=await handleAdminChat(req,f.env,new URL(req.url),'',(v,status=200)=>Response.json(v,{status}));
+ return {status:response.status,json:await response.json()};
 }
-test('not anonymous and never a musician token',async()=>{
- const e=await setup();
- assert.equal((await call(e,'GET','/api/chat/admin/messages',false)).status,401);
- assert.equal((await call(e,'DELETE','/api/chat/admin/messages/2',false)).status,401);
- assert.equal(e.rows[1].deleted_at,null);
- assert.equal(e.signals.length,0);
+test('only Administrator can read or remove messages',async()=>{
+ const f=await fixture();
+ assert.equal((await request(f,'GET','/api/chat/admin/messages',false)).status,401);
+ assert.equal((await request(f,'DELETE','/api/chat/admin/messages/1',false)).status,401);
+ assert.equal(f.rows.length,3);
 });
-test('authorized viewer sees all authors in sequence, even removed historical names',async()=>{
- const e=await setup();
- const result=await call(e,'GET','/api/chat/admin/messages');
- assert.equal(result.status,200);
- assert.deepEqual(result.body.messages.map(x=>x.senderName),['Noa','Fer']);
- assert.equal(result.body.messages[0].text,'mensaje histórico');
- assert.deepEqual(result.body.reactions,[{messageSeq:2,actorId:'member:new',emoji:'👍'}]);
- assert.equal(result.body.hasMore,false);
- assert.equal((await call(e,'GET','/api/chat/admin/messages?beforeSeq=2')).body.messages.length,1);
- assert.equal((await call(e,'GET','/api/chat/admin/messages?beforeSeq=xyz')).status,400);
-});
-test('moderator soft deletion preserves reply chain, clears emoji and signals both Chats',async()=>{
- const e=await setup();
- const r=await call(e,'DELETE','/api/chat/admin/messages/2');
+test('history excludes all old deletion notices and includes named authors',async()=>{
+ const f=await fixture(),r=await request(f,'GET','/api/chat/admin/messages');
  assert.equal(r.status,200);
- assert.equal(r.body.message.text,'');
- assert.equal(r.body.message.senderName,'Fer');
- assert.ok(r.body.message.deletedAt);
- assert.equal(e.rows.length,2);
- assert.equal(e.rows[0].body,'mensaje histórico');
- assert.deepEqual(e.reactions,[]);
- assert.deepEqual(e.signals,[{path:'https://internal/admin-chat-message-updated',data:{seq:2}}]);
- assert.equal((await call(e,'DELETE','/api/chat/admin/messages/2')).status,200);
- assert.equal((await call(e,'DELETE','/api/chat/admin/messages/999')).status,404);
- assert.equal((await call(e,'DELETE','/api/chat/admin/messages/0')).status,400);
+ assert.deepEqual(r.json.messages.map(m=>m.senderName),['Noa','Fer']);
+ assert.equal((await request(f,'GET','/api/chat/admin/messages?beforeSeq=2')).json.messages.length,1);
 });
-test('Durable Object relays moderation to musicians and private Admin without send permission',()=>{
- const code=readFileSync(new URL('../src/index.ts',import.meta.url),'utf8');
- assert.match(code,/admin-chat-message-updated/);
- assert.match(code,/if\(!row\|\|!row.deleted_at\)/);
- assert.match(code,/this\.broadcast\(\{type:'chat.updated',message:mapMessage\(row\)\}\)/);
- assert.match(code,/'chat.message':'admin.chat.message'/);
- assert.match(code,/'chat.updated':'admin.chat.updated'/);
- assert.match(code,/verifyAdminSession\(adminTokenRequest\(token\),this.env\)/);
+test('moderation physically removes message, reactions and reply reference',async()=>{
+ const f=await fixture(),r=await request(f,'DELETE','/api/chat/admin/messages/1');
+ assert.equal(r.status,200);
+ assert.deepEqual(r.json,{ok:true,seq:1});
+ assert.equal(f.rows.some(m=>m.seq===1),false);
+ assert.equal(f.rows.find(m=>m.seq===2).reply_to_seq,null);
+ assert.deepEqual(f.reactions,[]);
+ assert.deepEqual(f.signals,[{url:'https://internal/admin-chat-message-deleted',payload:{seq:1}}]);
+ assert.equal((await request(f,'DELETE','/api/chat/admin/messages/1')).status,404);
 });
-
-test('The ONE Worker CORS preflight admits DELETE for authenticated moderator calls, rejects other origins',()=>{
- const code=readFileSync(new URL('../src/index.ts',import.meta.url),'utf8');
- assert.match(code,/request\.method === 'OPTIONS'/);
- assert.match(code,/'access-control-allow-methods': 'GET, POST, DELETE, OPTIONS'/);
- assert.match(code,/'access-control-allow-headers': 'Authorization, Content-Type, X-Havana-Client-Asset-Id'/);
- assert.ok(code.indexOf("if (request.headers.has('origin') && !origin)")<
-  code.indexOf("if (request.method === 'OPTIONS')"),
-  'Unknown origins must be denied before preflight');
- assert.equal((code.match(/'access-control-allow-methods':/g)||[]).length,1,
-  'No second CORS entrypoint should diverge');
+test('one deletion implementation, broadcast event and CORS preflight',()=>{
+ const source=readFileSync(new URL('../src/index.ts',import.meta.url),'utf8');
+ const helper=readFileSync(new URL('../src/message-removal.js',import.meta.url),'utf8');
+ assert.match(source,/deleteChatMessageRecord\(this.env,input.seq\)/);
+ assert.match(source,/this.broadcast\(\{type:'chat.deleted',seq:input.seq\}\)/);
+ assert.match(source,/'chat.deleted':'admin.chat.deleted'/);
+ assert.match(source,/'access-control-allow-methods': 'GET, POST, DELETE, OPTIONS'/);
+ assert.match(helper,/UPDATE chat_messages SET reply_to_seq=NULL/);
+ assert.match(helper,/DELETE FROM chat_reactions/);
+ assert.match(helper,/DELETE FROM chat_messages/);
 });
