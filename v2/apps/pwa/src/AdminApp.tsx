@@ -14,6 +14,7 @@ export default function AdminApp(){
  const [tab,setTab]=useState<Tab>('access');
  const [health,setHealth]=useState<{phase:'checking'|'online'|'offline';data:BackendHealth|null}>({phase:'checking',data:null});
  const [installEvent,setInstallEvent]=useState<Event|null>(null);
+ const [updatePending,setUpdatePending]=useState(false);
  const current=tabs.find(item=>item.id===tab)!;
  const refresh=useCallback(async()=>{
    try{const data=await fetchBackendHealth();setHealth({phase:data.ok&&data.database==='ok'?'online':'offline',data});}
@@ -25,6 +26,12 @@ export default function AdminApp(){
    document.addEventListener('visibilitychange',onReturn);window.addEventListener('online',onReturn);
    return()=>{window.clearInterval(timer);document.removeEventListener('visibilitychange',onReturn);window.removeEventListener('online',onReturn);};
  },[refresh]);
+ useEffect(()=>{
+   const handler=()=>setUpdatePending(true);
+   if(document.documentElement.dataset.adminUpdatePending==='true')setUpdatePending(true);
+   window.addEventListener('havana-admin-update-pending',handler);
+   return()=>window.removeEventListener('havana-admin-update-pending',handler);
+ },[]);
  useEffect(()=>{
    const capture=(event:Event)=>{event.preventDefault();setInstallEvent(event);};
    window.addEventListener('beforeinstallprompt',capture);
@@ -64,6 +71,9 @@ export default function AdminApp(){
            <div><strong>{health.phase==='online'?'Servidor conectado':health.phase==='checking'?'Comprobando conexión…':'Conexión sin confirmar'}</strong>
              <p>Los nombres autorizados se guardan en el servidor V2.</p></div>
          </div>
+       </div>}
+       {updatePending&&<div className="a-admin-update-pending" role="status">
+         Hay una actualización preparada. Se aplicará cuando cierres sesión, sin interrumpir tu trabajo.
        </div>}
        <AdminChatAccess section={tab}/>
        {tab!=='access'&&<section className="a-panel a-module-next">
