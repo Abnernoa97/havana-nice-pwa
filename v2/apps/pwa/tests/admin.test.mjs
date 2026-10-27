@@ -72,3 +72,19 @@ test('one connected members panel; no contradictory duplicate placeholder',()=>{
  assert.doesNotMatch(ui,/Permisos de músicos protegidos|Integrantes del Chat/);
  assert.match(component,/Músicos de HAVANA NICE V2/);
 });
+
+test('S01 pending device requests resume separately from Chat history on Android and iPhone',()=>{
+ const shared=read('../../../packages/shared/src/index.ts');
+ assert.match(shared,/usablePendingChatEnrollment/);
+ const a=read('../../android/App.tsx'),p=read('../src/App.tsx');
+ assert.match(read('../../android/chatStorage.ts'),/havana-v2-chat-pending-device-v1/);
+ assert.match(read('../src/local.ts'),/pending-device-enrollment-v1/);
+ assert.match(read('../../android/chatStorage.ts'),/havana-v2-chat-local-v1/);
+ assert.match(read('../src/local.ts'),/offline-outbox-v1/);
+ for(const [s,load,save] of [[a,'loadNativePendingEnrollment','saveNativePendingEnrollment'],[p,'loadPendingEnrollment','savePendingEnrollment']]){
+  assert.ok(s.includes('Promise.all([')&&s.includes(load+'()'));
+  assert.ok(s.includes('await '+save+'(pending)'));
+  assert.ok(s.includes('void '+save+'(null)'));
+  assert.match(s,/usablePendingChatEnrollment\(enrollment\)/);
+ }
+});

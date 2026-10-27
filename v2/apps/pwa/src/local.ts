@@ -1,4 +1,4 @@
-import type { ChatMessage, ChatSession } from '@havana/shared';
+import {usablePendingChatEnrollment,type PendingChatDeviceEnrollment,type ChatMessage,type ChatSession} from '@havana/shared';
 
 export interface LocalChatState {
   session: ChatSession;
@@ -45,4 +45,27 @@ export async function saveLocalChat(value: LocalChatState | null): Promise<void>
       tx.onerror = () => reject(tx.error);
     });
   } finally { db.close(); }
+}
+
+// Independent IndexedDB key, same store and schema; no existing outbox migration.
+const PENDING_KEY='pending-device-enrollment-v1';
+export async function loadPendingEnrollment():Promise<PendingChatDeviceEnrollment|null>{
+ const db=await database();let val:unknown;
+ try{val=await new Promise<unknown>((resolve,reject)=>{
+  const tx=db.transaction(STORE,'readonly');const req=tx.objectStore(STORE).get(PENDING_KEY);
+  req.onsuccess=()=>resolve(req.result??null);req.onerror=()=>reject(req.error);
+ });}finally{db.close();}
+ if(usablePendingChatEnrollment(val))return val;
+ if(val!=null)await savePendingEnrollment(null);
+ return null;
+}
+export async function savePendingEnrollment(value:PendingChatDeviceEnrollment|null):Promise<void>{
+ if(value&&!usablePendingChatEnrollment(value))throw new Error('Solicitud vencida o inválida');
+ const db=await database();
+ try{await new Promise<void>((resolve,reject)=>{
+  const tx=db.transaction(STORE,'readwrite');
+  if(value)tx.objectStore(STORE).put(value,PENDING_KEY);
+  else tx.objectStore(STORE).delete(PENDING_KEY);
+  tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);
+ });}finally{db.close();}
 }

@@ -2,11 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import {
   fetchBackendHealth, getChatSnapshot, getOlderChatMessages, searchChatMessages, lastReadByOther, messageDeliveryLabel, newClientMessageId,
   openChatSocket, reconcileChatMessages, startNamedChatSession, restoreNamedChatSession,
-  DeviceApprovalRequiredError, requestChatDeviceEnrollment, checkChatDeviceEnrollment, type PendingChatDeviceEnrollment,
+  DeviceApprovalRequiredError, requestChatDeviceEnrollment, checkChatDeviceEnrollment, usablePendingChatEnrollment, type PendingChatDeviceEnrollment,
   type BackendHealth, type ChatMessage, type ChatServerEvent, type ChatSession,
   reconcileReactions, reconcileUpdatedMessage, type ChatReaction, type ChatEmoji, type ChatReadReceipt,
 } from '@havana/shared';
-import { loadLocalChat, saveLocalChat } from './local';
+import { loadLocalChat, saveLocalChat, loadPendingEnrollment, savePendingEnrollment } from './local';
 import SwipeMessage, {type MessageAnchor} from './SwipeMessage';
 
 export default function App() {
@@ -355,10 +355,10 @@ export default function App() {
 
   useEffect(() => {
     disposed.current = false;
-    void loadLocalChat().then(async saved => {
+    void Promise.all([loadLocalChat(),loadPendingEnrollment()]).then(async ([saved,pending]) => {
       if(disposed.current)return;
       if(activeSession.current){restoredStorage.current=true;persist();return;}
-      if (!saved || !saved.session || Date.parse(saved.session.expiresAt) <= Date.now()) return;
+      if (!saved || !saved.session || Date.parse(saved.session.expiresAt) <= Date.now()) {if(pending){setEnrollment(pending);setName(pending.displayName);}return;}
       let approved:ChatSession | null = saved.session;
       try {approved = await restoreNamedChatSession(saved.session);}
       catch {approved = saved.session;} // Offline: keep local chat pending reconnection
@@ -456,6 +456,7 @@ export default function App() {
     setHasMore(false);
     outbox.current.clear();
     setEnrollment(null);
+    void savePendingEnrollment(null);
     setSession(next);
     activeSession.current=next;
     persist();
@@ -470,13 +471,16 @@ export default function App() {
       acceptApprovedSession(next);
     }catch(reason){
       if(reason instanceof DeviceApprovalRequiredError){
-        try{setEnrollment(await requestChatDeviceEnrollment(name.trim(),'iPhone · HAVANA NICE V2'));}
+        try{const pending=await requestChatDeviceEnrollment(name.trim(),'iPhone · HAVANA NICE V2');await savePendingEnrollment(pending);setEnrollment(pending);}
         catch(e){setError(e instanceof Error?e.message:'No se pudo solicitar acceso');}
       } else setError(reason instanceof Error?reason.message:'No se pudo entrar');
     }finally{setJoining(false);}
   }
   async function checkEnrollment(){
     if(!enrollment||checkingEnrollment)return;
+    if(!usablePendingChatEnrollment(enrollment)){
+      setEnrollment(null);void savePendingEnrollment(null);setError('La solicitud venció. Puedes solicitar otra.');return;
+    }
     setCheckingEnrollment(true);setError('');
     try{
       const checked=await checkChatDeviceEnrollment(enrollment);
@@ -601,7 +605,7 @@ export default function App() {
             <button type="button" onClick={()=>void checkEnrollment()} disabled={checkingEnrollment}>
               {checkingEnrollment?'Comprobando…':'Comprobar autorización'}
             </button>
-            <button type="button" onClick={()=>{setEnrollment(null);setError('');}}>Cancelar solicitud</button>
+            <button type="button" onClick={()=>{setEnrollment(null);void savePendingEnrollment(null);setError('');}}>Cancelar solicitud</button>
             {error&&<p className="chat-error" role="alert">{error}</p>}
           </> : <>
           <h2>Bienvenido.</h2>

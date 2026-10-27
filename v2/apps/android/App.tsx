@@ -6,10 +6,10 @@ import {
 import {
   HAVANA_V2_DEV_API_BASE_URL, fetchBackendHealth, getChatSnapshot, getOlderChatMessages, searchChatMessages, lastReadByOther, messageDeliveryLabel, newClientMessageId,
   reconcileChatMessages, reconcileReactions, reconcileUpdatedMessage, startNamedChatSession, restoreNamedChatSession,
-  DeviceApprovalRequiredError, requestChatDeviceEnrollment, checkChatDeviceEnrollment, type PendingChatDeviceEnrollment,
+  DeviceApprovalRequiredError, requestChatDeviceEnrollment, checkChatDeviceEnrollment, usablePendingChatEnrollment, type PendingChatDeviceEnrollment,
   type ChatMessage, type ChatServerEvent, type ChatSession, type ChatReaction, type ChatEmoji, type ChatReadReceipt,
 } from '@havana/shared';
-import { loadNativeLocalChat, saveNativeLocalChat } from './chatStorage';
+import { loadNativeLocalChat, saveNativeLocalChat, loadNativePendingEnrollment, saveNativePendingEnrollment } from './chatStorage';
 import SwipeableBubble, {type BubbleAnchor} from './SwipeableBubble';
 
 export default function App() {
@@ -467,10 +467,10 @@ export default function App() {
 
   useEffect(() => {
     disposed.current = false;
-    void loadNativeLocalChat().then(async saved => {
+    void Promise.all([loadNativeLocalChat(),loadNativePendingEnrollment()]).then(async ([saved,pending]) => {
       if (disposed.current) return;
       if (activeSession.current) {restoredStorage.current=true;persistLocal();return;}
-      if (!saved?.session || Date.parse(saved.session.expiresAt) <= Date.now()) return;
+      if (!saved?.session || Date.parse(saved.session.expiresAt) <= Date.now()) {if(pending){setEnrollment(pending);setName(pending.displayName);}return;}
       let approved:ChatSession | null = saved.session;
       try {approved = await restoreNamedChatSession(saved.session);}
       catch {approved = saved.session;} // Offline: retain local identity and retry once online
@@ -563,6 +563,7 @@ export default function App() {
     setResults(null);
     setHasMore(false);
     setEnrollment(null);
+    void saveNativePendingEnrollment(null);
     setSession(next);
     activeSession.current=next;
     persistLocal();
@@ -580,6 +581,7 @@ export default function App() {
       if(reason instanceof DeviceApprovalRequiredError) {
         try {
           const pending=await requestChatDeviceEnrollment(name.trim(),'Android · HAVANA NICE V2');
+          await saveNativePendingEnrollment(pending);
           setEnrollment(pending);
         } catch(e) {setError(e instanceof Error?e.message:'No se pudo solicitar acceso');}
       } else setError(reason instanceof Error?reason.message:'No se pudo entrar');
@@ -587,6 +589,9 @@ export default function App() {
   }
   async function checkEnrollment(){
     if(!enrollment||checkingEnrollment)return;
+    if(!usablePendingChatEnrollment(enrollment)){
+      setEnrollment(null);void saveNativePendingEnrollment(null);setError('La solicitud venció. Puedes solicitar otra.');return;
+    }
     setCheckingEnrollment(true);setError('');
     try{
       const result=await checkChatDeviceEnrollment(enrollment);
@@ -713,7 +718,7 @@ export default function App() {
               <Pressable accessibilityRole="button" onPress={()=>void checkEnrollment()} disabled={checkingEnrollment} style={styles.joinButton}>
                 <Text style={styles.joinText}>{checkingEnrollment?'Comprobando…':'Comprobar autorización'}</Text>
               </Pressable>
-              <Pressable accessibilityRole="button" onPress={()=>{setEnrollment(null);setError('');}} style={{paddingVertical:14}}>
+              <Pressable accessibilityRole="button" onPress={()=>{setEnrollment(null);void saveNativePendingEnrollment(null);setError('');}} style={{paddingVertical:14}}>
                 <Text style={styles.footer}>Cancelar solicitud en este teléfono</Text>
               </Pressable>
               {error?<Text style={styles.error}>{error}</Text>:null}

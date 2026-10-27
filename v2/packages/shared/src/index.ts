@@ -156,6 +156,15 @@ export interface PendingChatDeviceEnrollment {
   requestId:string; requestSecret:string; expiresAt:string; status:'pending';
   displayName:string;
 }
+/** Client-side expiration guard; the server is still the authorization authority. */
+export function usablePendingChatEnrollment(value:unknown,now=Date.now()):value is PendingChatDeviceEnrollment{
+ if(!value||typeof value!=='object')return false;
+ const p=value as Partial<PendingChatDeviceEnrollment>;
+ return p.status==='pending'&&typeof p.displayName==='string'&&!!p.displayName.trim()&&
+ typeof p.requestId==='string'&&/^[A-Za-z0-9_-]{20,40}$/.test(p.requestId)&&
+ typeof p.requestSecret==='string'&&/^[A-Za-z0-9_-]{40,100}$/.test(p.requestSecret)&&
+ typeof p.expiresAt==='string'&&Number.isFinite(Date.parse(p.expiresAt))&&Date.parse(p.expiresAt)>now;
+}
 export class DeviceApprovalRequiredError extends Error {
   constructor() {super('Este teléfono necesita la autorización del administrador.');this.name='DeviceApprovalRequiredError';}
 }
