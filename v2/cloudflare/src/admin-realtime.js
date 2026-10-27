@@ -13,7 +13,7 @@ export function adminTokenRequest(token){
  return new Request('https://internal/admin-session-check',{headers:{authorization:'Bearer '+token}});
 }
 export async function notifyAdminClients(env,topic){
- if(!['requests','members'].includes(topic))return;
+ if(!['members'].includes(topic))return;
  // Event is a topic invalidation only: never transmit names, device IDs or tokens.
  try{
   await env.CHAT_ROOMS.get(env.CHAT_ROOMS.idFromName('main-chat-v2')).fetch(
