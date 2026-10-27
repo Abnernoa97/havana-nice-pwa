@@ -3,6 +3,7 @@ import { handleChatMedia, mediaReadiness } from './drive-media.js';
 import { handleAdminSessionApi, verifyAdminSession } from './admin-auth.js';
 import { adminSocketToken, adminTokenRequest, notifyAdminClients } from './admin-realtime.js';
 import {handleAdminMemberManagement,recordMemberEvent,readMemberDevice} from './member-admin.js';
+import {handleAdminChat} from './admin-chat.js';
 import {claimFirstInstallation,auditDuplicateInstallation,closeUnboundChatSession,handleSingleInstallationAdmin} from './single-installation.js';
 // HAVANA NICE V2 isolated Worker. Only D1-authorized musician names may enroll.
 // Random durable device credentials are issued once and validated against D1 on every request.
@@ -133,6 +134,16 @@ export class ChatRoom {
       this.broadcast({type:'chat.presence',users:this.onlineUsers()});
       return respond({ok:true});
     }
+    if (new URL(request.url).pathname === '/admin-chat-message-updated' && request.method === 'POST') {
+      let data=null;try{data=await request.json();}catch{}
+      if(!Number.isSafeInteger(data?.seq)||data.seq<=0)return respond({error:'Invalid message'},400);
+      const row=await this.env.DB.prepare(
+        'SELECT seq,client_message_id,sender_id,sender_name,body,created_at,reply_to_seq,edited_at,deleted_at FROM chat_messages WHERE seq=?'
+      ).bind(data.seq).first();
+      if(!row||!row.deleted_at)return respond({error:'Message not deleted'},409);
+      this.broadcast({type:'chat.updated',message:mapMessage(row)});
+      return respond({ok:true});
+    }
     if (new URL(request.url).pathname === '/admin-invalidate' && request.method === 'POST') {
       let event=null;
       try{event=await request.json();}catch{}
@@ -150,6 +161,7 @@ export class ChatRoom {
       const client=pair[0],server=pair[1];server.accept();
       this.adminSockets.set(server,token);
       this.send(server,{type:'admin.ready'});
+      this.send(server,{type:'admin.chat.presence',users:this.onlineUsers()});
       const cleanup=()=>this.adminSockets.delete(server);
       server.addEventListener('close',cleanup);
       server.addEventListener('error',cleanup);
@@ -216,6 +228,28 @@ export class ChatRoom {
   }
   broadcast(data) {
     for (const socket of this.sockets) this.send(socket, data);
+    this.broadcastToAdmins(data);
+  }
+  broadcastToAdmins(data){
+    const types={
+      'chat.message':'admin.chat.message','chat.updated':'admin.chat.updated',
+      'chat.reaction':'admin.chat.reaction','chat.presence':'admin.chat.presence',
+      'chat.typing':'admin.chat.typing','chat.read':'admin.chat.read'
+    };
+    const type=types[data?.type];
+    if(!type)return;
+    // Only the separately authenticated administrator can receive Chat content.
+    // Re-check for revoked/expired sessions on each event.
+    this.state.waitUntil((async()=>{
+      for(const [socket,token] of this.adminSockets){
+        if(!await verifyAdminSession(adminTokenRequest(token),this.env)){
+          try{socket.close(4003,'Admin session ended');}catch{}
+          this.adminSockets.delete(socket);
+          continue;
+        }
+        this.send(socket,{...data,type});
+      }
+    })().catch(()=>{}));
   }
   async invalidateAdmins(topic){
     for(const [socket,token] of this.adminSockets){
@@ -242,6 +276,7 @@ export class ChatRoom {
       this.typingSent.set(socket, now);
       const signal = {type: 'chat.typing', actorId: senderId, senderName, active: input.active, expiresAt: now + 4000};
       for (const other of this.sockets) if (other !== socket) this.send(other, signal);
+      this.broadcastToAdmins(signal);
       return;
     }
 
@@ -361,6 +396,9 @@ export default {
     if (url.pathname.startsWith('/api/chat/admin/duplicate-logins') ||
         url.pathname === '/api/chat/admin/release-installation') {
       return handleSingleInstallationAdmin(request,env,url,origin,respond);
+    }
+    if (url.pathname === '/api/chat/admin/messages' || url.pathname.startsWith('/api/chat/admin/messages/')) {
+      return handleAdminChat(request,env,url,origin,respond);
     }
     if (url.pathname === '/api/chat/admin/members') {
       if (request.method !== 'GET' && request.method !== 'POST') return respond({error:'Método no permitido'},405,origin);
