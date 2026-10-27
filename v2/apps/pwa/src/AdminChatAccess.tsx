@@ -298,8 +298,8 @@ export default function AdminChatAccess({section}:{section:Section}){
                  <div className="a-member-events">{history[person.actor_id]?.events.map((event,index)=>
                    <div className="a-member-event" key={event.occurred_at+'-'+index}>
                      <strong>{event.event_type==='login'?'Entrada':event.event_type==='connect'?'Conectó al Chat':'Desconectó del Chat'} · {new Date(event.occurred_at).toLocaleString('es-MX',{dateStyle:'medium',timeStyle:'short'})}</strong>
-                     <span>{event.platform} · {event.operating_system}</span>
-                     <span>{event.device_name}{event.device_model?' · Modelo: '+event.device_model:' · Modelo no disponible'}</span>
+                     <span>{event.platform} · {event.device_model==='K'&&event.operating_system==='Android 10'?'Android (versión no disponible)':event.operating_system}</span>
+                     <span>{event.device_name}{event.device_model&&event.device_model!=='K'?' · Modelo: '+event.device_model:' · Modelo no disponible'}</span>
                    </div>)}</div>}
                <small>{history[person.actor_id]?.since}</small>
              </>}
