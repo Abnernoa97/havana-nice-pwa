@@ -1,13 +1,8 @@
 name: HAVANA NICE V2 Android APK
 
+# Only distribute a new APK when explicitly requested, never while pruning
+# rejected legacy login paths or changing the shared authentication contract.
 on:
-  push:
-    branches:
-      - havana-nice-v2-foundation
-    paths:
-      # Do not publish another APK while we are refining Admin/PWA or
-      # shared contracts. Stage native changes explicitly under Android.
-      - 'v2/apps/android/**'
   workflow_dispatch:
 
 permissions:
