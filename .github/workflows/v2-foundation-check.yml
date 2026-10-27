@@ -116,6 +116,16 @@ jobs:
             --header 'Content-Type: application/json' --data '{"actorId":"member:orly","confirmName":"Orly"}' "$BASE/api/chat/admin/remove-member")"
           test "$STATUS" = "401"
 
+      - name: Verify discarded device approval routes are removed, not disabled
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE="https://havana-nice-v2-dev.soloaplicaciones97.workers.dev"
+          for route in /api/chat/device/request /api/chat/device/status /api/chat/pwa/session /api/chat/admin/device-requests; do
+            STATUS="$(curl --silent --show-error --output /tmp/v2-removed-login.json --write-out '%{http_code}' "$BASE$route")"
+            test "$STATUS" = "404"
+          done
+
       - name: Verify unknown and malformed musician names never receive a session
         shell: bash
         run: |
