@@ -198,3 +198,28 @@ test('musician trash waits for authenticated D1 preview and blocks media before 
  assert.match(server,/member-delete-preview/);
  assert.match(route,/api\/chat\/admin\/member-delete-preview/);
 });
+
+test('member data inspection can be verified without pressing irreversible trash',()=>{
+ const app=read('../src/AdminChatAccess.tsx');
+ const api=read('../src/admin-api.ts');
+ const inspect=app.indexOf('async function inspectMemberData(person:AdminMember)');
+ const trash=app.indexOf('async function removeMember(person:AdminMember)');
+ assert.ok(inspect>0&&trash>inspect,'Read-only inspection must be independent of delete');
+ const body=app.slice(inspect,trash);
+ assert.match(body,/await adminDeletionPreview\(session\.token,person\.actor_id\)/);
+ assert.doesNotMatch(body,/adminRemoveMember\(|window\.confirm\(/,'Inspector must never mutate or confirm a delete');
+ assert.match(app,/Ver datos asociados/);
+ assert.match(app,/Consulta de solo lectura\. No elimina ni modifica información/);
+ assert.match(app,/impact\[person\.actor_id\]\.counts\.mediaAssets/);
+ assert.match(app,/impact\[person\.actor_id\]\.counts\.sessions/);
+ assert.match(app,/impact\[person\.actor_id\]\.counts\.historyEvents/);
+ assert.match(api,/method:'POST',body:JSON\.stringify\(\{actorId,confirmName\}\)/);
+ assert.match(api,/return api<AdminDeletionPreview>/);
+ assert.match(api,/authenticated\(token\)/);
+});
+
+test('read-only account audit does not carry data into logout',()=>{
+ const app=read('../src/AdminChatAccess.tsx');
+ assert.match(app,/setExpanded\(''\);setHistory\(\{\}\);setHistoryErrors\(\{\}\);setImpact\(\{\}\);setImpactErrors\(\{\}\)/);
+ assert.match(app,/delete next\[person\.actor_id\]/);
+});
