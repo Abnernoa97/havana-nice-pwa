@@ -42,6 +42,27 @@ export async function recordMemberEvent(env,actorId,eventType,request,details=nu
    meta.platform,meta.operatingSystem,meta.deviceName,meta.model,actorId).run();
 }
 export function readMemberDevice(request){return deviceDetails(request);}
+async function memberDeletionImpact(env,actorId){
+ // Private, read-only snapshot. No tokens or message bodies are returned.
+ // Media files may live outside D1: a safe deletion MUST refuse until
+ // an actual remote object cleanup path exists.
+ const row=await env.DB.prepare(
+  'SELECT '+
+  '(SELECT COUNT(*) FROM chat_sessions WHERE actor_id=?) AS sessions,'+
+  '(SELECT COUNT(*) FROM chat_messages WHERE sender_id=?) AS messages,'+
+  '(SELECT COUNT(*) FROM chat_reactions WHERE actor_id=? OR message_seq IN (SELECT seq FROM chat_messages WHERE sender_id=?)) AS reactions,'+
+  '(SELECT COUNT(*) FROM chat_read_receipts WHERE actor_id=?) AS receipts,'+
+  '(SELECT COUNT(*) FROM chat_device_requests WHERE actor_id=?) AS deviceRequests,'+
+  '(SELECT COUNT(*) FROM chat_pwa_first_claims WHERE actor_id=?) AS firstClaims,'+
+  '(SELECT COUNT(*) FROM chat_access_events WHERE actor_id=?) AS historyEvents,'+
+  '(SELECT COUNT(*) FROM v2_media_assets WHERE sender_id=?) AS mediaAssets'
+ ).bind(actorId,actorId,actorId,actorId,actorId,actorId,actorId,actorId,actorId).first();
+ const counts={};
+ for(const key of ['sessions','messages','reactions','receipts','deviceRequests','firstClaims','historyEvents','mediaAssets'])
+   counts[key]=Math.max(0,Number(row?.[key]||0));
+ return counts;
+}
+
 function reply(respond,origin,body,status=200){return respond(body,status,origin);}
 export async function handleAdminMemberManagement(request,env,url,origin,respond,ROOM){
  if(!await verifyAdminSession(request,env))
@@ -65,6 +86,15 @@ export async function handleAdminMemberManagement(request,env,url,origin,respond
    return reply(respond,origin,{entries:Number(counts?.entries||0),events:events.results||[],
      since:'Solo desde la activación del historial; no se inventan registros anteriores.'});
  }
+ if(url.pathname==='/api/chat/admin/member-delete-preview' && request.method==='GET'){
+   const actorId=url.searchParams.get('actorId')||'';
+   if(!ID.test(actorId))return reply(respond,origin,{error:'Miembro inválido'},400);
+   const member=await env.DB.prepare('SELECT actor_id,display_name FROM chat_members WHERE actor_id=?')
+     .bind(actorId).first();
+   if(!member)return reply(respond,origin,{error:'Miembro no encontrado'},404);
+   const counts=await memberDeletionImpact(env,actorId);
+   return reply(respond,origin,{displayName:member.display_name,counts,canDelete:counts.mediaAssets===0});
+ }
  if(url.pathname!=='/api/chat/admin/remove-member'||request.method!=='POST')
    return reply(respond,origin,{error:'Ruta no válida'},404);
  let payload;
@@ -78,6 +108,13 @@ export async function handleAdminMemberManagement(request,env,url,origin,respond
  if(!member)return reply(respond,origin,{error:'Miembro no encontrado'},404);
  if(member.display_name!==confirmName)return reply(respond,origin,{
    error:'El nombre de confirmación no coincide.'},409);
+ // No partial deletion: remote multimedia cannot yet be cleaned by this
+ // module. When the media subsystem is enabled, implement real remote cleanup
+ // with a durable queue before removing this guard.
+ const impact=await memberDeletionImpact(env,actorId);
+ if(impact.mediaAssets>0)return reply(respond,origin,{
+   error:'No se puede eliminar: este músico tiene archivos multimedia cuya eliminación completa todavía no está implementada.'
+ },409);
  // Transaction order preserves message reply FKs and removes all musician-owned
  // D1 data. Never delete other actors' messages; replies to removed messages
  // keep their text with reply_to_seq=NULL.
