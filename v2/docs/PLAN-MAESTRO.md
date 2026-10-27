@@ -747,6 +747,12 @@ Hallazgos y acciones documentados:
 
 **Captura nueva del propietario en Administrador PWA:** al volver a abrir el acordeón de `Prueba 1`, se siguen viendo **1 entrada**, los mismos **2 eventos `connect` y 2 eventos `disconnect`**; aparecen las fechas y horas del 27/10 entre 01:32 y 01:33 a. m. y, en vez de los identificadores genéricos `Android 10; K` de Chrome, ahora se lee **`Android (versión no disponible)`** y **`Modelo no disponible`**. Se da por **confirmada físicamente la corrección de presentación y conservación del historial**, sin modificar D1. La prueba anterior contra D1 ya confirmó los cinco eventos exactos. **S01/S02/P04 permanecen abiertos**: resta comprobar desconexión efectiva e impedimento de reingreso después de eliminar un usuario de prueba, sin afectar a los seis músicos habituales. No ejecutar ese borrado sin ensayo controlado y respaldo independiente verificado. **Avance oficial sigue 10/27**.
 
+### Prueba física de eliminación de «Prueba 1» — 27/10/2026, 01:45 CDMX
+
+**Ejecutada por el propietario mediante la PWA Administrador**: la captura de `Acceso a músicos` muestra seis miembros activos (Andy, Fer, Jali, Noa, Orly, Rafa) y «Prueba 1» ya no aparece. **Lectura independiente Cloudflare D1, sin escrituras**: `chat_members` registra exactamente esos seis y cero `Prueba 1`; `chat_sessions` tiene 10 filas y cero sesiones sin miembro; `chat_access_events` tiene dos eventos restantes, cero eventos huérfanos; `chat_device_requests` sin solicitudes huérfanas; `chat_messages` contiene 45 mensajes, cero con `sender_name='Prueba 1'`. Se conserva el Chat de los demás. Los 4 registros huérfanos de `chat_reactions` y 3 de `chat_read_receipts` son anomalías históricas ya presentes, no atribuidas automáticamente a esta baja. **El asistente no ha ejecutado operaciones de borrado**.
+
+**Subprueba certificada:** usuario de prueba ausente tanto en la interfaz como en el registro D1 y sin sesiones ni historial asociados. **Por validar físicamente:** en el teléfono donde su Chat estaba abierto, comprobar expulsión inmediata, denegación de acceso en reconexión e intento posterior de entrar con el nombre eliminado. Una captura del listado Admin no demuestra por sí misma WebSocket cerrado en tiempo real. No recrear automáticamente `Prueba 1` ni alterar seis músicos originales. Sin una copia externa D1 verificable, no realizar depuraciones adicionales destructivas. **Tablero oficial continúa 10/27; S01, S02 y P04 todavía abiertos.**
+
 ### Procedimiento permanente
 
 1. Leer este plan y el HEAD de `havana-nice-v2-foundation`.
