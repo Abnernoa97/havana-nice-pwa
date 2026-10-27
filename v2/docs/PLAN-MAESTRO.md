@@ -33,7 +33,7 @@
 
 **Seguridad vinculante:** instalar una PWA no concede acceso administrativo. Paneles de músicos/dispositivos, aprobaciones y revocaciones solo pueden manejar datos mediante autenticación administrativa independiente con permisos reales en Worker; jamás insertar el secreto `V2_DEVICE_ADMIN_SECRET` en la PWA. El flag `V2_DEVICE_APPROVAL_MODE=enforce` sigue deshabilitado hasta que las sesiones antiguas estén protegidas y la migración esté probada.
 
-**Una entrega vertical por capacidad:** requisitos → API/DB/permisos → cliente Android/PWA → la misma capacidad en Administrador → pruebas y preservación de datos → confirmación y tachado en este Plan Maestro. Quedan abiertos S01/S02/P04 hasta que funcionen realmente, no por existir una pantalla.
+**Una entrega vertical por capacidad:** requisitos → API/DB/permisos → cliente Android/PWA → la misma capacidad en Administrador → pruebas y preservación de datos → confirmación y tachado en este Plan Maestro. **El contrato detallado de sincronización y las funciones de administración se fijan en §11.1–11.4; no son un plan paralelo.** Quedan abiertos S01/S02/P04 hasta que funcionen realmente, no por existir una pantalla.
 
 ---
 
@@ -435,20 +435,47 @@ Perfil, imagen, portada e información de integrantes solamente cuando esté apr
 
 Cuenta, nombre, dispositivos aprobados, preferencias, permisos, diagnóstico, versión web/nativa, políticas de datos y cierre de sesión. Los ajustes visuales se publican en la PWA; acciones del SO se invocan por el puente.
 
-# 11. ADMINISTRADOR V2
+# 11. ADMINISTRADOR V2 — CENTRO DE CONTROL Y SINCRONIZACIÓN CON MÚSICOS
 
-Administrador utiliza la **misma arquitectura** visual PWA y el mismo Worker, con rutas y permisos propios. No compartir una sesión de Admin con una sesión de músico sin autorización explícita.
+**Decisión confirmada el 26/10/2026, tras auditoría de solo lectura de HAVANA NICE original:** conservar como **referencia funcional positiva** su administración unificada, el inicio de sesión independiente, el inventario y autorización de teléfonos, el calendario con destinatarios, el repertorio y las notificaciones con actualizaciones en vivo. Implementar esas **capacidades** de forma nativa a la arquitectura aprobada de V2; **no copiar código heredado, permisos anónimos, datos, sesiones ni debilidades de seguridad**, ni conectar V2 a la base Supabase de producción. Original permanece totalmente intocable. La auditoría no equivale a certificación de que estas funciones estén terminadas en V2.
 
-Responsabilidades:
+**Administrador único:** siempre la PWA instalable `/admin.html`, en el mismo repositorio, la misma rama de desarrollo, el **mismo Worker V2 + D1 + Durable Objects/WebSockets** y contratos del músico. Su sesión, pantallas y permisos son independientes de las sesiones del Chat. Cada módulo se entrega como una única operación vertical **backend ↔ Chat Android nativo/PWA iPhone o pantalla PWA compartida ↔ Administrador PWA**, sin paneles, bases o implementaciones paralelos.
 
-1. Crear/autorizar/desactivar nombres; gestionar dispositivos pendientes, activos, bloqueados y revocados.
-2. Administración de calendario, destinatarios, shows, horarios y edición flexible.
-3. Administración del repertorio general y repertorios por evento; sincronizar en vivo con las tarjetas de músico.
-4. Crear notificaciones, gestionar Chat, contenidos y preferencias permitidas.
-5. Consultar actividad, errores, diagnósticos, sincronización y cuotas sin revelar tokens.
-6. Registro auditable de cambios sensibles y revocaciones.
+## 11.1 Identidad administrativa y permisos (S02 + P04)
 
-**Prioridad de seguridad antes de invitar a todo el equipo:** aprobación de dispositivo, revocación de tokens y sockets, listado de dispositivos y permisos por rol. Los nombres sencillos continúan siendo la UX oficial, pero no se consideran por sí solos prueba fuerte de identidad.
+- **Inicio de sesión de Administrador independiente del músico:** identidad administrativa verificable por el **servidor** antes de cualquier lectura o acción privada. El nombre de un músico, una PWA instalada o una sesión del Chat nunca conceden privilegios administrativos.
+- Mantener el flujo V2 de acceso administrativo protegido, sesión temporal, revocación/cierre y verificación de cada petición en Worker/D1. **No guardar tokens administrativos en localStorage/IndexedDB ni incluir secretos en frontend, GitHub o documentación.** Alta inicial del administrador exclusivamente mediante procedimiento seguro y autorizado; jamás eludir las restricciones del conector Cloudflare.
+- Separar permisos por operación: músico consulta solo sus datos autorizados; administrador ve o cambia solo aquello que su rol permite; revocación o inactividad se hace efectiva en API y conexiones. Mantener registro auditable de decisiones sensibles (qué se hizo, a qué cuenta/dispositivo, cuándo y resultado) sin exponer credenciales.
+- **No replicar** las políticas de lectura anónima de Chat/calendario detectadas en la aplicación original ni su autorización automática del primer teléfono. La facilidad de «escribir nombre una vez» se mantiene **solo después de autorización real del dispositivo**.
+
+## 11.2 Inventario central de músicos, teléfonos, solicitudes y sesiones (S01 + P04)
+
+- Una **lista real única** de músicos con identidad, activo/inactivo, dispositivos asociados y su estado individual: `pending`, `approved`, `denied/blocked`, `revoked` según contrato vigente; identificación/etiqueta del teléfono, último uso, fecha de solicitud/autorización y sesiones asociadas. Los contadores muestran datos reales de D1: **sesiones emitidas no equivalen a dispositivos conectados**.
+- Un teléfono nuevo pide acceso desde Android nativo o Chat PWA iPhone; la petición persiste en backend y en la copia local temporal del dispositivo. Administrador recibe y consulta solicitudes reales, y puede **aprobar, rechazar o revocar individualmente**. No crear permisos por conocer un nombre o por ser el primer teléfono.
+- Aprobación del servidor → canje **único** de la solicitud → credencial individual; en posteriores aperturas restaurar la identidad sin escribir de nuevo el nombre. Si la solicitud vence, es rechazada o revocada, mostrar estado real y dar vía segura para volver a solicitar permiso. Limitar abusos y evitar doble canje.
+- Revocación comprobada en Worker/D1, API, sesiones y WebSocket del **dispositivo afectado**, sin invalidar a los demás músicos ni borrar sus conversaciones, cachés o datos; permitir el reemplazo de dispositivo con una decisión expresa de Administrador.
+- Desarrollar y probar primero el modo **`observe`**, preservando las sesiones heredadas; **`enforce` continúa desactivado** hasta que las altas, renovaciones y revocaciones estén completas en Android y iPhone, y sean probadas físicamente. No asumir que la APK 0.0.4 ya certificó S01.
+
+## 11.3 Sincronización operativa de Administrador ↔ aplicaciones de músicos
+
+**Regla obligatoria para todos los módulos:** lo que se autoriza, crea, edita, asigna, desactiva o revoca desde el Administrador se valida en el **mismo Worker**, se confirma en la **misma D1 V2** y se notifica por un canal realtime autenticado del backend a los clientes afectados; Android, iPhone y Administrador reconcilian el estado real. No hay tres copias de negocio ni tres fuentes de verdad.
+
+- **Administrador en tiempo real, sin depender del botón «Actualizar».** Suscripciones autenticadas a cambios relevantes del Chat, músicos, dispositivos, solicitudes y módulos futuros; al recibir eventos, refrescar solo lo necesario, con orden e idempotencia. Al reconectar, abrir o volver del segundo plano, recuperar cambios perdidos consultando al servidor. El botón manual queda únicamente como respaldo/diagnóstico, no como mecanismo principal.
+- **Calendario:** crear/editar/cancelar eventos y asignar **destinatarios concretos** desde el Administrador. Cada músico recibe/consulta solo eventos y cambios que le correspondan, con horarios como **texto libre**, detalles y repertorio del evento en su tarjeta. Sin duplicar el calendario por plataforma.
+- **Repertorio:** gestión central del catálogo general y listas de evento desde Administrador; cambios de canciones, categorías, enlaces, orden, asignaciones y checklist se sincronizan con las pantallas de músicos autorizados, incluso tras desconexión o reapertura. Mantener reglas por evento y no mostrar listas inexistentes.
+- **Notificaciones:** el Administrador crea avisos dirigidos a todos o a destinatarios autorizados. **Un solo evento/identificador de notificación en backend** alimenta feed, leídas/no leídas y push Android nativo/iPhone PWA según permisos y capacidades reales; evitar duplicados y respetar destinatarios. Publicar desde Admin no requiere una nueva APK si el cambio es solo de pantalla/datos PWA; FCM/servicios Android sí requieren implementación nativa.
+- **Chat:** acciones administrativas permitidas, actividad y señales de nuevas solicitudes reflejadas en la PWA Admin; el Chat de Android **sigue 100 % React Native**, y el de iPhone sigue PWA. No convertir el Chat en WebView para resolver sincronización.
+- **Archivos:** datos estructurados, roles, destinatarios y estados viven en **D1**; fotografías, audio y video utilizarán **un mismo almacenamiento de medios autorizado** por los clientes y Administrador cuando se implante M01–M05, con acceso controlado por Worker. Un *bucket* es para archivos, **no sustituye** el backend/base de datos ni implica crear R2 o mezclar almacenamiento de producción.
+
+**Modelo de flujo esperado:** acción en Admin → sesión/rol/alcance validados en Worker → transacción y registro en D1 → evento realtime autorizado a las superficies interesadas → actualización local y caché → recuperación íntegra al volver online. Nunca confiar en IDs de destinatario, estado de dispositivo o rol enviados por el frontend sin comprobarlos en servidor.
+
+## 11.4 Criterios de aceptación y orden, sin nuevos hitos
+
+1. **Ahora, mientras terminamos Chat:** S01 + S02 + **solo la sección Chat del P04**. Acceso administrativo real; lista de músicos/dispositivos; petición de teléfono nuevo; aprobación/rechazo/revocación; avisos realtime al Administrador; pruebas de permisos, caducidad, reconexión y persistencia. Probar que las **6 sesiones existentes** y la APK instalada sobreviven. No cerrar un hito por tener solamente código o una pantalla.
+2. **Después de aprobar Chat completo:** Home, Calendario, Repertorio, Notificaciones y otros módulos, **siempre con su sección de Administrador y sincronización de músico terminada simultáneamente**. Incluir pruebas de cambios de Admin visibles en ambos clientes, destino correcto, offline/reconexión, usuarios revocados, sin duplicados ni filtraciones.
+3. Conservar **0 MXN de costo adicional**, UI administrativa limpia y funcional, APK únicamente cuando cambien Chat/servicios nativos Android, y desplegar pantallas PWA sin reinstalar. Mantener `main`, HAVANA NICE original, su Supabase, HAVANA CLOUD y proyectos independientes sin modificación.
+
+**Estado al aprobar esta especificación:** reglas y criterios definidos; **implementación completa y pruebas físicas aún pendientes** en S01, S02 y P04. El tablero continúa en **10 de 27 hitos**, sin añadir otro contador ni afirmar que el Administrador ya funciona. Los detalles de Calendario/Repertorio/Notificaciones se amplían aquí sin adelantar esos módulos frente al Chat.
 
 # 12. CACHÉ, OFFLINE Y SINCRONIZACIÓN LOCAL
 
