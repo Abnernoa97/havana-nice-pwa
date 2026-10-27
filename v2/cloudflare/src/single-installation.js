@@ -22,6 +22,14 @@ export async function claimFirstInstallation(env,member,tokenHash,expiry){
  ]);
  return Number(rows[1]?.meta?.changes)===1;
 }
+// Do not orphan a bound installation on generic logout. Only Admin may release it.
+export async function closeUnboundChatSession(env,tokenHash){
+ const result=await env.DB.prepare(
+   'DELETE FROM chat_sessions WHERE token_hash=? AND NOT EXISTS '+
+   '(SELECT 1 FROM chat_single_device_owners WHERE token_hash=?)'
+ ).bind(tokenHash,tokenHash).run();
+ return Number(result.meta?.changes)===1;
+}
 export async function auditDuplicateInstallation(env,actorId,request){
  // Bounded per account to avoid an unbounded audit table from guessed names.
  try{

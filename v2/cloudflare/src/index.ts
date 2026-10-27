@@ -3,7 +3,7 @@ import { handleChatMedia, mediaReadiness } from './drive-media.js';
 import { handleAdminSessionApi, verifyAdminSession } from './admin-auth.js';
 import { adminSocketToken, adminTokenRequest, notifyAdminClients } from './admin-realtime.js';
 import {handleAdminMemberManagement,recordMemberEvent,readMemberDevice} from './member-admin.js';
-import {claimFirstInstallation,auditDuplicateInstallation,handleSingleInstallationAdmin} from './single-installation.js';
+import {claimFirstInstallation,auditDuplicateInstallation,closeUnboundChatSession,handleSingleInstallationAdmin} from './single-installation.js';
 // HAVANA NICE V2 isolated Worker. Only D1-authorized musician names may enroll.
 // Random durable device credentials are issued once and validated against D1 on every request.
 const encoder = new TextEncoder();
@@ -421,8 +421,12 @@ export default {
       const token = (request.headers.get('authorization') || '').replace(/^Bearer\s+/i, '');
       const current = await verifySession(env, token);
       if (!current) return respond({ error: 'Acceso no autorizado' }, 401, origin);
-      await env.DB.prepare('DELETE FROM chat_sessions WHERE token_hash=?')
-        .bind(await sha256(token)).run();
+      // An owner token must be released via Admin, never orphaned by logout.
+      // The legacy single-session sign-out remains available.
+      if(!await closeUnboundChatSession(env,await sha256(token)))
+        return respond({code:'admin_release_required',
+          error:'Este dispositivo está vinculado. Solo el Administrador puede liberarlo.'
+        },409,origin);
       return respond({ok:true}, 200, origin);
     }
     if (url.pathname === '/api/chat/messages' && request.method === 'GET') {

@@ -294,7 +294,6 @@ export default function App() {
           if (value.actorId !== next.actorId) {
             setTyping(value.active ? `${value.senderName} está escribiendo…` : '');
             if (typingTimer.current) clearTimeout(typingTimer.current);
-      if (draftTimer.current) clearTimeout(draftTimer.current);
             if (value.active) typingTimer.current = setTimeout(() => setTyping(''), 4200);
           }
         } else if (value.type === 'chat.updated') {

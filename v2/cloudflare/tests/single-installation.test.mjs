@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {claimFirstInstallation,auditDuplicateInstallation,handleSingleInstallationAdmin} from '../src/single-installation.js';
+import {claimFirstInstallation,auditDuplicateInstallation,closeUnboundChatSession,handleSingleInstallationAdmin} from '../src/single-installation.js';
 
 const actor='member:test-one';
 const user={actor_id:actor,display_name:'Prueba Uno'};
@@ -45,6 +45,11 @@ class FakeD1{
    throw Error('Unexpected D1 first '+sql);
  }
  async run(sql,args){
+   if(sql.startsWith('DELETE FROM chat_sessions WHERE token_hash=?')){
+     const [hash]=args;
+     if([...this.owner.values()].includes(hash))return {meta:{changes:0}};
+     return {meta:{changes:Number(this.sessions.delete(hash))}};
+   }
    if(sql.startsWith('INSERT INTO chat_duplicate_login_alerts')){
      if(this.alerts.length>=20)return {meta:{changes:0}};
      this.alerts.push({id:args[0],actor_id:args[1],attempted_at:args[2],
@@ -145,4 +150,29 @@ test('reviewing one alert does not delete the alert or its audit trail',async()=
  assert.equal(reviewed.status,200);
  assert.equal(e.DB.alerts.length,1);
  assert.ok(e.DB.alerts[0].reviewed_at>0);
+});
+
+test('generic logout must not strand bound owner, but still signs out legacy sessions',async()=>{
+ const e=env();
+ await claimFirstInstallation(e,user,'owner-hash',Date.UTC(2100,0,1));
+ assert.equal(await closeUnboundChatSession(e,'owner-hash'),false);
+ assert.equal(e.DB.owner.get(actor),'owner-hash');
+ assert.equal(e.DB.sessions.has('owner-hash'),true);
+ e.DB.sessions.set('legacy-hash',{actorId:'member:legacy'});
+ assert.equal(await closeUnboundChatSession(e,'legacy-hash'),true);
+ assert.equal(e.DB.sessions.has('legacy-hash'),false);
+ assert.equal(e.DB.sessions.has('owner-hash'),true);
+});
+
+test('Admin release permits replacement without reviving the former session',async()=>{
+ const e=env();
+ await claimFirstInstallation(e,user,'first-owner',Date.UTC(2100,0,1));
+ await handler(e,'POST','/api/chat/admin/release-installation',
+   {actorId:actor,confirmName:'Prueba Uno'},token);
+ assert.equal(e.DB.owner.size,0);
+ assert.equal(e.DB.sessions.has('first-owner'),false);
+ assert.equal(await claimFirstInstallation(e,user,'replacement-owner',Date.UTC(2100,0,1)),true);
+ assert.equal(await claimFirstInstallation(e,user,'first-owner',Date.UTC(2100,0,1)),false);
+ assert.equal(e.DB.owner.get(actor),'replacement-owner');
+ assert.equal(e.DB.sessions.size,1);
 });
