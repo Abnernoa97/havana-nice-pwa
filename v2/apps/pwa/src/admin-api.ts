@@ -61,7 +61,7 @@ export function adminMemberHistory(token:string,actorId:string){
 }
 export type AdminDeletionImpact={
  sessions:number;messages:number;reactions:number;receipts:number;
- deviceRequests:number;firstClaims:number;historyEvents:number;mediaAssets:number;
+ historyEvents:number;mediaAssets:number;
 };
 export type AdminDeletionPreview={displayName:string;counts:AdminDeletionImpact;canDelete:boolean};
 export function adminDeletionPreview(token:string,actorId:string){
