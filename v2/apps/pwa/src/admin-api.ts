@@ -41,6 +41,7 @@ export function adminRevokeOtherSessions(token:string){
 }
 export type AdminMember={
  actor_id:string;username:string;display_name:string;active:number;session_count:number;
+ single_device_mode?:number;installation_bound?:number;
 };
 export function adminMembers(token:string){
  return api<{members:AdminMember[]}>('/api/chat/admin/members',authenticated(token));
@@ -73,6 +74,21 @@ export function adminRemoveMember(token:string,actorId:string,confirmName:string
   authenticated(token,{method:'POST',body:JSON.stringify({actorId,confirmName})}));
 }
 
+export type AdminDuplicateLoginAlert={
+ id:string;actor_id:string;display_name:string;attempted_at:number;
+ platform:string;operating_system:string;device_name:string;reviewed_at:number|null;
+};
+export function adminDuplicateLogins(token:string){
+ return api<{alerts:AdminDuplicateLoginAlert[]}>('/api/chat/admin/duplicate-logins',authenticated(token));
+}
+export function adminReviewDuplicateLogin(token:string,id:string){
+ return api<{ok:boolean}>('/api/chat/admin/duplicate-logins/review',
+  authenticated(token,{method:'POST',body:JSON.stringify({id})}));
+}
+export function adminReleaseInstallation(token:string,actorId:string,confirmName:string){
+ return api<{ok:boolean;revokedSessions:number}>('/api/chat/admin/release-installation',
+  authenticated(token,{method:'POST',body:JSON.stringify({actorId,confirmName})}));
+}
 export type AdminRealtimeEvent={type:'admin.ready'}|{type:'admin.invalidate';topic:'requests'|'members'};
 export function openAdminRealtime(token:string,onEvent:(event:AdminRealtimeEvent)=>void):WebSocket{
  if(!/^[A-Za-z0-9_-]{40,128}$/.test(token))throw new Error('Sesión administrativa inválida');
