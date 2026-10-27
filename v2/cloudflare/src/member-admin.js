@@ -7,17 +7,20 @@ const ID=/^member:(?:[a-z0-9_-]{1,28}|[0-9a-f-]{36})$/i;
 function deviceDetails(request){
  const agent=(request.headers.get('user-agent')||'').slice(0,800);
  const android=/Android\s*([\d.]+)?/i.exec(agent);
+ // Chrome UA reduction freezes Android version as 10 and device model as K.
+ // Neither value identifies the actual device (Chrome Privacy Sandbox spec).
+ const reducedAndroid=/Android\s+10\s*;\s*K\s*(?:;|\))/i.test(agent);
  const ios=/(?:CPU(?: iPhone)? OS)\s*([\d_]+)/i.exec(agent);
  const isIpad=/iPad/i.test(agent),isIphone=/iPhone|iPod/i.test(agent);
- const system=android?'Android'+(android[1]?' '+android[1]:''):
+ const system=android?(reducedAndroid?'Android (versión no disponible)':'Android'+(android[1]?' '+android[1]:'')):
    isIpad||isIphone?'iOS'+(ios?' '+ios[1].replace(/_/g,'.'):''):
    /Windows NT/i.test(agent)?'Windows':/Macintosh|Mac OS X/i.test(agent)?'macOS':
    /Linux/i.test(agent)?'Linux':'No identificado';
  let model=null;
- if(android){
+ if(android&&!reducedAndroid){
    const hit=/(?:Android\s*[\d.]*;\s*)([^;)]+?)(?:\s+Build\/|\s*\)|;)/i.exec(agent);
    const candidate=hit?.[1]?.trim()||'';
-   if(candidate && !/^(?:[a-z]{2}-[a-z]{2}|wv|mobile|u|linux)$/i.test(candidate))
+   if(candidate && !/^(?:K|[a-z]{2}-[a-z]{2}|wv|mobile|u|linux)$/i.test(candidate))
      model=candidate.slice(0,100);
  }
  const deviceName=isIpad?'iPad':isIphone?'iPhone':android?'Teléfono Android':
@@ -53,7 +56,9 @@ export async function handleAdminMemberManagement(request,env,url,origin,respond
      env.DB.prepare("SELECT COUNT(*) AS entries FROM chat_access_events WHERE actor_id=? AND event_type='login'")
        .bind(actorId).first(),
      env.DB.prepare(
-       'SELECT event_type,occurred_at,platform,operating_system,device_name,device_model '+
+       'SELECT event_type,occurred_at,platform,'+
+       "CASE WHEN device_model='K' AND operating_system='Android 10' THEN 'Android (versión no disponible)' ELSE operating_system END AS operating_system,"+
+       "device_name,CASE WHEN device_model='K' THEN NULL ELSE device_model END AS device_model "+
        'FROM chat_access_events WHERE actor_id=? ORDER BY occurred_at DESC LIMIT 100'
      ).bind(actorId).all()
    ]);
