@@ -90,3 +90,10 @@
  .a-member-identity strong{font-size:13px}
  .a-member-history{margin-left:0}
 }
+
+/* A quiet, non-disruptive notice while a verified admin session is active. */
+.a-admin-update-pending{border:1px solid #d0c0a7;background:#f8f0df;color:#715a39;padding:13px 16px;font-size:12px;line-height:1.55;border-radius:12px;margin:0 0 14px}
+.a-admin-session-security{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;border-top:1px solid #e2d6c7;margin-top:18px;padding-top:14px;color:#766d62;font-size:12px}
+.a-admin-session-security strong{font-weight:700;color:#292a23}
+.a-admin-session-security button{background:transparent;border:1px solid #c4b5a3;border-radius:10px;padding:10px 12px;font-size:12px;color:#302921}
+.a-admin-session-security button:disabled{opacity:.5}
