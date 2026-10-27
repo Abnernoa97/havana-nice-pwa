@@ -763,6 +763,14 @@ Hallazgos y acciones documentados:
 - **Integridad comprobada en D1:** seis músicos activos, diez sesiones de músicos, 45 mensajes y cero archivos multimedia. **No se ejecutaron altas, bajas, revocaciones, escrituras D1 ni cambios Android nativo**. `main` original continúa reservado.
 - **Aceptación pendiente:** el propietario debe abrir `Administrador → Acceso a músicos → nombre → Ver datos asociados` y verificar que el resumen aparece sin pulsar papelera ni afectar sesión. La prueba visual de esta nueva función **no se ha efectuado**; mantener S01/S02/P04 abiertos y el tablero **10/27**. Limpieza histórica destructiva continúa prohibida hasta tener copia independiente de D1 verificada.
 
+### Validación física y D1 — inspección de Andy y Noa · 27/10/2026, 09:55 CDMX
+
+**Dos capturas reales aportadas por el propietario:** dentro del acordeón «Ver datos asociados» se ve el resumen de **Andy** (4 sesiones, 1 mensaje, 0 reacciones, 1 lectura, 0 eventos de historial, 2 solicitudes antiguas, 1 activación PWA antigua, 0 archivos multimedia) y **Noa** (2 sesiones, 13 mensajes, 7 reacciones, 1 lectura, 4 eventos de historial, 0 solicitudes antiguas, 1 activación PWA antigua, 0 archivos multimedia). **Se contrastaron individualmente todos esos valores con una consulta SQL de solo lectura sobre D1** y coincidieron exactamente. Se confirmó que no se necesitó tocar la papelera ni eliminar datos, y que los seis integrantes, diez sesiones totales y 45 mensajes continúan intactos.
+
+**Aclaración funcional publicada:** la vista de resumen ahora etiqueta `chat_sessions` como **«Credenciales de acceso»**, no «teléfonos conectados»; incluye un texto de que esos registros no equivalen a conexiones en vivo, y que reacciones abarca las vinculadas al músico o a sus mensajes. Solo frontend Admin PWA y prueba de regresión; ninguna modificación en API, Worker, D1, Android nativo, `main` original ni sesiones de usuarios. GitHub Foundation CI `40536322319` **SUCCESS** (mismo SHA que `40536249345` reejecutado automáticamente tras cancelación de concurrencia), Pages V2 SHA `513076a9b500b2477b0a8a41a40df21ad7ce2323` **active**, Worker `b2ed49b4-00f4-4c65-b768-4c333c9ecbad` al 100 %.
+
+**Criterio de aceptación cumplido:** interfaz de inspección de solo lectura validada físicamente con **dos músicos** y base SQL; su terminología fue corregida para evitar confusiones. **No cerrar todavía S01/S02/P04**, pues incluyen autenticación robusta, copias de respaldo e integración de módulos posteriores. **Tablero oficial: 10/27**. No promover ninguno de los seis músicos a usuario de prueba para una baja.
+
 ### Procedimiento permanente
 
 1. Leer este plan y el HEAD de `havana-nice-v2-foundation`.
