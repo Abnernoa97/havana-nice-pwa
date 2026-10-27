@@ -1,0 +1,107 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {handleAdminMemberManagement,readMemberDevice,recordMemberEvent} from '../src/member-admin.js';
+
+const BASE='https://havana-nice-v2-dev.soloaplicaciones97.workers.dev';
+const token='Q'.repeat(43),actor='member:orly';
+const digest=async value=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value)))]
+  .map(x=>x.toString(16).padStart(2,'0')).join('');
+class FakeDB{
+ constructor(){this.members=new Map([[actor,{actor_id:actor,display_name:'Orly'}]]);this.statements=[];this.sessionHash='';}
+ prepare(sql){
+  return {bind:(...args)=>({
+    first:async()=>{
+      if(sql.startsWith('SELECT expires_at,revoked_at'))return args[0]===this.sessionHash?{expires_at:Date.now()+60_000,revoked_at:null}:null;
+      if(sql.startsWith('SELECT actor_id,display_name FROM chat_members'))return this.members.get(args[0])||null;
+      if(sql.startsWith('SELECT actor_id FROM chat_members'))return this.members.get(args[0])||null;
+      if(sql.startsWith('SELECT COUNT(*) AS entries'))return {entries:2};
+      throw Error('Unexpected first: '+sql);
+    },
+    all:async()=>{
+      if(sql.startsWith('SELECT event_type,occurred_at'))return {results:[]};
+      throw Error('Unexpected all: '+sql);
+    },
+    run:async()=>{this.statements.push({sql,args});return {meta:{changes:1}};},
+    sql,args
+  })};
+ }
+ async batch(queries){
+   return queries.map(({sql,args})=>{
+     this.statements.push({sql,args});
+     if(sql.startsWith('DELETE FROM chat_members'))this.members.delete(args[0]);
+     return {meta:{changes:1}};
+   });
+ }
+}
+async function env(){
+ const DB=new FakeDB();
+ DB.sessionHash=await digest(token);
+ const events=[];
+ return {DB,events,V2_ADMIN_LOGIN_MODE:'enabled',V2_ADMIN_LOGIN_SECRET:'S'.repeat(48),
+ CHAT_ROOMS:{idFromName:x=>x,get:()=>({fetch:async(path,options)=>{events.push({path,body:options?.body});return Response.json({ok:true});}})}};
+}
+const handler=async(e,method,path,body,authorized=true)=>{
+ const req=new Request(BASE+path,{method,
+  headers:{...(authorized?{authorization:'Bearer '+token}:{}),...(body?{'content-type':'application/json'}:{})},
+  body:body?JSON.stringify(body):undefined});
+ const result=await handleAdminMemberManagement(req,e,new URL(req.url),'', (body,status=200)=>Response.json(body,{status}),'main-chat-v2');
+ return {status:result.status,body:await result.json()};
+};
+test('access history extracts only grounded UA device data',()=>{
+ const samsung=readMemberDevice(new Request(BASE,{headers:{origin:'https://havana-nice-v2-dev.pages.dev',
+  'user-agent':'Mozilla/5.0 (Linux; Android 14; SM-S928B Build/UP1A) AppleWebKit/537.36'}}));
+ assert.match(samsung.operatingSystem,/Android 14/);
+ assert.equal(samsung.deviceName,'Teléfono Android');
+ assert.equal(samsung.model,'SM-S928B');
+ assert.equal(samsung.platform,'PWA');
+ const iphone=readMemberDevice(new Request(BASE,{headers:{'user-agent':'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15'}}));
+ assert.equal(iphone.deviceName,'iPhone');
+ assert.equal(iphone.model,null);
+ assert.match(iphone.operatingSystem,/iOS 17\.5/);
+});
+test('successful named login writes a date-bearing record without raw UA or IP',async()=>{
+ const e=await env();
+ const request=new Request(BASE,{headers:{'user-agent':'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)'}});
+ await recordMemberEvent(e,actor,'login',request);
+ assert.equal(e.DB.statements.length,1);
+ const item=e.DB.statements[0];
+ assert.match(item.sql,/INSERT INTO chat_access_events/);
+ assert.match(item.sql,/WHERE EXISTS \(SELECT 1 FROM chat_members/);
+ assert.equal(item.args[1],actor);assert.equal(item.args[2],'login');
+ assert.equal(typeof item.args[3],'number');
+ assert.equal(item.args[7],null);
+});
+test('anonymous clients cannot read or delete member history',async()=>{
+ const e=await env();
+ const a=await handler(e,'GET','/api/chat/admin/member-history?actorId=member%3Aorly',null,false);
+ const b=await handler(e,'POST','/api/chat/admin/remove-member',{actorId:actor,confirmName:'Orly'},false);
+ assert.equal(a.status,401);assert.equal(b.status,401);
+ assert.equal(e.DB.members.size,1);assert.equal(e.DB.statements.length,0);
+});
+test('history reflects actual database entry count, never invented metadata',async()=>{
+ const e=await env();
+ const r=await handler(e,'GET','/api/chat/admin/member-history?actorId=member%3Aorly');
+ assert.equal(r.status,200);assert.equal(r.body.entries,2);
+ assert.deepEqual(r.body.events,[]);
+ assert.match(r.body.since,/no se inventan/);
+});
+test('permanent deletion requires the exact target member name',async()=>{
+ const e=await env();
+ const r=await handler(e,'POST','/api/chat/admin/remove-member',{actorId:actor,confirmName:'Andy'});
+ assert.equal(r.status,409);assert.equal(e.DB.members.size,1);assert.equal(e.DB.statements.length,0);
+});
+test('atomic permanent deletion clears all musician-owned D1 tables then expels Chat sockets',async()=>{
+ const e=await env();
+ const result=await handler(e,'POST','/api/chat/admin/remove-member',{actorId:actor,confirmName:'Orly'});
+ assert.equal(result.status,200);assert.equal(result.body.deleted,true);
+ assert.equal(e.DB.members.size,0);
+ const queries=e.DB.statements.map(x=>x.sql).join('\n');
+ for(const term of ['UPDATE chat_messages SET reply_to_seq=NULL','DELETE FROM chat_reactions WHERE message_seq',
+  'DELETE FROM chat_reactions WHERE actor_id','DELETE FROM chat_messages WHERE sender_id',
+  'DELETE FROM chat_read_receipts','DELETE FROM chat_sessions','DELETE FROM chat_device_requests',
+  'DELETE FROM chat_pwa_first_claims','DELETE FROM chat_access_events','DELETE FROM chat_members']){
+   assert.ok(queries.includes(term),'Missing cleanup '+term);
+ }
+ assert.deepEqual(e.events.map(x=>new URL(x.path).pathname),['/member-removed','/admin-invalidate']);
+ assert.equal(JSON.parse(e.events[0].body).actorId,actor);
+});
