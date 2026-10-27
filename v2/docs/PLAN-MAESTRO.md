@@ -691,6 +691,17 @@ Hallazgos y acciones documentados:
 
 **Siguiente validación estrictamente de Administrador:** propietario abre `/admin.html`, confirma que el nuevo botón refleja sus sesiones anteriores, prueba un cierre voluntario de otras sesiones **si lo desea**, comprueba que la actual permanece y que las anteriores no pueden acceder; verifica acordeón de historial tras un acceso posterior al despliegue y la expulsión al borrar un integrante EXCLUSIVAMENTE de prueba. Seguir depurando ruta antigua de dispositivo sin romper Android 0.0.4 ni iPhone PWA. **No abrir otros módulos ni aumentar los 10/27 hitos todavía.**
 
+### Depuración segura — ejecución 3, 27/10/2026 · preservación de sesiones y estabilidad Admin
+
+**Regla cumplida: no romper funciones certificadas.** Cambios exclusivos en `v2/apps/pwa/src/admin-api.ts`, `AdminChatAccess.tsx` y prueba `v2/apps/pwa/tests/admin.test.mjs`. **No modificar** React Native/Android, secretos, Worker, D1, componentes Chat, datos ni `main`. No revocar sesiones reales ni crear miembros de prueba.
+
+- **Fallo corregido:** la PWA Admin distinguía la autorización del usuario por comparación de texto de error, y al fallar una comprobación por falta de Internet o un error temporal trataba la sesión como vencida. Ahora `AdminApiError` incluye código HTTP y `isAdminUnauthorized` solamente considera 401 como fallo auténtico de autorización. Ante pérdida de red el Administrador informa «Sin conexión temporal», conserva la sesión y mantiene el listado ya cargado; al volver al primer plano/conectarse intenta actualizar. Las credenciales Admin continúan solo en memoria, nunca en `localStorage`.
+- **Pruebas de regresión:** GitHub Actions `40460155058` **SUCCESS**: TypeScript, pruebas Admin y seguridad, build PWA, compilación de bundle Android sin distribución, smoke backend/Cloudflare. Cloudflare Pages registró el commit `644e91fdcfc83a59c0b60641887370f6f1211bd2` como desplegado; el Worker V2 **permanece sin cambios** en `54d761d5-2388-429a-b95c-1213f1651dac`, 100 %.
+- **Integridad D1 posterior:** 6 músicos autorizados, 10 sesiones de músicos, 45 mensajes, 0 eventos de acceso nuevos. No afirmar que existe historial antiguo; los eventos comenzarán tras nuevas entradas/conexiones reales. Time Travel bookmark del corte previo `000000ba-00000000-00005111-f7804ba1c6c8e59707886a02aa096446`; Cloudflare completó la exportación SQL, pero **no existe copia externa descargada y validada** en este trabajo. Por tanto **no ejecutar limpiezas destructivas** de sesiones, mensajes, tablas o ramas.
+- **Pendiente específico de Administración:** prueba física de Admin al desconectar Internet y reconectar, historial con eventos reales, baja de usuario exclusivamente de prueba con expulsión conectada y limpieza de multimedia futuro; corregir rutas viejas de aprobación de dispositivos solo después de identificar todos los clientes dependientes. No instalar APK nueva ni ampliar módulos visuales.
+
+**Tablero inalterado: 10/27 hitos; S01/S02/P04 siguen pendientes de QA final.**
+
 ### Procedimiento permanente
 
 1. Leer este plan y el HEAD de `havana-nice-v2-foundation`.
