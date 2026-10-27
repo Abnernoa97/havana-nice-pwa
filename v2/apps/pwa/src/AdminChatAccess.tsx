@@ -1,6 +1,7 @@
 import {useCallback,useEffect,useState,type FormEvent} from 'react';
+import AdminChatGeneral from './AdminChatGeneral';
 import {adminAvailability,adminLogin,adminLogout,adminVerify,adminOtherSessions,adminRevokeOtherSessions,adminMembers,adminCreateMember,adminMemberHistory,adminDeletionPreview,adminRemoveMember,adminDuplicateLogins,adminReviewDuplicateLogin,adminReleaseInstallation,openAdminRealtime,
- type AdminSession,type AdminMember,type AdminMemberHistory,type AdminDeletionPreview,type AdminDuplicateLoginAlert,isAdminUnauthorized} from './admin-api';
+ type AdminSession,type AdminMember,type AdminMemberHistory,type AdminDeletionPreview,type AdminDuplicateLoginAlert,type AdminChatStreamEvent,isAdminUnauthorized} from './admin-api';
 
 type Section='access'|'chat'|'repertoire'|'calendar'|'more';
 type Readiness='loading'|'disabled'|'enabled'|'error';
@@ -48,6 +49,8 @@ export default function AdminChatAccess({section}:{section:Section}){
  const [duplicateBusy,setDuplicateBusy]=useState('');
  const [releaseBusy,setReleaseBusy]=useState('');
  const [realtime,setRealtime]=useState<'waiting'|'connected'|'reconnecting'>('waiting');
+ const [chatEvent,setChatEvent]=useState<AdminChatStreamEvent|null>(null);
+ const onChatExpired=useCallback(()=>{setSession(null);setError('Tu sesión administrativa expiró.');},[]);
  // Prevent frontend updates from interrupting authorized admin sessions.
  // The marker contains no credential; actual tokens stay in React memory only.
  useEffect(()=>{
@@ -123,6 +126,7 @@ export default function AdminChatAccess({section}:{section:Section}){
          if(!active||socket!==opened)return;
          if(event.type==='admin.ready'){retry=1000;setRealtime('connected');void refreshMembers(session.token);void refreshOtherSessions(session.token);void refreshDuplicateAlerts(session.token);}
          if(event.type==='admin.invalidate'&&event.topic==='members'){void refreshMembers(session.token);void refreshDuplicateAlerts(session.token);}
+         if(event.type.startsWith('admin.chat.'))setChatEvent(event as AdminChatStreamEvent);
        });
        socket=opened;
        opened.onclose=e=>{
@@ -312,7 +316,7 @@ export default function AdminChatAccess({section}:{section:Section}){
    finally{setBusy(false);}
  }
  // Keep the Administrator's verified session when changing navigation sections.
- if(section!=='access')return null;
+ if(section!=='access'&&section!=='chat')return null;
  if(readiness==='loading')return <section className="a-panel">Comprobando el acceso administrativo…</section>;
  if(readiness!=='enabled')return <section className="a-panel">
    <h2>Acceso de Administrador</h2>
@@ -329,6 +333,7 @@ export default function AdminChatAccess({section}:{section:Section}){
    </form>
    {error&&<p role="alert" className="a-admin-error">{error}</p>}
  </section>;
+ if(section==='chat')return <AdminChatGeneral token={session.token} connected={realtime==='connected'} liveEvent={chatEvent} onExpired={onChatExpired}/>;
  return <div className="a-access-workspace">
    <section className="a-panel a-admin-private">
      <div className="a-admin-toolbar">

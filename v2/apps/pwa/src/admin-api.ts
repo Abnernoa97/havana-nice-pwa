@@ -89,7 +89,27 @@ export function adminReleaseInstallation(token:string,actorId:string,confirmName
  return api<{ok:boolean;revokedSessions:number}>('/api/chat/admin/release-installation',
   authenticated(token,{method:'POST',body:JSON.stringify({actorId,confirmName})}));
 }
-export type AdminRealtimeEvent={type:'admin.ready'}|{type:'admin.invalidate';topic:'members'};
+export type AdminChatMessage={
+ seq:number;clientMessageId:string;senderId:string;senderName:string;text:string;
+ sentAt:string;replyToSeq:number|null;editedAt:string|null;deletedAt:string|null;
+};
+export type AdminChatReaction={messageSeq:number;actorId:string;emoji:string};
+export type AdminChatSnapshot={messages:AdminChatMessage[];reactions:AdminChatReaction[];hasMore:boolean};
+export function adminChatMessages(token:string,beforeSeq?:number){
+ const before=beforeSeq===undefined?'':'?beforeSeq='+encodeURIComponent(String(beforeSeq));
+ return api<AdminChatSnapshot>('/api/chat/admin/messages'+before,authenticated(token));
+}
+export function adminDeleteChatMessage(token:string,seq:number){
+ return api<{ok:boolean;message:AdminChatMessage}>('/api/chat/admin/messages/'+encodeURIComponent(String(seq)),
+  authenticated(token,{method:'DELETE'}));
+}
+export type AdminChatStreamEvent=
+ |{type:'admin.chat.message'|'admin.chat.updated';message:AdminChatMessage}
+ |{type:'admin.chat.reaction';messageSeq:number;actorId:string;emoji:string;active:boolean}
+ |{type:'admin.chat.presence';users:{actorId:string;displayName:string}[]}
+ |{type:'admin.chat.typing';actorId:string;senderName:string;active:boolean;expiresAt:number}
+ |{type:'admin.chat.read';actorId:string;displayName:string;seq:number};
+export type AdminRealtimeEvent={type:'admin.ready'}|{type:'admin.invalidate';topic:'members'}|AdminChatStreamEvent;
 export function openAdminRealtime(token:string,onEvent:(event:AdminRealtimeEvent)=>void):WebSocket{
  if(!/^[A-Za-z0-9_-]{40,128}$/.test(token))throw new Error('Sesión administrativa inválida');
  const url=API.replace(/^http/,'ws')+'/ws/admin';
@@ -100,6 +120,15 @@ export function openAdminRealtime(token:string,onEvent:(event:AdminRealtimeEvent
    if(value.type==='admin.ready')onEvent({type:'admin.ready'});
    if(value.type==='admin.invalidate'&&value.topic==='members')
      onEvent({type:'admin.invalidate',topic:value.topic});
+   if(value.type==='admin.chat.message'||value.type==='admin.chat.updated'){
+     const data=value as Partial<Extract<AdminChatStreamEvent,{type:'admin.chat.message'|'admin.chat.updated'}>>;
+     if(data.message&&Number.isSafeInteger(data.message.seq))
+       onEvent({type:value.type,message:data.message});
+   }
+   if(value.type==='admin.chat.presence'&&Array.isArray((value as {users?:unknown}).users))
+     onEvent(value as AdminChatStreamEvent);
+   if(value.type==='admin.chat.reaction'||value.type==='admin.chat.typing'||value.type==='admin.chat.read')
+     onEvent(value as AdminChatStreamEvent);
   }catch{/* Unrecognized server event: ignore; privileged API remains authoritative. */}
  });
  return socket;
