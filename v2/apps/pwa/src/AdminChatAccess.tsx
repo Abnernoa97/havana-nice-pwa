@@ -205,16 +205,16 @@ export default function AdminChatAccess({section}:{section:Section}){
            {historyLoading===person.actor_id?<p>Cargando datos desde Cloudflare…</p>:
              !history[person.actor_id]?<p>Sin datos de historial disponibles.</p>:
              <>
-               <p className="a-member-count">Entradas registradas: <strong>{history[person.actor_id].entries}</strong></p>
-               {history[person.actor_id].events.length===0?
+               <p className="a-member-count">Entradas registradas: <strong>{history[person.actor_id]?.entries ?? 0}</strong></p>
+               {history[person.actor_id]?.events.length===0?
                  <p>Sin historial registrado. Las entradas anteriores a la activación de este registro no se pueden reconstruir.</p>:
-                 <div className="a-member-events">{history[person.actor_id].events.map((event,index)=>
+                 <div className="a-member-events">{history[person.actor_id]?.events.map((event,index)=>
                    <div className="a-member-event" key={event.occurred_at+'-'+index}>
                      <strong>{event.event_type==='login'?'Entrada':event.event_type==='connect'?'Conectó al Chat':'Desconectó del Chat'} · {new Date(event.occurred_at).toLocaleString('es-MX',{dateStyle:'medium',timeStyle:'short'})}</strong>
                      <span>{event.platform} · {event.operating_system}</span>
                      <span>{event.device_name}{event.device_model?' · Modelo: '+event.device_model:' · Modelo no disponible'}</span>
                    </div>)}</div>}
-               <small>{history[person.actor_id].since}</small>
+               <small>{history[person.actor_id]?.since}</small>
              </>}
          </div>}
        </div>)}</div>}
