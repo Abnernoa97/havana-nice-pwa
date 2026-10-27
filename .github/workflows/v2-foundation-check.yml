@@ -117,7 +117,7 @@ jobs:
             "$BASE/ws/admin" \
             -H "Origin: https://havana-nice-v2-dev.pages.dev" \
             -H "Upgrade: websocket" -H "Connection: Upgrade" \
-            -H "Sec-WebSocket-Version: 13" -H "Sec-WebSocket-Key: SGF2YW5hTmljZVYyVGVzdCE=" \
+            -H "Sec-WebSocket-Version: 13" -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" \
             -H "Sec-WebSocket-Protocol: havana-v2-admin, admin.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")"
           echo "Admin WS unauthorized upgrade: $STATUS"
           test "$STATUS" = "401"
