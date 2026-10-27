@@ -105,3 +105,12 @@ test('atomic permanent deletion clears all musician-owned D1 tables then expels 
  assert.deepEqual(e.events.map(x=>new URL(x.path).pathname),['/member-removed','/admin-invalidate']);
  assert.equal(JSON.parse(e.events[0].body).actorId,actor);
 });
+
+test('confirmed member removal stays successful when Durable Object notifications fail',async()=>{
+ const e=await env();
+ e.CHAT_ROOMS.get=()=>({fetch:async()=>{throw new Error('Realtime temporarily unavailable');}});
+ const result=await handler(e,'POST','/api/chat/admin/remove-member',{actorId:actor,confirmName:'Orly'});
+ assert.equal(result.status,200);
+ assert.equal(result.body.deleted,true);
+ assert.equal(e.DB.members.size,0,'D1 deletion is authoritative and cannot be undone by notification outage');
+});
