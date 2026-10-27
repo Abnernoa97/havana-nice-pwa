@@ -1,7 +1,5 @@
 // @ts-nocheck
 import { handleChatMedia, mediaReadiness } from './drive-media.js';
-import { deviceGateEnabled, handleDeviceApprovalApi } from './device-approval.js';
-import { handlePwaFirstDeviceSession } from './pwa-first-device.js';
 import { handleAdminSessionApi, verifyAdminSession } from './admin-auth.js';
 import { adminSocketToken, adminTokenRequest, notifyAdminClients } from './admin-realtime.js';
 import {handleAdminMemberManagement,recordMemberEvent,readMemberDevice} from './member-admin.js';
@@ -70,14 +68,13 @@ async function verifySession(env, token) {
   if (typeof token !== 'string' || !/^[A-Za-z0-9_-]{40,100}$/.test(token)) return null;
   try {
     const row = await env.DB.prepare(
-      'SELECT s.actor_id, m.display_name, s.expires_at, s.enrollment_id ' +
+      'SELECT s.actor_id, m.display_name, s.expires_at ' +
       'FROM chat_sessions s JOIN chat_members m ON m.actor_id=s.actor_id AND m.active=1 WHERE s.token_hash=? ' +
-      "AND (s.enrollment_id IS NULL OR EXISTS (SELECT 1 FROM chat_device_requests d WHERE d.request_id=s.enrollment_id AND d.status='approved')) " +
       'AND (m.single_device_mode=0 OR EXISTS (SELECT 1 FROM chat_single_device_owners owner '+
       'WHERE owner.actor_id=m.actor_id AND owner.token_hash=s.token_hash))'
     ).bind(await sha256(token)).first();
     if (!row || !Number.isFinite(row.expires_at) || row.expires_at <= Date.now()) return null;
-    return { actorId: row.actor_id, displayName: row.display_name, exp: row.expires_at, enrollmentId:row.enrollment_id??null };
+    return { actorId: row.actor_id, displayName: row.display_name, exp: row.expires_at };
   } catch { return null; }
 }
 // Never accept the session from an URL query string (would leak into access logs).
@@ -136,20 +133,6 @@ export class ChatRoom {
       this.broadcast({type:'chat.presence',users:this.onlineUsers()});
       return respond({ok:true});
     }
-    if (new URL(request.url).pathname === '/device-revoked' && request.method === 'POST') {
-      let data=null;
-      try {data=await request.json();}catch{}
-      if (!/^[A-Za-z0-9_-]{20,40}$/.test(data?.enrollmentId||'')) return respond({error:'Invalid enrollment'},400);
-      for (const [socket,member] of this.members.entries()) {
-        if(member.enrollmentId===data.enrollmentId) {
-          this.send(socket,{type:'chat.revoked',error:'Dispositivo revocado por administrador'});
-          socket.close(4003,'Device revoked');
-          this.sockets.delete(socket);this.members.delete(socket);this.typingSent.delete(socket);
-        }
-      }
-      this.broadcast({type:'chat.presence',users:this.onlineUsers()});
-      return respond({ok:true},200);
-    }
     if (new URL(request.url).pathname === '/admin-invalidate' && request.method === 'POST') {
       let event=null;
       try{event=await request.json();}catch{}
@@ -188,7 +171,7 @@ export class ChatRoom {
     const client = pair[0], server = pair[1];
     server.accept();
     this.sockets.add(server);
-    this.members.set(server, {actorId, name, enrollmentToken, enrollmentId:session.enrollmentId??null});
+    this.members.set(server, {actorId, name, enrollmentToken});
     const deviceDetails=readMemberDevice(request);
     await recordMemberEvent(this.env,actorId,'connect',request,deviceDetails).catch(()=>{});
     server.send(JSON.stringify({ type: 'chat.ready', at: new Date().toISOString(), users: this.onlineUsers() }));
@@ -413,14 +396,7 @@ export default {
     if (url.pathname.startsWith('/api/chat/admin/auth/')) {
       return handleAdminSessionApi(request,env,url,origin,respond);
     }
-    if (url.pathname.startsWith('/api/chat/device/') || url.pathname.startsWith('/api/chat/admin/device-requests')) {
-      return handleDeviceApprovalApi(request,env,url,origin,respond,normalizeMusicianName,ROOM);
-    }
-    if (url.pathname === '/api/chat/pwa/session') {
-      return handlePwaFirstDeviceSession(request,env,origin,respond,normalizeMusicianName);
-    }
     if (url.pathname === '/api/chat/session' && request.method === 'POST') {
-      if (deviceGateEnabled(env)) return respond({ code:'device_approval_required', error: 'Este dispositivo necesita autorización. Solicita acceso desde este teléfono.' }, 403, origin);
       let payload;
       try { payload = await request.json(); } catch { return respond({ error: 'Solicitud inválida' }, 400, origin); }
       const username = normalizeMusicianName(payload?.displayName);
