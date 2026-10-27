@@ -3,7 +3,7 @@ import { handleChatMedia, mediaReadiness } from './drive-media.js';
 import { deviceGateEnabled, handleDeviceApprovalApi } from './device-approval.js';
 import { handlePwaFirstDeviceSession } from './pwa-first-device.js';
 import { handleAdminSessionApi, verifyAdminSession } from './admin-auth.js';
-import { adminSocketToken, adminTokenRequest } from './admin-realtime.js';
+import { adminSocketToken, adminTokenRequest, notifyAdminClients } from './admin-realtime.js';
 // HAVANA NICE V2 isolated Worker. Only D1-authorized musician names may enroll.
 // Random durable device credentials are issued once and validated against D1 on every request.
 const encoder = new TextEncoder();
@@ -43,8 +43,8 @@ async function sha256(value) {
 const MEMBER_SESSION_EXPIRY = Date.UTC(2100, 0, 1);
 function normalizeMusicianName(value) {
   if (typeof value !== 'string') return '';
-  const name = value.trim().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-  return /^[a-z][a-z0-9_-]{0,27}$/.test(name) ? name : '';
+  const name = value.trim().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ');
+  return /^[a-z][a-z0-9 _-]{0,27}$/.test(name) ? name : '';
 }
 async function createSession(env, member) {
   const token = b64(crypto.getRandomValues(new Uint8Array(32)));
@@ -323,8 +323,25 @@ export default {
     }
     if (url.pathname === '/realtime/health') return env.CHAT_ROOMS.get(env.CHAT_ROOMS.idFromName('foundation-health')).fetch('https://internal/health');
     if (url.pathname === '/api/chat/admin/members') {
-      if (request.method !== 'GET') return respond({error:'Método no permitido'},405,origin);
+      if (request.method !== 'GET' && request.method !== 'POST') return respond({error:'Método no permitido'},405,origin);
       if (!await verifyAdminSession(request,env)) return respond({error:'No autorizado'},401,origin);
+      if (request.method === 'POST') {
+        let payload;
+        try { payload=await request.json(); } catch {return respond({error:'Solicitud inválida'},400,origin);}
+        const displayName=typeof payload?.displayName==='string'?
+          payload.displayName.normalize('NFC').trim().replace(/\s+/g,' '):'';
+        const username=normalizeMusicianName(displayName);
+        if (!username || displayName.length>28) return respond({
+          error:'Escribe un nombre válido de hasta 28 caracteres. Se permiten espacios y acentos.'
+        },400,origin);
+        const actorId='member:'+crypto.randomUUID();
+        const created=await env.DB.prepare(
+          'INSERT OR IGNORE INTO chat_members(username,actor_id,display_name,active) VALUES(?,?,?,1)'
+        ).bind(username,actorId,displayName).run();
+        if(Number(created.meta?.changes)!==1)return respond({error:'Este nombre ya existe en el Administrador.'},409,origin);
+        await notifyAdminClients(env,'members');
+        return respond({member:{actor_id:actorId,username,display_name:displayName,active:1,session_count:0}},201,origin);
+      }
       // No bearer tokens, device secrets or private message history are returned.
       const members = await env.DB.prepare(
         'SELECT m.actor_id,m.display_name,m.username,m.active,COUNT(s.token_hash) AS session_count ' +
