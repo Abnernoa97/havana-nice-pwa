@@ -369,7 +369,7 @@ export default function AdminChatAccess({section}:{section:Section}){
              <small>Consulta de solo lectura. No elimina ni modifica información.</small>
              {impactErrors[person.actor_id]&&<p className="a-admin-error" role="alert">{impactErrors[person.actor_id]}</p>}
              {impact[person.actor_id]&&<MemberImpactSummary
-               name={person.display_name} preview={impact[person.actor_id]}/>}
+               name={person.display_name} preview={impact[person.actor_id]!}/>}
            </div>
          </div>}
        </div>)}</div>}
