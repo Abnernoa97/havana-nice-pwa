@@ -1,5 +1,8 @@
 # HAVANA NICE V2 — CONTINUIDAD EXACTA PARA EL SIGUIENTE CHAT
 
+**ESTADO MÁS RECIENTE — 27/10/2026, reinicio de accesos autorizado:** el propietario pidió borrar los músicos y volverlos a agregar manualmente desde Admin con la nueva lógica. D1 V2 fue actualizado: se desactivaron y eliminaron 7 nombres (Andy, Fer, Jali, Noa, Orly, Rafa, Prueba 2), 12 sesiones, 1 dispositivo vinculado, 1 alerta, 20 eventos de acceso y 7 marcadores de lectura. La consulta final confirmó **0 miembros / 0 sesiones / 0 vínculos / 0 alertas**. Se preservaron **46 mensajes y 11 reacciones** para evitar destrucción de historial no solicitada; ninguna cuenta borrada puede reentrar por ese historial. Admin sigue independiente. Time Travel bookmark existente verificado previamente, NO confundir con copia externa. Se eliminó de `0007_named_musician_access.sql` el autosembrado de los seis músicos y se añadió guard preventivo. Próximo paso: propietario da altas desde Admin, todos en modo único. **No volver a migrar cuentas antiguas: ya no existen.**
+
+
 **Fecha del traspaso: 27 de octubre de 2026, alrededor de las 11:25 h (Ciudad de México).**
 **Fuente oficial:** [PLAN-MAESTRO.md](./PLAN-MAESTRO.md).
 **Estado vigente: 12/27 hitos terminados, 15 pendientes. S01 y S02 CERRADOS por aceptación explícita del propietario; siguiente M01.**
@@ -10,14 +13,14 @@
 
 **ACTUALIZACIÓN POSTERIOR — 27/10, 12:06 h aprox.:** el propietario creó `Prueba 2` desde Admin y confirmó ingreso real en teléfono A; teléfono B recibió «Este nombre ya está vinculado a otro dispositivo. Se notificó al Administrador»; Admin mostró una alerta para `Prueba 2` con fecha 27/10, 11:58 a. m. Lectura directa D1: `single_device_mode=1`, exactamente **1 vínculo + 1 alerta** para `Prueba 2`. El propietario indicó expresamente dar **por aprobado S02**, sin pruebas adicionales de desconexión o liberación: importa el rechazo del segundo ingreso. No inventar que esos casos fueron probados. Los seis músicos previos conservan `single_device_mode=0` y no están todavía migrados. **SIGUIENTE ACCIÓN: M01, fotos privadas funcionales en Chat**, preservando todo lo existente. Retención de borradores ante revocación y migración legado pasan a H03/Q01; no bloquean M01.
 
-> **LO PRIMERO QUE DEBES HACER EN EL NUEVO CHAT:** leer este archivo y el Plan Maestro en la misma rama; verificar estado actual de GitHub, Cloudflare y D1 sin alterar datos. **S02 YA ESTÁ ACEPTADO** para nombres nuevos con evidencia física de rechazo duplicado y alerta. No repetir pruebas de seguridad. **CONTINUAR M01 (FOTOS PRIVADAS DE CHAT)** según la arquitectura única, con Android Chat 100 % nativo, iPhone Chat PWA y backend común. Seis usuarios históricos NO migrados: no bloquearlos ni atribuirles protección que todavía no tienen. No reinstalar ni borrar datos.
+> **LO PRIMERO QUE DEBES HACER EN EL NUEVO CHAT:** leer este archivo y el Plan Maestro en la misma rama; verificar estado actual de GitHub, Cloudflare y D1 sin alterar datos. **S02 YA ESTÁ ACEPTADO** para nombres nuevos con evidencia física de rechazo duplicado y alerta. No repetir pruebas de seguridad. **CONTINUAR M01 (FOTOS PRIVADAS DE CHAT)** según la arquitectura única, con Android Chat 100 % nativo, iPhone Chat PWA y backend común. El padrón anterior YA SE VACIÓ por petición del propietario: 0 usuarios; no intentar migrarlo ni recrearlo automáticamente. No reinstalar ni borrar datos.
 
 ## 1. Orden exacto desde la aceptación de S02
 
-1. **Continuidad:** conservar la única rama `havana-nice-v2-foundation`, documentos únicos, CI, Worker/D1 aislados, seis músicos originales y APK instalada. Revisar estado reciente antes de cambios; no asumir que un commit documental implica nuevo Worker.
+1. **Continuidad:** conservar la única rama `havana-nice-v2-foundation`, documentos únicos, CI, Worker/D1 aislados, historial preservado y APK instalada. **El padrón de músicos ya fue eliminado a solicitud del propietario**: no recrear automáticamente nombres anteriores ni reutilizar credenciales. Revisar D1 antes de cambios; no asumir que un commit documental implica nuevo Worker.
 2. **S02 aprobado por el propietario:** `Prueba 2` fue autorizado desde Admin; primer teléfono entró; segundo teléfono rechazado; alerta privada visible en Administrador y 1 vínculo + 1 alerta en D1. No repetir pruebas de desconexión, liberación ni inventar resultados. La pantalla «Liberar dispositivo» existe, no fue ensayada físicamente.
 3. **M01 activo:** fotos privadas del Chat. Inspeccionar si existe pasarela de almacenamiento lista y autorización/costo; implementar funcionalidad real en Worker/contratos, PWA iPhone y Android Chat nativo, sin WebView. No montar infraestructura costosa por inercia.
-4. **Protecciones:** los seis músicos anteriores continúan con modo legado sin bloqueo de duplicados por instalación; posponer adaptación prudente a H03/Q01 junto a retención de borradores ante revocación y evitar pérdida de datos. No borrar `Prueba 2` sin permiso.
+4. **Protecciones:** no quedan músicos anteriores en D1: 0 nombres autorizados, 0 sesiones y 0 vínculos. El propietario reañadirá manualmente los nombres y solo podrán entrar con nuevas credenciales modo único. Mensajes históricos preservados. En H03/Q01 revisar resiliencia de borradores ante revocación sin bloquear M01.
 5. **Hitos:** 12/27 cerrados, 15 pendientes; el próximo es M01. Solo tachar otros hitos con resultados probados o aceptación explícita de un alcance real, sin reabrir S02 por QA adicional no solicitado.
 
 ## 2. Decisión DEFINITIVA del propietario sobre accesos
@@ -54,7 +57,7 @@ El propietario **RECHAZÓ** las contraseñas individuales y las aprobaciones man
 - v2/cloudflare/src/single-installation.js — reclamo atómico del titular mediante token hash, auditoría de intentos duplicados, revisión de alertas y release de instalación solo por Admin.
 - v2/cloudflare/src/member-admin.js — lista/historial y baja; bloquea bajas con multimedia externa sin limpieza efectiva.
 - v2/cloudflare/src/admin-auth.js y admin-realtime.js — credencial de Administrador separada, WebSocket privado de invalidación.
-- v2/cloudflare/migrations/0013_single_installation_access.sql — columna single_device_mode (los seis existentes en 0, nuevos en 1), tablas chat_single_device_owners y chat_duplicate_login_alerts.
+- v2/cloudflare/migrations/0013_single_installation_access.sql — columna single_device_mode (valor legado por defecto 0 para migraciones históricas, pero **ya no hay cuentas antiguas activas**), tablas chat_single_device_owners y chat_duplicate_login_alerts. Las altas desde Admin usan 1; `0007` ya no crea usuarios de muestra.
 - v2/apps/pwa/src/AdminChatAccess.tsx y admin-api.ts — vista «Acceso a músicos», alertas de acceso duplicado, revisión, vínculo y «Liberar dispositivo», «Ver datos asociados», sesiones Admin.
 - v2/cloudflare/tests/single-installation.test.mjs y demás tests + .github/workflows/v2-foundation-check.yml — CI.
 - v2/packages/shared/src/index.ts — contratos de Chat; v2/apps/android/App.tsx (Chat React Native); v2/apps/pwa/src/App.tsx (Chat iPhone PWA).
@@ -80,7 +83,7 @@ El propietario **RECHAZÓ** las contraseñas individuales y las aprobaciones man
 
 **CERRADOS: 12/27** — B01 B02 B03 B04, C01 C02 C03 C04 C05, H01, S01, **S02 (aceptación del propietario para altas nuevas con bloqueo y alerta probados físicamente)**. **ABIERTOS: 15/27** — H02 H03 H04, M01 M02 M03 M04 M05, P01 P02 P03 P04 P05, Q01 Q02. No atribuir QA físico no realizado a S02.
 
-**S02 CERRADO CON ALCANCE ACEPTADO:** la prueba real de primer dispositivo, bloqueo en segundo y alerta Admin SÍ existe, y el propietario dio por suficiente ese resultado. No hubo QA físico de desconexión, liberación y nueva vinculación; no afirmarlo ni reabrir el hito por esos casos. Las seis cuentas antiguas siguen en modo legado y su migración sin pérdida se atenderá dentro de H03/Q01, antes de asegurar que la regla cubre a todos.
+**S02 CERRADO CON ALCANCE ACEPTADO:** la prueba real de primer dispositivo, bloqueo en segundo y alerta Admin SÍ existe, y el propietario dio por suficiente ese resultado. No hubo QA físico de desconexión, liberación y nueva vinculación. El propietario decidió luego revocar y eliminar el padrón anterior completo para reañadir nombres en modo único, así que no queda migración legacy pendiente.
 
 **Precisión de la alerta:** hoy el mecanismo descrito avisa en Admin autenticado y conectado por WebSocket o cuando recargue los datos. No existe prueba de notificación push externa con Admin cerrado (M05 abierto).
 
@@ -92,7 +95,7 @@ Cuando el propietario diga **«Revisa el Plan Maestro y sigue con la continuidad
 
 1. Ir a este repositorio/rama, leer **primero este archivo de continuidad** y luego v2/docs/PLAN-MAESTRO.md.
 2. Revisar el último commit y CI de GitHub y el último Worker/Pages/D1 real (solo lectura inicial).
-3. Resumir brevemente estado 12/27, S01 y S02 cerrados, el límite para las seis cuentas históricas y el **siguiente trabajo M01**.
+3. Resumir brevemente 12/27, S01 y S02 cerrados, **acceso de músicos vacío por decisión del propietario**, nueva alta Admin en modo único, y siguiente trabajo M01.
 4. **Continuar M01 (fotos privadas)** en una sola línea de Worker, PWA, Android Chat nativo y Admin donde aplique. No hacer más pruebas repetitivas de seguridad S02; no borrar músicos ni alterar sesiones sin aprobación.
 5. Avanzar hitos posteriores con CI y evidencia pertinente; documentar verificación real y el alcance, sin presentar las seis cuentas históricas como ya migradas.
 

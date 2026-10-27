@@ -12,17 +12,5 @@ CREATE TABLE IF NOT EXISTS chat_members (
 );
 CREATE INDEX IF NOT EXISTS idx_chat_members_active ON chat_members(active);
 
--- Existing lab sessions remain in D1 for audit; auth will reject tokens whose
--- actor_id does not belong to an enabled member.
-INSERT OR IGNORE INTO chat_members(username,actor_id,display_name,active)
- VALUES ('orly','member:orly','Orly',1);
-INSERT OR IGNORE INTO chat_members(username,actor_id,display_name,active)
- VALUES ('andy','member:andy','Andy',1);
-INSERT OR IGNORE INTO chat_members(username,actor_id,display_name,active)
- VALUES ('jali','member:jali','Jali',1);
-INSERT OR IGNORE INTO chat_members(username,actor_id,display_name,active)
- VALUES ('rafa','member:rafa','Rafa',1);
-INSERT OR IGNORE INTO chat_members(username,actor_id,display_name,active)
- VALUES ('noa','member:noa','Noa',1);
-INSERT OR IGNORE INTO chat_members(username,actor_id,display_name,active)
- VALUES ('fer','member:fer','Fer',1);
+-- No default musicians are created here. Only the authenticated Administrator
+-- may add names through the current V2 access management API.

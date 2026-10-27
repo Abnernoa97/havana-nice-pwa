@@ -38,6 +38,9 @@ present(worker,/chat\.revoked/,'Worker must notify active sessions when access i
 // survive in source, migrations, UI, or routes.
 const adminAuth=read('cloudflare/src/admin-auth.js');
 const adminMigration=read('cloudflare/migrations/0010_chat_admin_sessions.sql');
+const musicianMigration=read('cloudflare/migrations/0007_named_musician_access.sql');
+absent(musicianMigration,/INSERT\s+(?:OR\s+IGNORE\s+)?INTO\s+chat_members\b/i,
+  'No musician accounts may be auto-seeded by historical migrations');
 present(adminAuth,/V2_ADMIN_LOGIN_MODE==='enabled'/,'Admin login must remain explicit');
 present(adminAuth,/chat_admin_login_limits/,'Admin login must rate limit failed attempts');
 present(adminAuth,/revoked_at/,'Admin session must support revocation');

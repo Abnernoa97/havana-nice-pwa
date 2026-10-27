@@ -18,7 +18,7 @@
 2. La entrada nueva de músico se realiza **solo** con `POST /api/chat/session`, nombre exacto normalizado y registro activo en D1. No contraseñas por músico, solicitudes de teléfonos, aprobaciones individuales ni otros formularios.
 3. `GET /api/chat/session` revalida el token persistente del mismo cliente. `DELETE /api/chat/session` no puede soltar la vinculación del único dispositivo nuevo; solo el Administrador puede liberar la instalación.
 4. Los músicos nuevos tienen `single_device_mode=1`: el primer cliente queda vinculado y un segundo recibe `409 name_already_bound`, con alerta para Administrador.
-5. **Excepción temporal protegida:** los seis músicos originales (Andy, Fer, Jali, Noa, Orly y Rafa) siguen con `single_device_mode=0` y credenciales anteriores. No migrar ni invalidar automáticamente, ni anunciar que ya tienen protección por instalación. La adaptación se tratará en H03/Q01 preservando todo.
+5. **Reinicio autorizado 27/10/2026:** se eliminaron del D1 los seis músicos históricos y `Prueba 2`, junto con 12 sesiones, 1 vínculo, 1 alerta, 20 eventos de acceso y 7 lecturas. **No hay usuarios ni sesiones actualmente**. Los próximos músicos los añade exclusivamente el Administrador con `single_device_mode=1`; ya no queda ninguna cuenta legado que migrar. Se conservaron los 46 mensajes históricos y sus 11 reacciones, que no otorgan acceso.
 6. El login del Administrador, con un secreto servidor independiente y sesiones separadas, es intencionado y no constituye una segunda entrada de músicos.
 
 **S02 aceptado** por el propietario tras prueba física con `Prueba 2` (bloqueo en segundo teléfono, alerta Admin y vinculación verificadas); no repetir pruebas de seguridad sin motivo. **Estado: 12/27 hitos, M01 siguiente.**
@@ -26,7 +26,7 @@
 ## Limpieza y archivos históricos
 
 - El código de aprobación antigua de teléfonos, peticiones individuales y contraseñas de laboratorio **no forma parte de la aplicación V2 actual**. El guard de CI prohíbe revivir sus rutas.
-- Las migraciones SQL aplicadas NO se borran: documentan cómo crear el esquema sin perder datos.
+- Las migraciones SQL y tablas del sistema se conservan. La migración histórica `0007` ya no contiene altas automáticas de los seis músicos: una base V2 nueva comienza con cero nombres hasta que el Administrador los agregue.
 - **Rama V2 limpia:** se retiraron de `havana-nice-v2-foundation` 55 copias idénticas de los archivos históricos de la raíz (19 704 817 bytes), tras comprobar cada hash contra `main`. Se conservan intactas en `main` y en el historial Git. Esto reduce archivos en el checkout de V2, pero no elimina objetos históricos del repositorio. Cloudflare Pages de V2 compila únicamente `v2`.
 - El archivo `cloudflare/src/havana-cloud-bridge-client.js` no participa actualmente en el Worker desplegado; es una propuesta de integración futura para multimedia, **no** un acceso alternativo y no debe activarse sin decisión sobre almacenamiento.
 - No crear otra rama, otro backend, login paralelo, APK de prueba innecesaria ni cambios destructivos de datos.
