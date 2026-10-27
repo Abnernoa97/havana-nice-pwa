@@ -64,7 +64,11 @@ export default function AdminChatAccess({section}:{section:Section}){
      setDuplicateAlerts(data.alerts);
    }catch(reason){
      if(isAdminUnauthorized(reason)){setSession(null);setError('Tu sesión de Administrador expiró.');}
-     else setError('No se pudieron actualizar las alertas de acceso.');
+     else if(reason instanceof Error && 'status' in reason && reason.status===404) {
+       // Backend and Pages are deployed separately. A staged UI update must
+       // not disturb the already-authorized Administrator session.
+       setDuplicateAlerts([]);
+     }else setError('No se pudieron actualizar las alertas de acceso.');
    }
  },[]);
  const refreshOtherSessions=useCallback(async(token:string)=>{
