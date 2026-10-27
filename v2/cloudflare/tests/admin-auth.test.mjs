@@ -122,7 +122,7 @@ test('admin invalidation sends topics only through private Durable Object bindin
  await notifyAdminClients(e,'members');
  await notifyAdminClients(e,'sensitive-musician-data');
  assert.deepEqual(events,[{topic:'members'}]);
- assert.deepEqual(urls,['https://internal/admin-invalidate','https://internal/admin-invalidate']);
+ assert.deepEqual(urls,['https://internal/admin-invalidate']);
 });
 test('Worker rechecks admin sessions for WebSocket; DO keeps admin sockets out of Chat roster',()=>{
  const fs=(p)=>readFileSync(new URL(p,import.meta.url),'utf8');
