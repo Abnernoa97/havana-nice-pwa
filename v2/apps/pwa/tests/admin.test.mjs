@@ -44,7 +44,7 @@ test('new musician endpoint requires a separate verified Administrator token',()
  assert.match(backend,/url\.pathname === '\/api\/chat\/admin\/members'/);
  assert.match(backend,/if \(!await verifyAdminSession\(request,env\)\)/);
  assert.match(backend,/request\.method === 'POST'/);
- assert.match(backend,/INSERT OR IGNORE INTO chat_members\(username,actor_id,display_name,active\)/);
+ assert.match(backend,/INSERT OR IGNORE INTO chat_members\(username,actor_id,display_name,active,single_device_mode\)/);
  assert.match(backend,/created\.meta\?\.changes/);
  assert.match(backend,/Este nombre ya existe en el Administrador/);
  assert.match(backend,/notifyAdminClients\(env,'members'\)/);
@@ -139,9 +139,9 @@ test('only Administrator-created active names reach the session-minting endpoint
  const app=read('../src/App.tsx');
  assert.match(app,/startNamedChatSession\(name\.trim\(\)\)/);
  const login=index.indexOf("if (url.pathname === '/api/chat/session' && request.method === 'POST')");
- const lookup=index.indexOf("SELECT username,actor_id,display_name FROM chat_members WHERE username=? AND active=1",login);
+ const lookup=index.indexOf("SELECT username,actor_id,display_name,single_device_mode FROM chat_members WHERE username=? AND active=1",login);
  const denial=index.indexOf("if (!member) return respond({ error: 'Tu nombre todavía no está autorizado.",lookup);
- const mint=index.indexOf("return respond(await createSession(env, member,request), 200, origin);",denial);
+ const mint=index.indexOf("const session=await createSession(env,member,request);",denial);
  assert.ok(login>=0 && lookup>login && denial>lookup && mint>denial,
    'Only an active, Administrator-allowlisted name may mint a musician session');
  assert.match(index,/if \(!username\) return respond\(\{ error: 'Escribe tu nombre para entrar' \}, 400, origin\)/);
@@ -151,8 +151,8 @@ test('Admin session count stays accurate on manual refresh, foreground, and WebS
  const panel=read('../src/AdminChatAccess.tsx');
  assert.match(panel,/const refreshOtherSessions=useCallback\(async\(token:string\)=>/);
  assert.match(panel,/void refreshMembers\(session\.token\);void refreshOtherSessions\(session\.token\);/);
- assert.match(panel,/adminVerify\(session\.token\)\.then\(\(\)=>\{void refreshMembers\(session\.token\);void refreshOtherSessions\(session\.token\);\}\)/);
- assert.match(panel,/onClick=\{\(\)=>\{void refreshMembers\(session\.token\);void refreshOtherSessions\(session\.token\);\}\}/);
+ assert.match(panel,/adminVerify\(session\.token\)\.then\(\(\)=>\{void refreshMembers\(session\.token\);void refreshOtherSessions\(session\.token\);void refreshDuplicateAlerts\(session\.token\);\}\)/);
+ assert.match(panel,/onClick=\{\(\)=>\{void refreshMembers\(session\.token\);void refreshOtherSessions\(session\.token\);void refreshDuplicateAlerts\(session\.token\);\}\}/);
  assert.match(panel,/if\(isAdminUnauthorized\(reason\)\)/);
  assert.match(panel,/else setOtherSessions\(null\)/);
  assert.match(panel,/window\.confirm\('¿Cerrar las otras '/);
@@ -232,4 +232,23 @@ test('member counters do not mistake D1 session rows for live connected phones',
  assert.match(panel,/Las credenciales registradas no equivalen a teléfonos conectados/);
  assert.match(panel,/Las reacciones incluyen las vinculadas al músico o a sus mensajes/);
  assert.match(panel,/<dd>\{counts\.sessions\}<\/dd>/);
+});
+
+test('one-musician one-installation alerts never display bearer tokens and release is separate from trash',()=>{
+ const panel=read('../src/AdminChatAccess.tsx');
+ const api=read('../src/admin-api.ts');
+ const worker=read('../../../cloudflare/src/index.ts');
+ assert.match(panel,/Intentos de acceso duplicado/);
+ assert.match(panel,/void refreshDuplicateAlerts\(session\.token\)/);
+ assert.match(panel,/adminReviewDuplicateLogin\(session\.token,id\)/);
+ assert.match(panel,/async function releaseInstallation\(person:AdminMember\)/);
+ assert.match(panel,/adminReleaseInstallation\(session\.token,person\.actor_id,person\.display_name\)/);
+ assert.match(panel,/Liberar dispositivo/);
+ assert.match(panel,/No se borrarán sus mensajes/);
+ assert.match(api,/adminDuplicateLogins\(token:string\)/);
+ assert.match(api,/authenticated\(token\)/);
+ assert.match(worker,/single_device_mode/);
+ assert.match(worker,/code:'name_already_bound'/);
+ assert.match(worker,/claimFirstInstallation/);
+ assert.doesNotMatch(panel,/token_hash|installation_secret|cf-connecting-ip/i);
 });
