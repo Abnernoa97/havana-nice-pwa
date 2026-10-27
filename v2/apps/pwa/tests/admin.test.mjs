@@ -225,3 +225,11 @@ test('read-only account audit does not carry data into logout',()=>{
  assert.match(app,/setExpanded\(''\);setHistory\(\{\}\);setHistoryErrors\(\{\}\);setImpact\(\{\}\);setImpactErrors\(\{\}\)/);
  assert.match(app,/delete next\[person\.actor_id\]/);
 });
+
+test('member counters do not mistake D1 session rows for live connected phones',()=>{
+ const panel=read('../src/AdminChatAccess.tsx');
+ assert.match(panel,/Credenciales de acceso/);
+ assert.match(panel,/Las credenciales registradas no equivalen a teléfonos conectados/);
+ assert.match(panel,/Las reacciones incluyen las vinculadas al músico o a sus mensajes/);
+ assert.match(panel,/<dd>\{counts\.sessions\}<\/dd>/);
+});
