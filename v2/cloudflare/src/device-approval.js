@@ -2,6 +2,7 @@
 // 0009 migration, an independent administrator secret and upgraded clients.
 // All sensitive tokens are random; D1 stores SHA-256 digests only.
 import { adminLoginConfigured, verifyAdminSession } from './admin-auth.js';
+import { notifyAdminClients } from './admin-realtime.js';
 const WINDOW = 24 * 60 * 60 * 1000;
 const SESSION_LIFETIME = 90 * WINDOW;
 const APP_ORIGIN = 'https://havana-nice-v2-dev.pages.dev';
@@ -81,6 +82,7 @@ export async function handleDeviceApprovalApi(request,env,url,origin,respond,nor
         );
       } catch {} // D1 denial remains authoritative even if the socket is already gone.
     }
+    await notifyAdminClients(env,'requests');
     return respond({ok:true,status:action==='approve'?'approved':action==='deny'?'denied':'revoked'},200,origin);
   }
   if(path==='/api/chat/device/request' && request.method==='POST') {
@@ -100,6 +102,7 @@ export async function handleDeviceApprovalApi(request,env,url,origin,respond,nor
     await env.DB.prepare(
       "INSERT INTO chat_device_requests(request_id,request_secret_hash,actor_id,display_name,device_label,status,created_at,expires_at) VALUES(?,?,?,?,?,'pending',?,?)"
     ).bind(requestId,await tokenDigest(requestSecret),member.actor_id,member.display_name,label||'Dispositivo nuevo',now,now+WINDOW).run();
+    await notifyAdminClients(env,'requests');
     return respond({status:'pending',requestId,requestSecret,expiresAt:new Date(now+WINDOW).toISOString()},202,origin);
   }
   if(path==='/api/chat/device/status'&&request.method==='POST') {
@@ -129,6 +132,7 @@ export async function handleDeviceApprovalApi(request,env,url,origin,respond,nor
     ]);
     if(Number(results[0]?.meta?.changes)!==1 || Number(results[1]?.meta?.changes)!==1)
       return errorReply(respond,origin,'La solicitud ya fue utilizada',409);
+    await notifyAdminClients(env,'members');
     return respond({token,actorId:row.actor_id,displayName:row.display_name,
       expiresAt:new Date(now+SESSION_LIFETIME).toISOString()},200,origin);
   }

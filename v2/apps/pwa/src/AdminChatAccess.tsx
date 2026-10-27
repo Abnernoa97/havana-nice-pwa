@@ -1,5 +1,5 @@
 import {useCallback,useEffect,useState,type FormEvent} from 'react';
-import {adminAvailability,adminDeviceAction,adminDeviceRequests,adminLogin,adminLogout,adminVerify,adminMembers,
+import {adminAvailability,adminDeviceAction,adminDeviceRequests,adminLogin,adminLogout,adminVerify,adminMembers,openAdminRealtime,
  type AdminDeviceRequest,type AdminSession,type AdminMember} from './admin-api';
 
 type Section='overview'|'requests'|'devices'|'members'|'security';
@@ -16,6 +16,7 @@ export default function AdminChatAccess({section}:{section:Section}){
  const [membersReady,setMembersReady]=useState(false);
  const [listReady,setListReady]=useState(false);
  const [pendingId,setPendingId]=useState('');
+ const [realtime,setRealtime]=useState<'waiting'|'connected'|'reconnecting'>('waiting');
  const refreshMembers=useCallback(async(token:string)=>{
    setMembersReady(false);
    try{
@@ -51,6 +52,66 @@ export default function AdminChatAccess({section}:{section:Section}){
   void adminVerify(session.token).then(()=>{void refresh(session.token);void refreshMembers(session.token);}).catch(()=>{
     setSession(null);setError('La sesión administrativa venció o fue revocada.');
   });
+ },[session,refresh,refreshMembers]);
+ // Authenticated real-time invalidation. Never store the admin token or show
+ // private data over WebSocket; the protected API is still the source of truth.
+ useEffect(()=>{
+   if(!session){setRealtime('waiting');return;}
+   let active=true,socket:WebSocket|null=null,retryTimer:ReturnType<typeof setTimeout>|null=null;
+   let retry=1000;
+   const refreshLatest=()=>{
+     if(!active||document.hidden||!navigator.onLine)return;
+     void adminVerify(session.token).then(()=>{
+       if(!active)return;
+       void refresh(session.token);void refreshMembers(session.token);
+     }).catch(()=>{
+       if(active){setSession(null);setError('La sesión administrativa expiró o fue revocada.');}
+     });
+   };
+   const connect=()=>{
+     if(!active||document.hidden||!navigator.onLine)return;
+     setRealtime('reconnecting');
+     try{
+       socket=openAdminRealtime(session.token,event=>{
+         if(!active)return;
+         if(event.type==='admin.ready'){retry=1000;setRealtime('connected');refreshLatest();}
+         if(event.type==='admin.invalidate'&&event.topic==='requests')void refresh(session.token);
+         if(event.type==='admin.invalidate'&&event.topic==='members')void refreshMembers(session.token);
+       });
+       socket.onclose=event=>{
+         if(!active)return;
+         setRealtime('reconnecting');socket=null;
+         if(event.code===4003){setSession(null);setError('La sesión administrativa fue revocada.');return;}
+         retryTimer=setTimeout(connect,retry);retry=Math.min(retry*2,15000);
+       };
+       socket.onerror=()=>{if(active)setRealtime('reconnecting');};
+     }catch{
+       if(!active)return;
+       retryTimer=setTimeout(connect,retry);retry=Math.min(retry*2,15000);
+     }
+   };
+   const onResume=()=>{
+     if(!active)return;
+     if(document.hidden||!navigator.onLine){socket?.close();return;}
+     refreshLatest();
+     if(!socket||socket.readyState===WebSocket.CLOSED)connect();
+   };
+   const expireAfter=Math.max(0,Date.parse(session.expiresAt)-Date.now());
+   const expiryTimer=setTimeout(()=>{
+     if(active){setSession(null);setError('La sesión administrativa expiró.');}
+   },Number.isFinite(expireAfter)?expireAfter:0);
+   document.addEventListener('visibilitychange',onResume);
+   window.addEventListener('online',onResume);
+   window.addEventListener('offline',onResume);
+   connect();
+   return()=>{
+     active=false;clearTimeout(expiryTimer);
+     if(retryTimer)clearTimeout(retryTimer);
+     document.removeEventListener('visibilitychange',onResume);
+     window.removeEventListener('online',onResume);
+     window.removeEventListener('offline',onResume);
+     socket?.close();
+   };
  },[session,refresh,refreshMembers]);
  async function login(e:FormEvent){
   e.preventDefault();if(processing||!password)return;
@@ -98,7 +159,7 @@ export default function AdminChatAccess({section}:{section:Section}){
  const visible=section==='requests'?rows.filter(x=>x.status==='pending'):rows.filter(x=>x.status==='approved'||x.status==='revoked');
  return <section className="a-panel a-admin-private">
   <div className="a-admin-toolbar"><div><h2>Administrador autorizado</h2>
-   <p className="a-detail">Sesión temporal · Los cambios son validados por Cloudflare</p></div>
+   <p className="a-detail">Sesión temporal · Los cambios son validados por Cloudflare · {realtime==='connected'?'Sincronización automática activa':'Reconectando sincronización automática'}</p></div>
    <div className="a-admin-toolbar-actions"><button type="button" onClick={()=>void refresh(session.token)}>Actualizar</button>
     <button type="button" onClick={()=>void logout()}>Cerrar sesión</button></div>
   </div>

@@ -2,6 +2,7 @@
 import { handleChatMedia, mediaReadiness } from './drive-media.js';
 import { deviceGateEnabled, handleDeviceApprovalApi } from './device-approval.js';
 import { handleAdminSessionApi, verifyAdminSession } from './admin-auth.js';
+import { adminSocketToken, adminTokenRequest } from './admin-realtime.js';
 // HAVANA NICE V2 isolated Worker. Only D1-authorized musician names may enroll.
 // Random durable device credentials are issued once and validated against D1 on every request.
 const encoder = new TextEncoder();
@@ -86,6 +87,7 @@ export class ChatRoom {
     this.sockets = new Set();
     this.members = new Map();
     this.typingSent = new Map();
+    this.adminSockets = new Map(); // independent of musician chat sockets
   }
   async fetch(request) {
     if (new URL(request.url).pathname === '/health') return Response.json({ ok: true, durableObject: 'ChatRoom', environment: this.env.HAVANA_ENV || 'development' });
@@ -102,6 +104,30 @@ export class ChatRoom {
       }
       this.broadcast({type:'chat.presence',users:this.onlineUsers()});
       return respond({ok:true},200);
+    }
+    if (new URL(request.url).pathname === '/admin-invalidate' && request.method === 'POST') {
+      let event=null;
+      try{event=await request.json();}catch{}
+      if(!['requests','members'].includes(event?.topic))return respond({error:'Invalid topic'},400);
+      await this.invalidateAdmins(event.topic);
+      return respond({ok:true},200);
+    }
+    if (new URL(request.url).pathname === '/ws/admin') {
+      if ((request.headers.get('upgrade')||'').toLowerCase()!=='websocket')
+        return respond({error:'WebSocket required'},426);
+      const token=adminSocketToken(request);
+      if(!token||!await verifyAdminSession(adminTokenRequest(token),this.env))
+        return respond({error:'Unauthorized'},401);
+      const pair=new WebSocketPair();
+      const client=pair[0],server=pair[1];server.accept();
+      this.adminSockets.set(server,token);
+      this.send(server,{type:'admin.ready'});
+      const cleanup=()=>this.adminSockets.delete(server);
+      server.addEventListener('close',cleanup);
+      server.addEventListener('error',cleanup);
+      // Admin sockets never enter musician presence, messages or membership maps.
+      return new Response(null,{status:101,webSocket:client,
+        headers:{'Sec-WebSocket-Protocol':'havana-v2-admin'}});
     }
     if ((request.headers.get('upgrade') || '').toLowerCase() !== 'websocket') return respond({ error: 'WebSocket required' }, 426);
     // Authenticated in both Worker and DO, without rebuilding the upgrade Request:
@@ -120,6 +146,7 @@ export class ChatRoom {
     this.members.set(server, {actorId, name, enrollmentToken, enrollmentId:session.enrollmentId??null});
     server.send(JSON.stringify({ type: 'chat.ready', at: new Date().toISOString(), users: this.onlineUsers() }));
     this.broadcast({ type: 'chat.presence', users: this.onlineUsers() });
+    void this.invalidateAdmins('members').catch(()=>{}); // report roster/session activity, not musician data
     server.addEventListener('message', event => {
       this.state.waitUntil((async () => {
         // Revoking a name immediately denies all subsequent chat actions,
@@ -155,6 +182,16 @@ export class ChatRoom {
   }
   broadcast(data) {
     for (const socket of this.sockets) this.send(socket, data);
+  }
+  async invalidateAdmins(topic){
+    for(const [socket,token] of this.adminSockets){
+      if(!await verifyAdminSession(adminTokenRequest(token),this.env)){
+        try{socket.close(4003,'Admin session ended');}catch{}
+        this.adminSockets.delete(socket);
+        continue;
+      }
+      this.send(socket,{type:'admin.invalidate',topic});
+    }
   }
   onlineUsers() {
     const users = new Map();
@@ -366,6 +403,19 @@ export default {
       return respond({ messages: rows.map(mapMessage), reactions: reactions.map(r => ({messageSeq:r.message_seq,actorId:r.actor_id,emoji:r.emoji})),
         receipts: (receipts.results||[]).map(r => ({actorId:r.actor_id,displayName:r.display_name,seq:r.last_read_seq})),
         hasMore: rows.length === MAX_HISTORY }, 200, origin);
+    }
+    if (url.pathname === '/ws/admin') {
+      // Admin websocket is available only from the known Administrator PWA origin.
+      // Authorization is checked in both Worker and Durable Object, every event
+      // is a topic hint, and no credentials are passed in query parameters.
+      const rawOrigin=request.headers.get('origin');
+      if(!rawOrigin||!origin)return respond({error:'Origin not allowed'},403,origin);
+      if((request.headers.get('upgrade')||'').toLowerCase()!=='websocket')
+        return respond({error:'Upgrade required'},426,origin);
+      const token=adminSocketToken(request);
+      if(!token||!await verifyAdminSession(adminTokenRequest(token),env))
+        return respond({error:'No autorizado'},401,origin);
+      return env.CHAT_ROOMS.get(env.CHAT_ROOMS.idFromName(ROOM)).fetch(request);
     }
     if (url.pathname === '/ws') {
       const session = await verifySession(env, websocketSessionToken(request));

@@ -47,3 +47,19 @@ export type AdminMember={
 export function adminMembers(token:string){
  return api<{members:AdminMember[]}>('/api/chat/admin/members',authenticated(token));
 }
+
+export type AdminRealtimeEvent={type:'admin.ready'}|{type:'admin.invalidate';topic:'requests'|'members'};
+export function openAdminRealtime(token:string,onEvent:(event:AdminRealtimeEvent)=>void):WebSocket{
+ if(!/^[A-Za-z0-9_-]{40,128}$/.test(token))throw new Error('Sesión administrativa inválida');
+ const url=API.replace(/^http/,'ws')+'/ws/admin';
+ const socket=new WebSocket(url,['havana-v2-admin','admin.'+token]);
+ socket.addEventListener('message',event=>{
+  try{
+   const value=JSON.parse(String(event.data)) as Partial<AdminRealtimeEvent>;
+   if(value.type==='admin.ready')onEvent({type:'admin.ready'});
+   if(value.type==='admin.invalidate'&&(value.topic==='requests'||value.topic==='members'))
+     onEvent({type:'admin.invalidate',topic:value.topic});
+  }catch{/* Unrecognized server event: ignore; privileged API remains authoritative. */}
+ });
+ return socket;
+}

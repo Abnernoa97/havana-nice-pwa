@@ -88,3 +88,15 @@ test('S01 pending device requests resume separately from Chat history on Android
   assert.match(s,/usablePendingChatEnrollment\(enrollment\)/);
  }
 });
+
+test('Admin Chat receives authenticated realtime changes without trusting push contents',()=>{
+ const api=read('../src/admin-api.ts');
+ const panel=read('../src/AdminChatAccess.tsx');
+ assert.match(api,/new WebSocket\(url,\['havana-v2-admin','admin\.'\+token\]\)/);
+ assert.match(panel,/openAdminRealtime\(session\.token/);
+ assert.match(panel,/event\.topic==='requests'/);
+ assert.match(panel,/event\.topic==='members'/);
+ assert.match(panel,/document\.addEventListener\('visibilitychange',onResume\)/);
+ assert.match(panel,/adminVerify\(session\.token\)/);
+ assert.doesNotMatch(api,/localStorage\.|sessionStorage\.|indexedDB\./);
+});

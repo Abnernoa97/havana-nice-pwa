@@ -1,4 +1,5 @@
 import test from 'node:test';
+import {readFileSync} from 'node:fs';
 import assert from 'node:assert/strict';
 import {adminLoginConfigured,handleAdminSessionApi,verifyAdminSession} from '../src/admin-auth.js';
 
@@ -92,4 +93,31 @@ test('five incorrect logins limit a single device but do not block another IP',a
  const different=await fetchAdmin(e,'POST','/api/chat/admin/auth/session',{password:adminPassword},
    undefined,'203.0.113.8');
  assert.equal(different.status,200);
+});
+
+// S01/P04: member Chat sessions cannot subscribe to privileged admin changes.
+import {adminSocketToken,adminTokenRequest,notifyAdminClients} from '../src/admin-realtime.js';
+test('admin realtime subprotocol requires the independent administrator token and never URL parameters',()=>{
+ const req=(protocol)=>new Request(endpoint+'/ws/admin',{headers:{'sec-websocket-protocol':protocol}});
+ assert.equal(adminSocketToken(req('havana-v2-admin, admin.'+'a'.repeat(43))),'a'.repeat(43));
+ assert.equal(adminSocketToken(req('havana-v2, session.'+'a'.repeat(43))),'');
+ assert.equal(adminSocketToken(req('admin.'+'a'.repeat(43))),'');
+ assert.equal(adminTokenRequest('a'.repeat(43)).headers.get('authorization'),'Bearer '+'a'.repeat(43));
+});
+test('admin invalidation sends topics only through private Durable Object binding',async()=>{
+ const urls=[],events=[];
+ const e={CHAT_ROOMS:{idFromName:n=>{assert.equal(n,'main-chat-v2');return n;},get:()=>({fetch:async(url,req)=>{urls.push(url);events.push(JSON.parse(req.body));return Response.json({ok:true});}})}};
+ await notifyAdminClients(e,'requests');await notifyAdminClients(e,'members');
+ await notifyAdminClients(e,'sensitive-musician-data');
+ assert.deepEqual(events,[{topic:'requests'},{topic:'members'}]);
+ assert.deepEqual(urls,['https://internal/admin-invalidate','https://internal/admin-invalidate']);
+});
+test('Worker rechecks admin sessions for WebSocket; DO keeps admin sockets out of Chat roster',()=>{
+ const fs=(p)=>readFileSync(new URL(p,import.meta.url),'utf8');
+ const worker=fs('../src/index.ts');
+ assert.match(worker,/url\.pathname === '\/ws\/admin'/);
+ assert.match(worker,/verifyAdminSession\(adminTokenRequest\(token\),env\)/);
+ assert.match(worker,/verifyAdminSession\(adminTokenRequest\(token\),this\.env\)/);
+ assert.match(worker,/this\.adminSockets = new Map/);
+ assert.match(worker,/this\.members\.set\(server, \{actorId/);
 });
