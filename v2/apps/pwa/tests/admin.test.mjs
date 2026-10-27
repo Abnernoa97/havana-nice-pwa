@@ -106,3 +106,15 @@ test('Administrator frontend defers new versions while its session or unsaved fo
  assert.match(admin,/Se aplicará cuando cierres sesión/);
  assert.match(access,/dataset\.adminSessionActive=session\?'true':'false'/);
 });
+
+test('Admin retains an authorized session during network outages and retries on resume',()=>{
+ const access=read('../src/AdminChatAccess.tsx');
+ const api=read('../src/admin-api.ts');
+ assert.match(api,/export class AdminApiError extends Error/);
+ assert.match(api,/export function isAdminUnauthorized/);
+ assert.match(api,/reason instanceof AdminApiError && reason\.status===401/);
+ assert.match(access,/if\(isAdminUnauthorized\(reason\)\)/);
+ assert.match(access,/else setError\('Sin conexión temporal\. La sesión sigue abierta/);
+ assert.match(access,/conservamos la sesión y los datos cargados/);
+ assert.doesNotMatch(access,/catch\(\(\)=>setSession\(null\)\)/);
+});
