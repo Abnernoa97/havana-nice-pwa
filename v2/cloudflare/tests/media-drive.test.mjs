@@ -68,3 +68,48 @@ test('Havana Cloud bridge remains closed when provider has not enabled uploads',
   assert.equal(result.eligibleAccounts,2);
   assert.equal(result.reason,'upload_bridge_not_ready');
 });
+
+import {preflightHavanaCloudPhotoVideo} from '../src/havana-cloud-bridge-client.js';
+
+test('Photo/video preflight is inert without a private binding and explicit gate',async()=>{
+  assert.deepEqual(await preflightHavanaCloudPhotoVideo({},{
+    kind:'photo',mimeType:'image/jpeg',fileName:'wedding.jpg',sizeBytes:12_345
+  }),{accepted:false,uploadRouteEnabled:false,reason:'private_bridge_not_authorized'});
+});
+test('Photo/video metadata reaches HAVANA CLOUD only through its private binding, not Google',async()=>{
+  const input={kind:'video',mimeType:'video/mp4',fileName:'dance.mp4',sizeBytes:1234567};
+  let calls=0;
+  const env={V2_CLOUD_BRIDGE_ENABLED:'enabled',V2_CLOUD_BRIDGE_SECRET:'S'.repeat(50),
+    HAVANA_CLOUD_BRIDGE:{fetch:async(url,init)=>{
+      calls++;
+      assert.equal(url,'https://havana-cloud.internal/api/internal/havana-v2/media/preflight');
+      assert.equal(init.method,'POST');
+      assert.equal(init.headers['x-havana-v2-internal-token'],'S'.repeat(50));
+      assert.deepEqual(JSON.parse(init.body),input);
+      return Response.json({accepted:true,kind:'video',chunkBytes:4194304,
+        uploadRouteEnabled:false,sessionUrl:'DO_NOT_EXPOSE',accountId:'DO_NOT_EXPOSE'});
+    }}};
+  const result=await preflightHavanaCloudPhotoVideo(env,input);
+  assert.equal(calls,1);
+  assert.deepEqual(result,{accepted:true,uploadRouteEnabled:false,
+    reason:'validation_only',kind:'video',chunkBytes:4194304});
+  assert.ok(!JSON.stringify(result).includes('DO_NOT_EXPOSE'));
+});
+test('Photo/video preflight never enables real uploads, even for malicious provider replies',async()=>{
+  const env={V2_CLOUD_BRIDGE_ENABLED:'enabled',V2_CLOUD_BRIDGE_SECRET:'k'.repeat(45),
+    HAVANA_CLOUD_BRIDGE:{fetch:async()=>Response.json({accepted:true,
+       uploadRouteEnabled:true,kind:'photo',chunkBytes:1048576})}};
+  const status=await preflightHavanaCloudPhotoVideo(env,{
+    kind:'photo',mimeType:'image/png',fileName:'party.png',sizeBytes:10000});
+  assert.equal(status.accepted,true);
+  assert.equal(status.uploadRouteEnabled,false);
+});
+test('Private preflight rejects audio and malformed metadata before calling HAVANA CLOUD',async()=>{
+  let calls=0;
+  const env={V2_CLOUD_BRIDGE_ENABLED:'enabled',V2_CLOUD_BRIDGE_SECRET:'e'.repeat(45),
+    HAVANA_CLOUD_BRIDGE:{fetch:async()=>{calls++;throw Error('Should not call')}}};
+  const data=await preflightHavanaCloudPhotoVideo(env,{
+    kind:'audio',mimeType:'audio/mpeg',fileName:'voice.mp3',sizeBytes:12000});
+  assert.deepEqual(data,{accepted:false,uploadRouteEnabled:false,reason:'invalid_metadata'});
+  assert.equal(calls,0);
+});
