@@ -108,6 +108,7 @@ export type ChatServerEvent =
   | { type: 'chat.typing'; actorId: string; senderName: string; active: boolean; expiresAt: number }
   | { type: 'chat.reaction'; messageSeq: number; actorId: string; emoji: ChatEmoji; active: boolean }
   | { type:'chat.updated'; message: ChatMessage }
+  | { type:'chat.deleted'; seq:number }
   | { type:'chat.read'; actorId:string; displayName:string; seq:number };
 
 export type ChatEmoji = '❤️' | '😂' | '👍';
@@ -118,6 +119,15 @@ export interface ChatSnapshot { messages: ChatMessage[]; reactions: ChatReaction
 
 export function reconcileUpdatedMessage(before: ChatMessage[], updated:ChatMessage):ChatMessage[] {
   return before.map(item => item.seq === updated.seq && updated.seq > 0 ? {...item,...updated,pending:false} : item);
+}
+export function reconcileDeletedMessage(before:ChatMessage[],seq:number):ChatMessage[]{
+ return before.filter(m=>m.seq!==seq&&!m.deletedAt).map(m=>m.replyToSeq===seq?{...m,replyToSeq:null}:m);
+}
+export function reconcileChatSnapshot(before:ChatMessage[],server:ChatMessage[]):ChatMessage[]{
+ const latest=server.filter(m=>!m.deletedAt),ids=new Set(latest.map(m=>m.seq));
+ const min=latest.length?Math.min(...latest.map(m=>m.seq)):0;
+ return reconcileChatMessages(before.filter(m=>!m.deletedAt&&(m.pending||m.seq<=0||
+ (min>0&&m.seq<min)||ids.has(m.seq))),latest);
 }
 export function lastReadByOther(reads:ChatReadReceipt[],ownActor:string):number {
   return Math.max(0,...reads.filter(r=>r.actorId!==ownActor).map(r=>r.seq));
