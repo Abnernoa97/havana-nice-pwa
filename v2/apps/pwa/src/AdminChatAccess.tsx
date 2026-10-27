@@ -1,6 +1,6 @@
 import {useCallback,useEffect,useState,type FormEvent} from 'react';
 import {adminAvailability,adminLogin,adminLogout,adminVerify,adminOtherSessions,adminRevokeOtherSessions,adminMembers,adminCreateMember,adminMemberHistory,adminRemoveMember,openAdminRealtime,
- type AdminSession,type AdminMember,type AdminMemberHistory} from './admin-api';
+ type AdminSession,type AdminMember,type AdminMemberHistory,isAdminUnauthorized} from './admin-api';
 
 type Section='access'|'chat'|'repertoire'|'calendar'|'more';
 type Readiness='loading'|'disabled'|'enabled'|'error';
@@ -32,7 +32,10 @@ export default function AdminChatAccess({section}:{section:Section}){
 
  const refreshMembers=useCallback(async(token:string)=>{
    try{const data=await adminMembers(token);setMembers(data.members);setLoaded(true);}
-   catch(e){const reason=e instanceof Error?e.message:'No se pudieron consultar los músicos';setError(reason);if(reason==='No autorizado')setSession(null);}
+   catch(e){
+     if(isAdminUnauthorized(e)){setSession(null);setError('Tu sesión de Administrador expiró.');return;}
+     setError('No se pudo actualizar la lista. Comprueba tu conexión; conservamos la sesión y los datos cargados.');
+   }
  },[]);
  useEffect(()=>{
    let active=true;
@@ -48,7 +51,10 @@ export default function AdminChatAccess({section}:{section:Section}){
      void refreshMembers(session.token);
      void adminOtherSessions(session.token).then(data=>setOtherSessions(data.others))
        .catch(()=>setOtherSessions(null));
-   }).catch(()=>{setSession(null);setError('Tu sesión de Administrador expiró.');});
+   }).catch(reason=>{
+     if(isAdminUnauthorized(reason)){setSession(null);setError('Tu sesión de Administrador expiró.');}
+     else setError('No se pudo verificar la conexión. Tu sesión permanece abierta para reintentar.');
+   });
  },[session,refreshMembers]);
  useEffect(()=>{
    if(!session){setRealtime('waiting');return;}
@@ -77,7 +83,11 @@ export default function AdminChatAccess({section}:{section:Section}){
    const resume=()=>{
      if(!active)return;
      if(document.hidden||!navigator.onLine){socket?.close();return;}
-     void adminVerify(session.token).then(()=>void refreshMembers(session.token)).catch(()=>setSession(null));
+     void adminVerify(session.token).then(()=>void refreshMembers(session.token)).catch(reason=>{
+       if(!active)return;
+       if(isAdminUnauthorized(reason)){setSession(null);setError('Tu sesión administrativa expiró.');}
+       else setError('Sin conexión temporal. La sesión sigue abierta; se actualizará al reconectar.');
+     });
      if(!socket||socket.readyState===WebSocket.CLOSED)reconnect();
    };
    const duration=Math.max(0,Date.parse(session.expiresAt)-Date.now());
