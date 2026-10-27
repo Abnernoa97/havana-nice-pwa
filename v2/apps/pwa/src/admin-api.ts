@@ -47,6 +47,9 @@ export type AdminMember={
 export function adminMembers(token:string){
  return api<{members:AdminMember[]}>('/api/chat/admin/members',authenticated(token));
 }
+export function adminCreateMember(token:string,displayName:string){
+ return api<{member:AdminMember}>('/api/chat/admin/members',authenticated(token,{method:'POST',body:JSON.stringify({displayName})}));
+}
 
 export type AdminRealtimeEvent={type:'admin.ready'}|{type:'admin.invalidate';topic:'requests'|'members'};
 export function openAdminRealtime(token:string,onEvent:(event:AdminRealtimeEvent)=>void):WebSocket{
