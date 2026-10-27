@@ -7,11 +7,11 @@ const token='Q'.repeat(43),actor='member:orly';
 const digest=async value=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value)))]
   .map(x=>x.toString(16).padStart(2,'0')).join('');
 class FakeDB{
- constructor(){this.members=new Map([[actor,{actor_id:actor,display_name:'Orly'}]]);this.statements=[];this.sessionHash='';}
+ constructor(){this.members=new Map([[actor,{actor_id:actor,display_name:'Orly'}]]);this.statements=[];this.sessionHash='';this.revoked=false;}
  prepare(sql){
   return {bind:(...args)=>({
     first:async()=>{
-      if(sql.startsWith('SELECT expires_at,revoked_at'))return args[0]===this.sessionHash?{expires_at:Date.now()+60_000,revoked_at:null}:null;
+      if(sql.startsWith('SELECT expires_at,revoked_at'))return args[0]===this.sessionHash?{expires_at:Date.now()+60_000,revoked_at:this.revoked?Date.now():null}:null;
       if(sql.startsWith('SELECT actor_id,display_name FROM chat_members'))return this.members.get(args[0])||null;
       if(sql.startsWith('SELECT actor_id FROM chat_members'))return this.members.get(args[0])||null;
       if(sql.startsWith('SELECT COUNT(*) AS entries'))return {entries:2};
@@ -21,7 +21,10 @@ class FakeDB{
       if(sql.startsWith('SELECT event_type,occurred_at'))return {results:[]};
       throw Error('Unexpected all: '+sql);
     },
-    run:async()=>{this.statements.push({sql,args});return {meta:{changes:1}};},
+    run:async()=>{
+      if(sql.startsWith('INSERT INTO chat_access_events')&&!this.members.has(args[8]))return {meta:{changes:0}};
+      this.statements.push({sql,args});return {meta:{changes:1}};
+    },
     sql,args
   })};
  }
@@ -113,4 +116,38 @@ test('confirmed member removal stays successful when Durable Object notification
  assert.equal(result.status,200);
  assert.equal(result.body.deleted,true);
  assert.equal(e.DB.members.size,0,'D1 deletion is authoritative and cannot be undone by notification outage');
+});
+
+test('revoked Administrator credentials cannot read member history or delete an account',async()=>{
+ const e=await env();
+ e.DB.revoked=true;
+ const history=await handler(e,'GET','/api/chat/admin/member-history?actorId='+encodeURIComponent(actor));
+ const deletion=await handler(e,'POST','/api/chat/admin/remove-member',{actorId:actor,confirmName:'Orly'});
+ assert.equal(history.status,401);
+ assert.equal(deletion.status,401);
+ assert.equal(e.DB.members.size,1);
+ assert.equal(e.DB.statements.length,0);
+});
+
+test('after account deletion, stale device event writes cannot recreate its history',async()=>{
+ const e=await env();
+ const result=await handler(e,'POST','/api/chat/admin/remove-member',{actorId:actor,confirmName:'Orly'});
+ assert.equal(result.status,200);
+ const before=e.DB.statements.length;
+ await recordMemberEvent(e,actor,'connect',new Request(BASE));
+ await recordMemberEvent(e,actor,'disconnect',new Request(BASE));
+ assert.equal(e.DB.statements.length,before,'No activity may resurrect a deleted member history');
+ const history=await handler(e,'GET','/api/chat/admin/member-history?actorId='+encodeURIComponent(actor));
+ const retry=await handler(e,'POST','/api/chat/admin/remove-member',{actorId:actor,confirmName:'Orly'});
+ assert.equal(history.status,404);
+ assert.equal(retry.status,404);
+});
+
+test('access history does not fabricate device model when identification is unavailable',()=>{
+ const req=new Request(BASE,{headers:{'user-agent':'Mozilla/5.0 Chrome/131.0.0.0'}});
+ const meta=readMemberDevice(req);
+ assert.equal(meta.operatingSystem,'No identificado');
+ assert.equal(meta.deviceName,'Dispositivo no identificado');
+ assert.equal(meta.model,null);
+ assert.equal(meta.platform,'Cliente no identificado');
 });
