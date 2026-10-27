@@ -171,3 +171,11 @@ test('Administrator reconnects safely after offline and background without dupli
  assert.match(panel,/window\.addEventListener\('online',resume\)/);
  assert.match(panel,/window\.addEventListener\('offline',resume\)/);
 });
+
+test('Admin never labels Chrome reduced historical K as a real phone model',()=>{
+ const app=read('../src/AdminChatAccess.tsx');
+ assert.match(app,/event\.device_model==='K'&&event\.operating_system==='Android 10'/);
+ assert.match(app,/Android \(versión no disponible\)/);
+ assert.match(app,/event\.device_model&&event\.device_model!=='K'/);
+ assert.match(app,/Modelo no disponible/);
+});
