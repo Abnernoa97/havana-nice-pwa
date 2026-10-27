@@ -14,9 +14,10 @@ if ('serviceWorker' in navigator) {
     .then(registration=>registration.update()).catch(()=>{});
 }
 
-// The current administrator shell contains no editable privileged forms.
-// When adding edit forms later, preserve drafts before any automatic reload.
-// A fresh installed PWA loads the newest bundle on every foreground visit.
+// Never reload while an Administrator session is active OR any form contains
+// unsaved input. The auth token lives in React memory and would be lost.
+// Fresh versions apply automatically only at a safe point (after logout, or
+// while the login page has no draft). No secret/session is persisted in storage.
 let checking=false;
 async function checkAdminUpdate() {
   if (checking || document.hidden) return;
@@ -28,7 +29,17 @@ async function checkAdminUpdate() {
     if (!response.ok) return;
     const latest=new DOMParser().parseFromString(await response.text(),'text/html')
       .querySelector<HTMLScriptElement>('script[type="module"][src]')?.getAttribute('src');
-    if(latest?.startsWith('/assets/') && latest!==current) window.location.reload();
+    if(latest?.startsWith('/assets/') && latest!==current) {
+      const active=document.documentElement.dataset.adminSessionActive==='true';
+      const formHasDraft=[...document.querySelectorAll<HTMLInputElement|HTMLTextAreaElement>('input,textarea')]
+        .some(input=>input.value.trim().length>0);
+      if(active||formHasDraft){
+        document.documentElement.dataset.adminUpdatePending='true';
+        window.dispatchEvent(new Event('havana-admin-update-pending'));
+      } else {
+        window.location.reload();
+      }
+    }
   } catch { /* Offline: retain active state and try again on reconnection. */ }
   finally { checking=false; }
 }
@@ -36,3 +47,5 @@ window.addEventListener('pageshow',()=>void checkAdminUpdate());
 window.addEventListener('online',()=>void checkAdminUpdate());
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)void checkAdminUpdate();});
 window.setInterval(()=>void checkAdminUpdate(),60_000);
+
+window.addEventListener('havana-admin-session-ended',()=>void checkAdminUpdate());
