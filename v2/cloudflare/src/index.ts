@@ -5,6 +5,7 @@ import { handlePwaFirstDeviceSession } from './pwa-first-device.js';
 import { handleAdminSessionApi, verifyAdminSession } from './admin-auth.js';
 import { adminSocketToken, adminTokenRequest, notifyAdminClients } from './admin-realtime.js';
 import {handleAdminMemberManagement,recordMemberEvent,readMemberDevice} from './member-admin.js';
+import {claimFirstInstallation,auditDuplicateInstallation,handleSingleInstallationAdmin} from './single-installation.js';
 // HAVANA NICE V2 isolated Worker. Only D1-authorized musician names may enroll.
 // Random durable device credentials are issued once and validated against D1 on every request.
 const encoder = new TextEncoder();
@@ -49,8 +50,19 @@ function normalizeMusicianName(value) {
 }
 async function createSession(env, member, request) {
   const token = b64(crypto.getRandomValues(new Uint8Array(32)));
-  await env.DB.prepare('INSERT INTO chat_sessions (token_hash, actor_id, display_name, expires_at) VALUES (?, ?, ?, ?)')
-    .bind(await sha256(token), member.actor_id, member.display_name, MEMBER_SESSION_EXPIRY).run();
+  const tokenHash=await sha256(token);
+  if(Number(member.single_device_mode)===1){
+    // First named login claims the only installation; concurrent contenders
+    // cannot mint a second Chat token. Legacy users are deliberately exempt.
+    const claimed=await claimFirstInstallation(env,member,tokenHash,MEMBER_SESSION_EXPIRY);
+    if(!claimed){
+      await auditDuplicateInstallation(env,member.actor_id,request);
+      return null;
+    }
+  }else{
+    await env.DB.prepare('INSERT INTO chat_sessions (token_hash, actor_id, display_name, expires_at) VALUES (?, ?, ?, ?)')
+      .bind(tokenHash, member.actor_id, member.display_name, MEMBER_SESSION_EXPIRY).run();
+  }
   await recordMemberEvent(env,member.actor_id,'login',request).catch(()=>{});
   return { token, actorId: member.actor_id, displayName: member.display_name, expiresAt: new Date(MEMBER_SESSION_EXPIRY).toISOString() };
 }
@@ -60,7 +72,9 @@ async function verifySession(env, token) {
     const row = await env.DB.prepare(
       'SELECT s.actor_id, m.display_name, s.expires_at, s.enrollment_id ' +
       'FROM chat_sessions s JOIN chat_members m ON m.actor_id=s.actor_id AND m.active=1 WHERE s.token_hash=? ' +
-      "AND (s.enrollment_id IS NULL OR EXISTS (SELECT 1 FROM chat_device_requests d WHERE d.request_id=s.enrollment_id AND d.status='approved'))"
+      "AND (s.enrollment_id IS NULL OR EXISTS (SELECT 1 FROM chat_device_requests d WHERE d.request_id=s.enrollment_id AND d.status='approved')) " +
+      'AND (m.single_device_mode=0 OR EXISTS (SELECT 1 FROM chat_single_device_owners owner '+
+      'WHERE owner.actor_id=m.actor_id AND owner.token_hash=s.token_hash))'
     ).bind(await sha256(token)).first();
     if (!row || !Number.isFinite(row.expires_at) || row.expires_at <= Date.now()) return null;
     return { actorId: row.actor_id, displayName: row.display_name, exp: row.expires_at, enrollmentId:row.enrollment_id??null };
@@ -108,6 +122,19 @@ export class ChatRoom {
       this.broadcast({type:'chat.presence',users:this.onlineUsers()});
       await this.invalidateAdmins('members');
       return respond({ok:true},200);
+    }
+    if (new URL(request.url).pathname === '/installation-released' && request.method === 'POST') {
+      let data=null;try{data=await request.json();}catch{}
+      if(typeof data?.actorId!=='string'||!/^member:[a-z0-9_-]{1,40}$/i.test(data.actorId))
+        return respond({error:'Invalid member'},400);
+      for(const [socket,member] of this.members.entries()){
+        if(member.actorId!==data.actorId)continue;
+        this.send(socket,{type:'chat.revoked',error:'El Administrador liberó este dispositivo'});
+        try{socket.close(4003,'Installation released');}catch{}
+        this.sockets.delete(socket);this.members.delete(socket);this.typingSent.delete(socket);
+      }
+      this.broadcast({type:'chat.presence',users:this.onlineUsers()});
+      return respond({ok:true});
     }
     if (new URL(request.url).pathname === '/device-revoked' && request.method === 'POST') {
       let data=null;
@@ -348,6 +375,10 @@ export default {
     if (url.pathname === '/api/chat/admin/member-history' || url.pathname === '/api/chat/admin/member-delete-preview' || url.pathname === '/api/chat/admin/remove-member') {
       return handleAdminMemberManagement(request,env,url,origin,respond,ROOM);
     }
+    if (url.pathname.startsWith('/api/chat/admin/duplicate-logins') ||
+        url.pathname === '/api/chat/admin/release-installation') {
+      return handleSingleInstallationAdmin(request,env,url,origin,respond);
+    }
     if (url.pathname === '/api/chat/admin/members') {
       if (request.method !== 'GET' && request.method !== 'POST') return respond({error:'Método no permitido'},405,origin);
       if (!await verifyAdminSession(request,env)) return respond({error:'No autorizado'},401,origin);
@@ -362,7 +393,7 @@ export default {
         },400,origin);
         const actorId='member:'+crypto.randomUUID();
         const created=await env.DB.prepare(
-          'INSERT OR IGNORE INTO chat_members(username,actor_id,display_name,active) VALUES(?,?,?,1)'
+          'INSERT OR IGNORE INTO chat_members(username,actor_id,display_name,active,single_device_mode) VALUES(?,?,?,1,1)'
         ).bind(username,actorId,displayName).run();
         if(Number(created.meta?.changes)!==1)return respond({error:'Este nombre ya existe en el Administrador.'},409,origin);
         await notifyAdminClients(env,'members');
@@ -370,9 +401,12 @@ export default {
       }
       // No bearer tokens, device secrets or private message history are returned.
       const members = await env.DB.prepare(
-        'SELECT m.actor_id,m.display_name,m.username,m.active,COUNT(s.token_hash) AS session_count ' +
-        'FROM chat_members m LEFT JOIN chat_sessions s ON s.actor_id=m.actor_id AND s.expires_at>? ' +
-        'GROUP BY m.actor_id,m.display_name,m.username,m.active ORDER BY m.display_name'
+        'SELECT m.actor_id,m.display_name,m.username,m.active,m.single_device_mode,'+
+        'MAX(CASE WHEN owner.actor_id IS NOT NULL THEN 1 ELSE 0 END) AS installation_bound,'+
+        'COUNT(s.token_hash) AS session_count '+
+        'FROM chat_members m LEFT JOIN chat_sessions s ON s.actor_id=m.actor_id AND s.expires_at>? '+
+        'LEFT JOIN chat_single_device_owners owner ON owner.actor_id=m.actor_id '+
+        'GROUP BY m.actor_id,m.display_name,m.username,m.active,m.single_device_mode ORDER BY m.display_name'
       ).bind(Date.now()).all();
       return respond({members:members.results||[]},200,origin);
     }
@@ -392,10 +426,14 @@ export default {
       const username = normalizeMusicianName(payload?.displayName);
       if (!username) return respond({ error: 'Escribe tu nombre para entrar' }, 400, origin);
       const member = await env.DB.prepare(
-        'SELECT username,actor_id,display_name FROM chat_members WHERE username=? AND active=1'
+        'SELECT username,actor_id,display_name,single_device_mode FROM chat_members WHERE username=? AND active=1'
       ).bind(username).first();
       if (!member) return respond({ error: 'Tu nombre todavía no está autorizado. Solicita acceso al administrador.' }, 403, origin);
-      return respond(await createSession(env, member,request), 200, origin);
+      const session=await createSession(env,member,request);
+      if(!session)return respond({code:'name_already_bound',
+        error:'Este nombre ya está vinculado a otro dispositivo. Se notificó al Administrador.'
+      },409,origin);
+      return respond(session,200,origin);
     }
     if (url.pathname === '/api/chat/session' && request.method === 'GET') {
       const token = (request.headers.get('authorization') || '').replace(/^Bearer\s+/i, '');
