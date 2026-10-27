@@ -74,6 +74,18 @@ jobs:
       - name: Export Android bundle
         run: npm run export -w @havana/android
 
+      - name: Verify new general Chat remains private without an Admin session
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE="https://havana-nice-v2-dev.soloaplicaciones97.workers.dev"
+          READ=$(curl --silent --show-error -o /tmp/hnv2-admin-chat-denied.json -w '%{http_code}' "$BASE/api/chat/admin/messages")
+          test "$READ" = 401
+          grep -q 'No autorizado' /tmp/hnv2-admin-chat-denied.json
+          ERASE=$(curl --silent --show-error -o /tmp/hnv2-admin-chat-delete-denied.json -w '%{http_code}' -X DELETE "$BASE/api/chat/admin/messages/1")
+          test "$ERASE" = 401
+          grep -q 'No autorizado' /tmp/hnv2-admin-chat-delete-denied.json
+
       - name: Verify live Cloudflare API
         shell: bash
         run: |
