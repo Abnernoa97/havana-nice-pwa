@@ -1,5 +1,11 @@
 # HAVANA NICE V2 — PLAN MAESTRO ÚNICO
 
+## CONTINUIDAD EXACTA — LEER PRIMERO AL REANUDAR EN OTRO CHAT
+
+**[ABRIR CONTINUIDAD-EXACTA.md](./CONTINUIDAD-EXACTA.md)** — Este es el documento de traspaso completo del chat del 27/10/2026. **LEER ANTES de hacer cambios o pedir información al propietario.** Empieza con «LO PRIMERO QUE DEBES HACER EN EL NUEVO CHAT» y fija el siguiente trabajo en S02 (un nombre autorizado, un dispositivo vinculado, rechazo de duplicados y alerta Admin), lo verificado físicamente, las rutas/CI y la migración segura de los seis músicos. No duplicar planes ni restaurar flujos descartados.
+
+**Instrucción de continuidad del propietario:** «Revisa el Plan Maestro y sigue con la continuidad de HAVANA NICE V2». Al recibirla, abrir primero el documento enlazado y este tablero de 27 hitos; contrastar GitHub/Cloudflare en lectura inicial y seguir ejecutando la primera tarea pendiente. **Estado del traspaso: 11/27 hitos; S01 cerrado, S02 abierto.**
+
 **Actualizado:** 27/10/2026. **Estado oficial: 11/27 hitos cerrados, 16 abiertos (41 %).** No tachar hitos por compilar: se requiere prueba real de sus criterios.
 
 ## 1. Fuente única y alcance
