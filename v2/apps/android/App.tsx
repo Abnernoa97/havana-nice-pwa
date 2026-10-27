@@ -303,7 +303,7 @@ export default function App() {
           setReactions(historyReactions);
           setReceipts(readHistory);
           setHasMore(more);
-          setMessages(before => reconcileChatMessages(before, history));
+          setMessages(before => reconcileChatSnapshot(before,history));
           if(initialHistoryPending.current)requestAnimationFrame(scheduleInitialBottom);
           sendReadReceipt(Math.max(0,...history.map(m=>m.seq)));
           flushOutbox();
@@ -417,6 +417,13 @@ export default function App() {
             setMenuMessage(current=>current?.seq===item.message.seq?null:current);
           }
           setError('');
+        } else if (item.type === 'chat.deleted') {
+          setMessages(before=>reconcileDeletedMessage(before,item.seq));
+          setResults(before=>before?.filter(m=>m.seq!==item.seq)??null);
+          setReactions(before=>before.filter(r=>r.messageSeq!==item.seq));
+          setReplyTo(current=>current?.seq===item.seq?null:current);
+          setMenuMessage(current=>current?.seq===item.seq?null:current);
+          setEditing(current=>current?.seq===item.seq?null:current);
         } else if (item.type === 'chat.read') {
           setReceipts(before=>[...before.filter(x=>x.actorId!==item.actorId),
             {actorId:item.actorId,displayName:item.displayName,seq:Math.max(item.seq,
