@@ -373,12 +373,14 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const origin = trustedOrigin(request.headers.get('origin'));
+    // One CORS policy for all Chat/Admin endpoints, including moderator DELETE.
+    // Reject untrusted origins *before* answering a browser preflight.
+    if (request.headers.has('origin') && !origin) return respond({ error: 'Origin not allowed' }, 403);
     if (request.method === 'OPTIONS') return new Response(null, {
       status: 204, headers: { 'access-control-allow-origin': origin || 'https://havana-nice-v2-dev.pages.dev',
-        'access-control-allow-methods': 'GET, POST, OPTIONS', 'access-control-allow-headers': 'Authorization, Content-Type, X-Havana-Client-Asset-Id',
+        'access-control-allow-methods': 'GET, POST, DELETE, OPTIONS', 'access-control-allow-headers': 'Authorization, Content-Type, X-Havana-Client-Asset-Id',
         'access-control-max-age': '3600', 'vary': 'Origin' },
     });
-    if (request.headers.has('origin') && !origin) return respond({ error: 'Origin not allowed' }, 403);
     if (url.pathname === '/health') {
       let row = null, database = 'error';
       try { row = await env.DB.prepare('SELECT value FROM system_meta WHERE key = ?').bind('schema_version').first(); database = 'ok'; } catch {}

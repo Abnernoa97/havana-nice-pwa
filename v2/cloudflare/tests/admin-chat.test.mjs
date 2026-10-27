@@ -100,3 +100,15 @@ test('Durable Object relays moderation to musicians and private Admin without se
  assert.match(code,/'chat.updated':'admin.chat.updated'/);
  assert.match(code,/verifyAdminSession\(adminTokenRequest\(token\),this.env\)/);
 });
+
+test('The ONE Worker CORS preflight admits DELETE for authenticated moderator calls, rejects other origins',()=>{
+ const code=readFileSync(new URL('../src/index.ts',import.meta.url),'utf8');
+ assert.match(code,/request\.method === 'OPTIONS'/);
+ assert.match(code,/'access-control-allow-methods': 'GET, POST, DELETE, OPTIONS'/);
+ assert.match(code,/'access-control-allow-headers': 'Authorization, Content-Type, X-Havana-Client-Asset-Id'/);
+ assert.ok(code.indexOf("if (request.headers.has('origin') && !origin)")<
+  code.indexOf("if (request.method === 'OPTIONS')"),
+  'Unknown origins must be denied before preflight');
+ assert.equal((code.match(/'access-control-allow-methods':/g)||[]).length,1,
+  'No second CORS entrypoint should diverge');
+});

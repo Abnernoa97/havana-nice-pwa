@@ -34,6 +34,12 @@ for(const [value,label] of [[worker,'Worker'],[android,'Android'],[pwa,'PWA']]) 
 present(worker,/JOIN chat_members/,'Worker must validate the enabled member on session reuse');
 present(worker,/active=1/,'Worker must deny revoked names');
 present(worker,/chat\.revoked/,'Worker must notify active sessions when access is revoked');
+// Exactly one cross-origin policy for PWA and administrator.
+// A DELETE preflight is required by Chrome/Safari before the moderator can remove a message.
+present(worker,/'access-control-allow-methods': 'GET, POST, DELETE, OPTIONS'/,
+ 'Chat Admin delete-for-all must remain permitted in the central CORS preflight');
+assert.equal((worker.match(/'access-control-allow-methods':/g)||[]).length,1,
+ 'Single Worker must own one CORS allow-methods declaration');
 // One name, one installation: the discarded approvals implementation must not
 // survive in source, migrations, UI, or routes.
 const adminAuth=read('cloudflare/src/admin-auth.js');

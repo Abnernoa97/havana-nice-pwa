@@ -86,6 +86,29 @@ jobs:
           test "$ERASE" = 401
           grep -q 'No autorizado' /tmp/hnv2-admin-chat-delete-denied.json
 
+      - name: Verify browser CORS preflight for moderator DELETE
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE="https://havana-nice-v2-dev.soloaplicaciones97.workers.dev"
+          PATH_TO_DELETE="/api/chat/admin/messages/1"
+          ORIGIN="https://havana-nice-v2-dev.pages.dev"
+          STATUS="$(curl --silent --show-error -D /tmp/hnv2-admin-delete-options.h -o /dev/null -w '%{http_code}' \
+            -X OPTIONS "$BASE$PATH_TO_DELETE" \
+            -H "Origin: $ORIGIN" \
+            -H "Access-Control-Request-Method: DELETE" \
+            -H "Access-Control-Request-Headers: authorization")"
+          test "$STATUS" = 204
+          grep -qi '^access-control-allow-origin: https://havana-nice-v2-dev.pages.dev' /tmp/hnv2-admin-delete-options.h
+          grep -qi '^access-control-allow-methods: .*DELETE' /tmp/hnv2-admin-delete-options.h
+          grep -qi '^access-control-allow-headers: .*Authorization' /tmp/hnv2-admin-delete-options.h
+          BAD="$(curl --silent --show-error -o /dev/null -w '%{http_code}' \
+            -X OPTIONS "$BASE$PATH_TO_DELETE" \
+            -H 'Origin: https://untrusted.example' \
+            -H 'Access-Control-Request-Method: DELETE')"
+          test "$BAD" = 403
+          # No authenticated DELETE is performed; original messages stay intact.
+
       - name: Verify live Cloudflare API
         shell: bash
         run: |
