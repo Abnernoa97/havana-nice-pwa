@@ -702,6 +702,18 @@ Hallazgos y acciones documentados:
 
 **Tablero inalterado: 10/27 hitos; S01/S02/P04 siguen pendientes de QA final.**
 
+### Depuración segura — ejecución 4, 27/10/2026 · Acceso a músicos sin cambios de backend
+
+**Solo PWA Administrador y pruebas de regresión; ninguna acción destructiva en Cloudflare ni otra APK.** Se revisó que `notifyAdminClients()` ya protege cambios D1 confirmados frente a fallos de entrega del aviso en tiempo real, por lo que **no se reescribió** el Worker.
+
+- **Altas/bajas D1 y pantalla:** `AdminChatAccess.tsx` modifica la lista visible **solo después** de respuesta confirmada por el API autenticado, tanto en `Añadir y autorizar` como en `Eliminar`. Si la consulta posterior de la lista no puede actualizarse por una caída de red, mantiene la alta/baja ya confirmada en la interfaz y vuelve a sincronizar después. No hay cambios de permisos ni acceso por nombre.
+- **Historial siempre verificable:** al abrir un acordeón se descarta la copia anterior del historial para ese músico y se consulta el servidor. Si falla, se muestra un error explícito con opción de cerrar/reabrir para reintentar; no presentar registros antiguos ni un cero supuesto como resultado actual.
+- **Pruebas sin tocar D1:** el test del Administrador verifica cambios visuales posteriores exclusivamente a respuestas exitosas; el test de `member-admin` simula fallo de Durable Object y comprueba que un borrado confirmado en D1 se comunica como exitoso. **No se ejecutó este borrado simulado contra miembros reales.**
+- **CI y despliegue:** GitHub Actions `40461905145` **SUCCESS**, Pages V2 commit `5bf823c8df93a8d8d548a640ceaacf50b94eda41` publicado. Worker V2 permanece en `54d761d5-2388-429a-b95c-1213f1651dac` al 100 %. No cambios en `main`, nativo Android, secretos, D1, Chat o sesiones.
+- **Inventario dinámico observado:** D1 muestra ahora **7 miembros activos**: los seis habituales más **`Prueba 1`**, nombre que ya existía cuando se hizo la comprobación read-only; **no lo creó el asistente**. Permanecen 10 sesiones, 45 mensajes y 0 eventos de acceso. No borrar `Prueba 1`; **utilizar ese mismo miembro para la prueba física futura**, sin crear más usuarios de prueba.
+- **Prueba aplazada por el propietario:** usar segundo teléfono más adelante, abrir PWA Chat con nombre `Prueba 1`, cotejar fecha, dispositivo, SO/modelo con el acordeón Admin y D1; comprobar después la revocación únicamente de este músico de pruebas previa autorización explícita. No efectuar pruebas destructivas sobre Andy/Fer/Jali/Noa/Orly/Rafa.
+- **Copia externa D1:** aún NO descargada/validada. Los bookmarks de D1 Time Travel no son una copia independiente. Prohibida limpieza destructiva de datos históricos o ramas sin respaldo y revisión de dependencias. **Tablero 10/27, S01/S02/P04 abiertos.**
+
 ### Procedimiento permanente
 
 1. Leer este plan y el HEAD de `havana-nice-v2-foundation`.
