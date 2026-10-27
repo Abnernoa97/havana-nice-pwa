@@ -1,7 +1,12 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import assert from 'node:assert/strict';
 
 const read = path => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
+// This development branch should not grow copies of the original main app.
+// Keep its root limited to the V2 workspace and CI workflow definitions.
+assert.deepEqual(readdirSync(new URL('../../', import.meta.url)).filter(
+  name=>!['.git','.github','v2'].includes(name)
+),[],'V2 development branch must not include unused main-era root files');
 const worker = read('cloudflare/src/index.ts');
 const android = read('apps/android/App.tsx');
 const pwa = read('apps/pwa/src/App.tsx');

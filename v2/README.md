@@ -27,7 +27,7 @@
 
 - El código de aprobación antigua de teléfonos, peticiones individuales y contraseñas de laboratorio **no forma parte de la aplicación V2 actual**. El guard de CI prohíbe revivir sus rutas.
 - Las migraciones SQL aplicadas NO se borran: documentan cómo crear el esquema sin perder datos.
-- Los archivos de la raíz del repositorio que no están en `v2/` pertenecen a la línea histórica `main`. Cloudflare Pages de V2 usa raíz de compilación `v2`; no borrar aquí archivos de la aplicación original por confundirlos con la versión nueva.
+- **Rama V2 limpia:** se retiraron de `havana-nice-v2-foundation` 55 copias idénticas de los archivos históricos de la raíz (19 704 817 bytes), tras comprobar cada hash contra `main`. Se conservan intactas en `main` y en el historial Git. Esto reduce archivos en el checkout de V2, pero no elimina objetos históricos del repositorio. Cloudflare Pages de V2 compila únicamente `v2`.
 - El archivo `cloudflare/src/havana-cloud-bridge-client.js` no participa actualmente en el Worker desplegado; es una propuesta de integración futura para multimedia, **no** un acceso alternativo y no debe activarse sin decisión sobre almacenamiento.
 - No crear otra rama, otro backend, login paralelo, APK de prueba innecesaria ni cambios destructivos de datos.
 
