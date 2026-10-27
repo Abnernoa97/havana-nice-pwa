@@ -151,47 +151,6 @@ export async function getChatSnapshot(session: ChatSession, apiBaseUrl = HAVANA_
   return { messages: data.messages || [], reactions: data.reactions || [], receipts:data.receipts||[], hasMore: !!data.hasMore };
 }
 
-/** S01: one-time device registration. Must be approved by the private Admin PWA. */
-export interface PendingChatDeviceEnrollment {
-  requestId:string; requestSecret:string; expiresAt:string; status:'pending';
-  displayName:string;
-}
-/** Client-side expiration guard; the server is still the authorization authority. */
-export function usablePendingChatEnrollment(value:unknown,now=Date.now()):value is PendingChatDeviceEnrollment{
- if(!value||typeof value!=='object')return false;
- const p=value as Partial<PendingChatDeviceEnrollment>;
- return p.status==='pending'&&typeof p.displayName==='string'&&!!p.displayName.trim()&&
- typeof p.requestId==='string'&&/^[A-Za-z0-9_-]{20,40}$/.test(p.requestId)&&
- typeof p.requestSecret==='string'&&/^[A-Za-z0-9_-]{40,100}$/.test(p.requestSecret)&&
- typeof p.expiresAt==='string'&&Number.isFinite(Date.parse(p.expiresAt))&&Date.parse(p.expiresAt)>now;
-}
-export class DeviceApprovalRequiredError extends Error {
-  constructor() {super('Este teléfono necesita la autorización del administrador.');this.name='DeviceApprovalRequiredError';}
-}
-export async function requestChatDeviceEnrollment(
- displayName:string,deviceLabel:string,apiBaseUrl=HAVANA_V2_DEV_API_BASE_URL,
-):Promise<PendingChatDeviceEnrollment>{
- const res=await fetch(`${apiBaseUrl}/api/chat/device/request`,{
-  method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({displayName,deviceLabel}),
- });
- const value=await res.json() as PendingChatDeviceEnrollment&{error?:string};
- if(!res.ok)throw new Error(value.error||'No se pudo solicitar autorización');
- if(value.status!=='pending'||!value.requestSecret||!value.requestId||!value.expiresAt)throw new Error('Solicitud de acceso incompleta');
- return {...value,displayName};
-}
-export async function checkChatDeviceEnrollment(
- pending:PendingChatDeviceEnrollment,apiBaseUrl=HAVANA_V2_DEV_API_BASE_URL,
-):Promise<{status:'pending'}|ChatSession>{
- const res=await fetch(`${apiBaseUrl}/api/chat/device/status`,{
-  method:'POST',headers:{'Content-Type':'application/json'},
-  body:JSON.stringify({requestId:pending.requestId,requestSecret:pending.requestSecret}),
- });
- const value=await res.json() as (ChatSession&{error?:string;status?:'pending'});
- if(res.status===202&&value.status==='pending')return {status:'pending'};
- if(!res.ok)throw new Error(value.error||'No se pudo verificar la autorización');
- if(!value.token||!value.actorId||!value.expiresAt)throw new Error('Autorización incompleta');
- return value;
-}
 export async function startNamedChatSession(
   displayName: string,
   apiBaseUrl = HAVANA_V2_DEV_API_BASE_URL,
@@ -202,7 +161,6 @@ export async function startNamedChatSession(
     body: JSON.stringify({ displayName }),
   });
   const data = await response.json() as ChatSession & { error?: string };
-  if (response.status===403 && (data as {code?:string}).code==='device_approval_required') throw new DeviceApprovalRequiredError();
   if (!response.ok) throw new Error(data.error || 'Could not join the lab chat');
   return data;
 }
