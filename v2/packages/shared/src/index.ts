@@ -126,8 +126,10 @@ export function reconcileDeletedMessage(before:ChatMessage[],seq:number):ChatMes
 export function reconcileChatSnapshot(before:ChatMessage[],server:ChatMessage[]):ChatMessage[]{
  const latest=server.filter(m=>!m.deletedAt),ids=new Set(latest.map(m=>m.seq));
  const min=latest.length?Math.min(...latest.map(m=>m.seq)):0;
+ const max=latest.length?Math.max(...latest.map(m=>m.seq)):0;
+ // Keep older pages and WebSocket messages that arrived after the GET began.
  return reconcileChatMessages(before.filter(m=>!m.deletedAt&&(m.pending||m.seq<=0||
- (min>0&&m.seq<min)||ids.has(m.seq))),latest);
+ (min>0&&(m.seq<min||m.seq>max))||ids.has(m.seq))),latest);
 }
 export function lastReadByOther(reads:ChatReadReceipt[],ownActor:string):number {
   return Math.max(0,...reads.filter(r=>r.actorId!==ownActor).map(r=>r.seq));
