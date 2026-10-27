@@ -127,7 +127,12 @@ test('pending device needs independent admin approval; redemption is one-time, r
   const revoke=await handle(call('POST','/api/chat/admin/device-requests/'+auth.requestId+'/revoke',{},adminKey),env);
   assert.equal(revoke.status,200);
   assert.equal(env.DB.requests.get(auth.requestId).status,'revoked');
-  assert.deepEqual(env.revoked,[{enrollmentId:auth.requestId}]);
+  // The same private DO binding now receives invalidation signals for the
+  // Administrator, in addition to the original immediate device revocation.
+  assert.deepEqual(env.revoked.filter(event=>event.enrollmentId),
+    [{enrollmentId:auth.requestId}]);
+  assert.deepEqual(env.revoked.filter(event=>event.topic).map(event=>event.topic),
+    ['requests','requests','members','requests']);
 });
 test('new device requests are limited; no access granted by requests alone',async()=>{
   const env=createEnv();
