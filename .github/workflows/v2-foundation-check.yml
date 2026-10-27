@@ -82,7 +82,7 @@ jobs:
           grep -q '"database":"ok"' /tmp/havana-health.json
           grep -q '"schemaVersion":"foundation-v1"' /tmp/havana-health.json
 
-      - name: Verify Admin enabled and device observe mode without granting new access
+      - name: Verify independent Admin access without discarded device-approval flow
         shell: bash
         run: |
           set -euo pipefail
@@ -96,9 +96,6 @@ jobs:
           STATUS="$(curl --silent --show-error --output /tmp/v2-admin-members-denied.json --write-out '%{http_code}' "$BASE/api/chat/admin/members")"
           test "$STATUS" = "401"
           grep -q 'No autorizado' /tmp/v2-admin-members-denied.json
-          STATUS="$(curl --silent --show-error --output /tmp/v2-admin-requests-denied.json --write-out '%{http_code}' "$BASE/api/chat/admin/device-requests")"
-          test "$STATUS" = "401"
-          grep -q 'No autorizado' /tmp/v2-admin-requests-denied.json
           STATUS="$(curl --silent --show-error --output /tmp/v2-admin-create-unauthorized.json --write-out '%{http_code}' \
             --header 'Content-Type: application/json' --data '{"displayName":"Guest User"}' "$BASE/api/chat/admin/members")"
           test "$STATUS" = "401"
@@ -118,14 +115,6 @@ jobs:
           STATUS="$(curl --silent --show-error --output /tmp/v2-admin-delete-denied.json --write-out '%{http_code}' \
             --header 'Content-Type: application/json' --data '{"actorId":"member:orly","confirmName":"Orly"}' "$BASE/api/chat/admin/remove-member")"
           test "$STATUS" = "401"
-          STATUS="$(curl --silent --show-error --output /tmp/v2-device-unknown.json --write-out '%{http_code}' \
-            --header 'Content-Type: application/json' --data '{"displayName":"ci_unknown_user"}' "$BASE/api/chat/device/request")"
-          test "$STATUS" = "403"
-          grep -q 'Nombre no autorizado' /tmp/v2-device-unknown.json
-          STATUS="$(curl --silent --show-error --output /tmp/v2-pwa-name-guard.json --write-out '%{http_code}' \
-            --header 'Content-Type: application/json' --data '{"displayName":"andy"}' "$BASE/api/chat/pwa/session")"
-          test "$STATUS" = "403"
-          grep -q '"code":"device_approval_required"' /tmp/v2-pwa-name-guard.json
 
       - name: Verify unknown and malformed musician names never receive a session
         shell: bash
