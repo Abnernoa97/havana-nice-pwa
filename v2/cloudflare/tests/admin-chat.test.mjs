@@ -44,7 +44,7 @@ async function setup(){
    };}
    return {bind,sql};
   },
-  async batch(queries){return Promise.all(queries.map(q=>q.bind().run()));}
+  async batch(queries){return Promise.all(queries.map(q=>q.run()));}
  };
  const env={DB,V2_ADMIN_LOGIN_MODE:'enabled',V2_ADMIN_LOGIN_SECRET:'S'.repeat(48),
   CHAT_ROOMS:{idFromName:n=>n,get:()=>({fetch:async(path,options)=>{
