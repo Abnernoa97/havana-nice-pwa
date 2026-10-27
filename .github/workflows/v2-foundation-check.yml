@@ -103,6 +103,11 @@ jobs:
             --header 'Content-Type: application/json' --data '{"displayName":"Guest User"}' "$BASE/api/chat/admin/members")"
           test "$STATUS" = "401"
           grep -q 'No autorizado' /tmp/v2-admin-create-unauthorized.json
+          STATUS="$(curl --silent --show-error --output /tmp/v2-admin-history-denied.json --write-out '%{http_code}' "$BASE/api/chat/admin/member-history?actorId=member%3Aorly")"
+          test "$STATUS" = "401"
+          STATUS="$(curl --silent --show-error --output /tmp/v2-admin-delete-denied.json --write-out '%{http_code}' \
+            --header 'Content-Type: application/json' --data '{"actorId":"member:orly","confirmName":"Orly"}' "$BASE/api/chat/admin/remove-member")"
+          test "$STATUS" = "401"
           STATUS="$(curl --silent --show-error --output /tmp/v2-device-unknown.json --write-out '%{http_code}' \
             --header 'Content-Type: application/json' --data '{"displayName":"ci_unknown_user"}' "$BASE/api/chat/device/request")"
           test "$STATUS" = "403"
@@ -162,29 +167,13 @@ jobs:
           STATUS=$(curl --silent --show-error -o /tmp/v2-chat-session-unauthorized.json -w '%{http_code}' "$BASE/api/chat/session")
           test "$STATUS" = "401"
 
-      - name: Validate named sign-in, restored access, and device sign-out
+      - name: Verify legacy sessions deny invalid credentials without manufacturing musician entries
         shell: bash
         run: |
           set -euo pipefail
           BASE="https://havana-nice-v2-dev.soloaplicaciones97.workers.dev"
-          STATUS="$(curl --silent --show-error --output /tmp/hn-v2-name-login.json --write-out '%{http_code}' \
-            -H 'Content-Type: application/json' -X POST "$BASE/api/chat/session" \
-            --data '{"displayName":"oRlY"}')"
-          test "$STATUS" = "200"
-          TOKEN="$(node -e "const s=require('/tmp/hn-v2-name-login.json');if(!s.token||s.actorId!=='member:orly'||s.displayName!=='Orly')process.exit(1);process.stdout.write(s.token)")"
-          test "${#TOKEN}" -ge 40
-          trap 'curl --silent --show-error --output /dev/null -X DELETE "$BASE/api/chat/session" -H "Authorization: Bearer $TOKEN" || true' EXIT
-          STATUS="$(curl --silent --show-error --output /tmp/hn-v2-name-restore.json --write-out '%{http_code}' \
-            "$BASE/api/chat/session" -H "Authorization: Bearer $TOKEN")"
-          test "$STATUS" = "200"
-          STATUS="$(curl --silent --show-error --output /tmp/hn-v2-name-history.json --write-out '%{http_code}' \
-            "$BASE/api/chat/messages" -H "Authorization: Bearer $TOKEN")"
-          test "$STATUS" = "200"
-          STATUS="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
-            -X DELETE "$BASE/api/chat/session" -H "Authorization: Bearer $TOKEN")"
-          test "$STATUS" = "200"
-          STATUS="$(curl --silent --show-error --output /tmp/hn-v2-revoked.json --write-out '%{http_code}' \
-            "$BASE/api/chat/session" -H "Authorization: Bearer $TOKEN")"
+          STATUS="$(curl --silent --show-error --output /tmp/v2-legacy-invalid-token.json --write-out '%{http_code}' \
+            "$BASE/api/chat/session" -H "Authorization: Bearer aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")"
           test "$STATUS" = "401"
 
       - name: Verify live private media endpoint is closed without independent Google OAuth
