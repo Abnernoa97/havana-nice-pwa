@@ -151,3 +151,13 @@ test('access history does not fabricate device model when identification is unav
  assert.equal(meta.model,null);
  assert.equal(meta.platform,'Cliente no identificado');
 });
+
+test('reduced Chromium Android UA does not report false OS version or model',()=>{
+ const reduced=readMemberDevice(new Request(BASE,{headers:{
+  'user-agent':'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 Chrome/143.0.0.0 Mobile Safari/537.36',
+  origin:'https://havana-nice-v2-dev.pages.dev'
+ }}));
+ assert.equal(reduced.operatingSystem,'Android (versión no disponible)');
+ assert.equal(reduced.model,null);
+ assert.equal(reduced.deviceName,'Teléfono Android');
+});
