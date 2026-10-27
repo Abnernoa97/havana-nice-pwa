@@ -32,3 +32,34 @@
 .a-admin-record>div:first-child strong{font-size:13px}
 .a-admin-record>div:first-child span,.a-admin-record>div:first-child small{color:#776b5d;font-size:11px}
 .a-admin-record-buttons{display:flex;gap:8px;flex-wrap:wrap}
+
+/* One Administrator / Acceso a músicos: functional form and live roster. */
+.a-access-workspace{display:grid;gap:14px}
+.a-access-workspace .a-panel{margin-top:0}
+.a-member-add{border-color:#cabbab}
+.a-member-form{display:flex;flex-direction:column;gap:10px;margin-top:18px;max-width:490px}
+.a-member-form label{font-size:12px;font-weight:750}
+.a-member-form input{background:#fff;border:1px solid #cfc2b2;color:#292a23;border-radius:11px;padding:13px 14px;font-size:16px;min-height:48px}
+.a-member-form input:focus{outline:2px solid #b7a28e;outline-offset:1px}
+.a-member-form button,.a-module-next button{border:0;border-radius:11px;background:#292a23;color:#fff;padding:14px 18px;font-size:13px;font-weight:700}
+.a-member-form button:disabled{opacity:.45;cursor:not-allowed}
+.a-member-notice{background:#edf3e8;border:1px solid #c9d7c1;border-radius:10px;padding:12px;font-size:13px;color:#305d3d}
+.a-member-heading{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.a-member-heading span{font-size:12px;font-weight:700;background:#ede4d6;padding:6px 11px;border-radius:999px}
+.a-member-rows{margin-top:12px}
+.a-member-row{display:flex;align-items:center;gap:13px;padding:14px 0;border-top:1px solid #e5d9c9}
+.a-member-avatar{width:40px;height:40px;flex-shrink:0;display:grid;place-items:center;background:#eee5d9;border-radius:13px;font-size:18px;font-weight:700;color:#6e5e4b}
+.a-member-identity{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1}
+.a-member-identity strong{font-size:14px;overflow-wrap:anywhere}
+.a-member-identity small{color:#786f64;font-size:11px}
+.a-member-status{font-size:11px;color:#80776b;border:1px solid #d8cdc0;padding:6px 9px;border-radius:99px}
+.a-member-status.on{color:#376546;border-color:#bad2bd}
+.a-module-next p{color:#817569;font-size:13px;line-height:1.65}
+.a-module-next button{margin-top:10px}
+.a-health-compact{margin-bottom:14px}
+@media(max-width:750px){
+ .a-bottom button span:last-child{font-size:9px;line-height:1.2;text-align:center;overflow-wrap:anywhere}
+ .a-bottom button{min-width:0;padding:9px 2px}
+ .a-title h1{font-size:clamp(30px,9vw,43px)}
+ .a-access-workspace{gap:12px}
+}
