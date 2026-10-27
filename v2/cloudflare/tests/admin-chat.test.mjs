@@ -39,7 +39,7 @@ async function fixture(){
     }
     throw Error('Unexpected run '+sql);
    }
-  };};},async batch(statements){return Promise.all(statements.map(x=>x.run()))}};
+  };}}},async batch(statements){return Promise.all(statements.map(x=>x.run()))}};
  const env={DB,V2_ADMIN_LOGIN_MODE:'enabled',V2_ADMIN_LOGIN_SECRET:'S'.repeat(48),
   CHAT_ROOMS:{idFromName:x=>x,get:()=>({fetch:async(url,request)=>{signals.push({url,payload:JSON.parse(request.body)});return Response.json({ok:true})}})}};
  return {env,rows,reactions,signals};
