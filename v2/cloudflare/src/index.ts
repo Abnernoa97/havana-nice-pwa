@@ -345,7 +345,7 @@ export default {
       return handleChatMedia(request, env, session, url, origin, respond);
     }
     if (url.pathname === '/realtime/health') return env.CHAT_ROOMS.get(env.CHAT_ROOMS.idFromName('foundation-health')).fetch('https://internal/health');
-    if (url.pathname === '/api/chat/admin/member-history' || url.pathname === '/api/chat/admin/remove-member') {
+    if (url.pathname === '/api/chat/admin/member-history' || url.pathname === '/api/chat/admin/member-delete-preview' || url.pathname === '/api/chat/admin/remove-member') {
       return handleAdminMemberManagement(request,env,url,origin,respond,ROOM);
     }
     if (url.pathname === '/api/chat/admin/members') {
