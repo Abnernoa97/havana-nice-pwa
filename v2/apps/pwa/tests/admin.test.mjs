@@ -266,3 +266,20 @@ test('legacy device approval endpoints and UIs are permanently removed',()=>{
  assert.match(access,/Intentos de acceso duplicado/);
  assert.match(access,/Liberar dispositivo/);
 });
+
+test('Administrator Chat uses the existing authenticated session, not a musician login',()=>{
+ const frame=read('../src/AdminApp.tsx');
+ const access=read('../src/AdminChatAccess.tsx');
+ const viewer=read('../src/AdminChatGeneral.tsx');
+ const api=read('../src/admin-api.ts');
+ const worker=read('../../../cloudflare/src/index.ts');
+ assert.match(access,/section==='chat'.*<AdminChatGeneral/);
+ assert.match(frame,/tab!=='access'&&tab!=='chat'/);
+ assert.match(viewer,/adminChatMessages\(token/);
+ assert.match(viewer,/adminDeleteChatMessage\(token,message.seq\)/);
+ assert.match(viewer,/admin.chat.message/);
+ assert.match(viewer,/m.senderName/);
+ assert.doesNotMatch(viewer,/startNamedChatSession|chat.send|textarea|type="submit"/);
+ assert.match(api,/\/api\/chat\/admin\/messages/);
+ assert.match(worker,/handleAdminChat\(request,env,url,origin,respond\)/);
+});
