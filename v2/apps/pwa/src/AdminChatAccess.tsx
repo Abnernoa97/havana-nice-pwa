@@ -10,7 +10,7 @@ function MemberImpactSummary({name,preview}:{name:string;preview:AdminDeletionPr
  return <div className="a-member-impact-summary" role="status">
    <strong>Datos asociados a {name}</strong>
    <dl>
-     <div><dt>Sesiones</dt><dd>{counts.sessions}</dd></div>
+     <div><dt>Credenciales de acceso</dt><dd>{counts.sessions}</dd></div>
      <div><dt>Mensajes</dt><dd>{counts.messages}</dd></div>
      <div><dt>Reacciones</dt><dd>{counts.reactions}</dd></div>
      <div><dt>Lecturas</dt><dd>{counts.receipts}</dd></div>
@@ -19,6 +19,7 @@ function MemberImpactSummary({name,preview}:{name:string;preview:AdminDeletionPr
      <div><dt>Activaciones PWA antiguas</dt><dd>{counts.firstClaims}</dd></div>
      <div><dt>Archivos multimedia</dt><dd>{counts.mediaAssets}</dd></div>
    </dl>
+   <small>Las credenciales registradas no equivalen a teléfonos conectados en este momento. Las reacciones incluyen las vinculadas al músico o a sus mensajes.</small>
    {canDelete?
      <small>Sin archivos multimedia pendientes de eliminación externa.</small>:
      <p className="a-admin-error">La eliminación está bloqueada para proteger los archivos multimedia externos.</p>}
