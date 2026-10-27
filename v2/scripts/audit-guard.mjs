@@ -29,27 +29,25 @@ for(const [value,label] of [[worker,'Worker'],[android,'Android'],[pwa,'PWA']]) 
 present(worker,/JOIN chat_members/,'Worker must validate the enabled member on session reuse');
 present(worker,/active=1/,'Worker must deny revoked names');
 present(worker,/chat\.revoked/,'Worker must notify active sessions when access is revoked');
-// Device approvals are staged behind an opt-in. Never switch on enrollment
-// until 0009 migration, admin secret and both native/web clients are ready.
+// One name, one installation: the discarded approvals implementation must not
+// survive in source, migrations, UI, or routes.
 const adminAuth=read('cloudflare/src/admin-auth.js');
 const adminMigration=read('cloudflare/migrations/0010_chat_admin_sessions.sql');
-present(adminAuth,/V2_ADMIN_LOGIN_MODE==='enabled'/,'Admin login must be explicitly enabled');
+present(adminAuth,/V2_ADMIN_LOGIN_MODE==='enabled'/,'Admin login must remain explicit');
 present(adminAuth,/chat_admin_login_limits/,'Admin login must rate limit failed attempts');
 present(adminAuth,/revoked_at/,'Admin session must support revocation');
 present(adminMigration,/CREATE TABLE IF NOT EXISTS chat_admin_sessions/,'Admin sessions need isolated D1 storage');
-present(adminAuth,/MIN_SECRET_LENGTH=40/,'Require high entropy bootstrap administrator secret');
-const approvals=read('cloudflare/src/device-approval.js');
-const migration=read('cloudflare/migrations/0009_chat_device_approvals.sql');
-present(approvals,/V2_DEVICE_APPROVAL_MODE === 'enforce'/,'S01 approvals must require explicit enablement');
-present(approvals,/V2_DEVICE_ADMIN_SECRET/,'S01 admin secret must never be hard-coded');
-present(approvals,/request_secret_hash/,'S01 must hash approval proof before D1 write');
-present(approvals,/redemptionNonce/,'S01 redeem token must be issued only for one atomic claim');
-present(migration,/redemption_nonce/,'S01 migration supports unique redemption claims');
-present(approvals,/verifyAdminRequest/,'S01 admin endpoints require independent authentication');
-present(migration,/ALTER TABLE chat_sessions ADD COLUMN enrollment_id/,'S01 migration must preserve existing sessions');
-absent(read('cloudflare/wrangler.jsonc'),/V2_DEVICE_APPROVAL_MODE/,'S01 gate may not be enabled before rollout');
-present(worker,/deviceGateEnabled\(env\)/,'Worker must gate new enrollment without breaking existing clients');
-present(worker,/device-revoked/,'S02 needs active WebSocket disconnect on per-device revoke');
+present(adminAuth,/MIN_SECRET_LENGTH=40/,'Administrator must use a high-entropy secret');
+const installation=read('cloudflare/src/single-installation.js');
+present(worker,/claimFirstInstallation/,'One name must bind only to one installation');
+present(worker,/name_already_bound/,'Duplicate logins must be denied');
+present(installation,/chat_duplicate_login_alerts/,'Attempt alerts must be persisted');
+present(installation,/release-installation/,'Admin must be able to release without deletion');
+for(const [value,label] of [[worker,'Worker'],[android,'Android'],[pwa,'PWA'],
+ [read('packages/shared/src/index.ts'),'Shared client']]){
+ absent(value,/device_approval_required|PendingChatDeviceEnrollment|checkChatDeviceEnrollment|requestChatDeviceEnrollment|chat\/pwa\/session|device\/request|device\/status|admin\/device-requests/,
+  label+' must not revive the discarded device approval workflow');
+}
 present(android,/restoreNamedChatSession/,'Android must restore only authorized remembered sessions');
 present(pwa,/restoreNamedChatSession/,'PWA must restore only authorized remembered sessions');
 
