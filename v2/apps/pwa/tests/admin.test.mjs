@@ -145,3 +145,14 @@ test('only Administrator-created active names reach the session-minting endpoint
    'Only an active, Administrator-allowlisted name may mint a musician session');
  assert.match(index,/if \(!username\) return respond\(\{ error: 'Escribe tu nombre para entrar' \}, 400, origin\)/);
 });
+
+test('Admin session count stays accurate on manual refresh, foreground, and WebSocket reconnection',()=>{
+ const panel=read('../src/AdminChatAccess.tsx');
+ assert.match(panel,/const refreshOtherSessions=useCallback\(async\(token:string\)=>/);
+ assert.match(panel,/void refreshMembers\(session\.token\);void refreshOtherSessions\(session\.token\);/);
+ assert.match(panel,/adminVerify\(session\.token\)\.then\(\(\)=>\{void refreshMembers\(session\.token\);void refreshOtherSessions\(session\.token\);\}\)/);
+ assert.match(panel,/onClick=\{\(\)=>\{void refreshMembers\(session\.token\);void refreshOtherSessions\(session\.token\);\}\}/);
+ assert.match(panel,/if\(isAdminUnauthorized\(reason\)\)/);
+ assert.match(panel,/else setOtherSessions\(null\)/);
+ assert.match(panel,/window\.confirm\('¿Cerrar las otras '/);
+});
