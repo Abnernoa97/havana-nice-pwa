@@ -132,3 +132,16 @@ test('Access to musicians uses only server-confirmed list changes and fresh hist
  assert.match(access,/No se pudo consultar el historial en Cloudflare/);
  assert.match(access,/role="alert">\{historyErrors\[person\.actor_id\]\}/);
 });
+
+test('only Administrator-created active names reach the session-minting endpoint',()=>{
+ const index=read('../../../cloudflare/src/index.ts');
+ const app=read('../src/App.tsx');
+ assert.match(app,/startNamedChatSession\(name\.trim\(\)\)/);
+ const login=index.indexOf("if (url.pathname === '/api/chat/session' && request.method === 'POST')");
+ const lookup=index.indexOf("SELECT username,actor_id,display_name FROM chat_members WHERE username=? AND active=1",login);
+ const denial=index.indexOf("if (!member) return respond({ error: 'Tu nombre todavía no está autorizado.",lookup);
+ const mint=index.indexOf("return respond(await createSession(env, member,request), 200, origin);",denial);
+ assert.ok(login>=0 && lookup>login && denial>lookup && mint>denial,
+   'Only an active, Administrator-allowlisted name may mint a musician session');
+ assert.match(index,/if \(!username\) return respond\(\{ error: 'Escribe tu nombre para entrar' \}, 400, origin\)/);
+});
