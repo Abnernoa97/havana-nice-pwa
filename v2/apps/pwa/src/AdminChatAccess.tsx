@@ -1,5 +1,5 @@
 import {useCallback,useEffect,useState,type FormEvent} from 'react';
-import {adminAvailability,adminLogin,adminLogout,adminVerify,adminOtherSessions,adminRevokeOtherSessions,adminMembers,adminCreateMember,adminMemberHistory,adminRemoveMember,openAdminRealtime,
+import {adminAvailability,adminLogin,adminLogout,adminVerify,adminOtherSessions,adminRevokeOtherSessions,adminMembers,adminCreateMember,adminMemberHistory,adminDeletionPreview,adminRemoveMember,openAdminRealtime,
  type AdminSession,type AdminMember,type AdminMemberHistory,isAdminUnauthorized} from './admin-api';
 
 type Section='access'|'chat'|'repertoire'|'calendar'|'more';
@@ -170,15 +170,29 @@ export default function AdminChatAccess({section}:{section:Section}){
  }
  async function removeMember(person:AdminMember){
    if(!session||removing||busy)return;
-   const confirmed=window.confirm(
-     '¿Eliminar DEFINITIVAMENTE a '+person.display_name+'?\\n\\nSe eliminarán su nombre, sesiones, mensajes propios, reacciones y registro de acceso. Se cerrarán sus dispositivos conectados. Esta acción no se puede deshacer.'
-   );
-   if(!confirmed)return;
    setRemoving(person.actor_id);setError('');setNotice('');
    try{
+     // Read the authoritative D1 impact BEFORE asking for irrevocable removal.
+     // Fail closed: no preview, no deletion.
+     const preview=await adminDeletionPreview(session.token,person.actor_id);
+     if(preview.displayName!==person.display_name)throw new Error('El nombre cambió. Actualiza la lista antes de eliminar.');
+     if(!preview.canDelete||preview.counts.mediaAssets>0)
+       throw new Error('Este músico tiene archivos multimedia: la eliminación completa todavía no está disponible.');
+     const counts=preview.counts;
+     const approved=window.confirm(
+       '¿Eliminar DEFINITIVAMENTE a '+person.display_name+'?\n\n'+
+       'Se eliminarán de Cloudflare:\n'+
+       '· Sesiones: '+counts.sessions+'\n'+
+       '· Mensajes propios: '+counts.messages+'\n'+
+       '· Reacciones: '+counts.reactions+'\n'+
+       '· Lecturas: '+counts.receipts+'\n'+
+       '· Eventos de historial: '+counts.historyEvents+'\n'+
+       '· Solicitudes de dispositivos: '+counts.deviceRequests+'\n\n'+
+       'Se cerrarán sus conexiones activas. Esta acción NO se puede deshacer.'
+     );
+     if(!approved)return;
      await adminRemoveMember(session.token,person.actor_id,person.display_name);
-     // This local update happens ONLY after the server confirmed deletion.
-     // A later list refresh can fail without falsely showing a deleted member.
+     // Only after the server confirms deletion, update local roster.
      setMembers(previous=>previous.filter(item=>item.actor_id!==person.actor_id));
      setHistory(previous=>{const next={...previous};delete next[person.actor_id];return next;});
      if(expanded===person.actor_id)setExpanded('');
