@@ -157,3 +157,17 @@ test('Admin session count stays accurate on manual refresh, foreground, and WebS
  assert.match(panel,/else setOtherSessions\(null\)/);
  assert.match(panel,/window\.confirm\('¿Cerrar las otras '/);
 });
+
+test('Administrator reconnects safely after offline and background without duplicate sockets',()=>{
+ const panel=read('../src/AdminChatAccess.tsx');
+ assert.match(panel,/const previous=socket;\s*socket=null; \/\/ The next foreground\/online event may connect immediately\./);
+ assert.match(panel,/if\(previous&&previous\.readyState!==WebSocket\.CLOSED\)previous\.close\(\)/);
+ assert.match(panel,/if\(!active\|\|socket!==opened\)return/);
+ assert.match(panel,/socket&&\(socket\.readyState===WebSocket\.OPEN\|\|socket\.readyState===WebSocket\.CONNECTING\)/);
+ assert.match(panel,/socket\.readyState===WebSocket\.CLOSING\|\|socket\.readyState===WebSocket\.CLOSED/);
+ assert.match(panel,/if\(!document\.hidden&&navigator\.onLine\)/);
+ assert.match(panel,/if\(timer!==null\)\{clearTimeout\(timer\);timer=null;\}/);
+ assert.match(panel,/document\.addEventListener\('visibilitychange',resume\)/);
+ assert.match(panel,/window\.addEventListener\('online',resume\)/);
+ assert.match(panel,/window\.addEventListener\('offline',resume\)/);
+});
