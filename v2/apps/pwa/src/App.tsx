@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   fetchBackendHealth, getChatSnapshot, getOlderChatMessages, searchChatMessages, lastReadByOther, messageDeliveryLabel, newClientMessageId,
-  openChatSocket, reconcileChatMessages, startPwaFirstDeviceSession, restoreNamedChatSession,
+  openChatSocket, reconcileChatMessages, startNamedChatSession, restoreNamedChatSession,
   DeviceApprovalRequiredError, requestChatDeviceEnrollment, checkChatDeviceEnrollment, usablePendingChatEnrollment, type PendingChatDeviceEnrollment,
   type BackendHealth, type ChatMessage, type ChatServerEvent, type ChatSession,
   reconcileReactions, reconcileUpdatedMessage, type ChatReaction, type ChatEmoji, type ChatReadReceipt,
@@ -463,8 +463,8 @@ export default function App() {
     retryCount.current=0;
     reconnect(next);
   }
-  // PWA uses the dedicated first-device route; familiar names cannot issue a
-  // new named session, even in observe mode. Native is upgraded separately.
+  // Only the musician names approved by the Administrator may sign in here.
+  // Existing local sessions are preserved. Device approvals are out of scope.
   async function beginDeviceEnrollment(displayName:string){
     const pending=await requestChatDeviceEnrollment(displayName,'PWA · HAVANA NICE V2');
     await savePendingEnrollment(pending); // commit locally before changing screen
@@ -474,7 +474,7 @@ export default function App() {
     if(!name.trim()||joining||enrollment)return;
     setJoining(true);setError('');
     try{
-      const next=await startPwaFirstDeviceSession(name.trim());
+      const next=await startNamedChatSession(name.trim());
       acceptApprovedSession(next);
     }catch(reason){
       if(reason instanceof DeviceApprovalRequiredError){
@@ -617,14 +617,14 @@ export default function App() {
             {error&&<p className="chat-error" role="alert">{error}</p>}
           </> : <>
           <h2>Bienvenido.</h2>
-          <p>Escribe tu nombre autorizado. Si ya existe otro dispositivo registrado con ese nombre, el Administrador deberá aprobar este acceso.</p>
+          <p>Introduce el nombre que el Administrador creó y autorizó para ti.</p>
           <form onSubmit={event => { event.preventDefault(); void join(); }}>
             <label htmlFor="chat-name">Tu nombre</label>
             <input id="chat-name" maxLength={28} autoComplete="nickname" autoCapitalize="none" value={name} onChange={event => setName(event.target.value)} placeholder="Tu nombre" />
             <button type="submit" disabled={joining || !name.trim()}>{joining ? 'Verificando dispositivo…' : 'Continuar'}</button>
           </form>
           {error && <p className="chat-error" role="alert">{error}</p>}
-          <small>El primer dispositivo de un integrante nuevo puede registrarse una sola vez. Los siguientes necesitan autorización.</small>
+          <small>Si tu nombre no está registrado por el Administrador, no podrás entrar.</small>
           </>}
         </section>
       ) : (
