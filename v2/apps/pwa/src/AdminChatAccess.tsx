@@ -1,195 +1,160 @@
 import {useCallback,useEffect,useState,type FormEvent} from 'react';
-import {adminAvailability,adminDeviceAction,adminDeviceRequests,adminLogin,adminLogout,adminVerify,adminMembers,openAdminRealtime,
- type AdminDeviceRequest,type AdminSession,type AdminMember} from './admin-api';
+import {adminAvailability,adminLogin,adminLogout,adminVerify,adminMembers,adminCreateMember,openAdminRealtime,
+ type AdminSession,type AdminMember} from './admin-api';
 
-type Section='overview'|'requests'|'devices'|'members'|'security';
+type Section='access'|'chat'|'repertoire'|'calendar'|'more';
 type Readiness='loading'|'disabled'|'enabled'|'error';
-function when(value:number){return new Date(value).toLocaleString('es-MX',{dateStyle:'medium',timeStyle:'short'});}
+
 export default function AdminChatAccess({section}:{section:Section}){
  const [readiness,setReadiness]=useState<Readiness>('loading');
  const [session,setSession]=useState<AdminSession|null>(null);
  const [password,setPassword]=useState('');
- const [processing,setProcessing]=useState(false);
+ const [name,setName]=useState('');
+ const [busy,setBusy]=useState(false);
  const [error,setError]=useState('');
- const [rows,setRows]=useState<AdminDeviceRequest[]>([]);
+ const [notice,setNotice]=useState('');
  const [members,setMembers]=useState<AdminMember[]>([]);
- const [membersReady,setMembersReady]=useState(false);
- const [listReady,setListReady]=useState(false);
- const [pendingId,setPendingId]=useState('');
+ const [loaded,setLoaded]=useState(false);
  const [realtime,setRealtime]=useState<'waiting'|'connected'|'reconnecting'>('waiting');
+
  const refreshMembers=useCallback(async(token:string)=>{
-   setMembersReady(false);
-   try{
-     const data=await adminMembers(token);
-     setMembers(data.members);
-     setMembersReady(true);
-   }catch(e){
-     setError(e instanceof Error?e.message:'No se pudieron consultar músicos');
-   }
- },[]);
- const refresh=useCallback(async(token:string)=>{
-   setListReady(false);
-   try{
-    const data=await adminDeviceRequests(token);
-    setRows(data.requests);
-    setListReady(true);
-   }catch(e){
-    const reason=e instanceof Error?e.message:'No se pudieron consultar solicitudes';
-    setError(reason);
-    if(reason.includes('No autorizado'))setSession(null);
-   }
+   try{const data=await adminMembers(token);setMembers(data.members);setLoaded(true);}
+   catch(e){const reason=e instanceof Error?e.message:'No se pudieron consultar los músicos';setError(reason);if(reason==='No autorizado')setSession(null);}
  },[]);
  useEffect(()=>{
-  let closed=false;
-  void adminAvailability().then(res=>{if(!closed)setReadiness(res.enabled?'enabled':'disabled');})
-   .catch(()=>{if(!closed)setReadiness('error');});
-  return()=>{closed=true;};
+   let active=true;
+   void adminAvailability().then(result=>{if(active)setReadiness(result.enabled?'enabled':'disabled');})
+     .catch(()=>{if(active)setReadiness('error');});
+   return()=>{active=false;};
  },[]);
  useEffect(()=>{
-  if(!session)return;
-  const expiry=Date.parse(session.expiresAt);
-  if(!Number.isFinite(expiry)||expiry<=Date.now()){setSession(null);return;}
-  void adminVerify(session.token).then(()=>{void refresh(session.token);void refreshMembers(session.token);}).catch(()=>{
-    setSession(null);setError('La sesión administrativa venció o fue revocada.');
-  });
- },[session,refresh,refreshMembers]);
- // Authenticated real-time invalidation. Never store the admin token or show
- // private data over WebSocket; the protected API is still the source of truth.
+   if(!session)return;
+   const expiry=Date.parse(session.expiresAt);
+   if(!Number.isFinite(expiry)||expiry<=Date.now()){setSession(null);return;}
+   void adminVerify(session.token).then(()=>void refreshMembers(session.token))
+     .catch(()=>{setSession(null);setError('Tu sesión de Administrador expiró.');});
+ },[session,refreshMembers]);
  useEffect(()=>{
    if(!session){setRealtime('waiting');return;}
-   let active=true,socket:WebSocket|null=null,retryTimer:ReturnType<typeof setTimeout>|null=null;
+   let active=true,socket:WebSocket|null=null,timer:ReturnType<typeof setTimeout>|null=null;
    let retry=1000;
-   const refreshLatest=()=>{
-     if(!active||document.hidden||!navigator.onLine)return;
-     void adminVerify(session.token).then(()=>{
-       if(!active)return;
-       void refresh(session.token);void refreshMembers(session.token);
-     }).catch(()=>{
-       if(active){setSession(null);setError('La sesión administrativa expiró o fue revocada.');}
-     });
-   };
-   const connect=()=>{
+   const reconnect=()=>{
      if(!active||document.hidden||!navigator.onLine)return;
      setRealtime('reconnecting');
      try{
        socket=openAdminRealtime(session.token,event=>{
          if(!active)return;
-         if(event.type==='admin.ready'){retry=1000;setRealtime('connected');refreshLatest();}
-         if(event.type==='admin.invalidate'&&event.topic==='requests')void refresh(session.token);
+         if(event.type==='admin.ready'){retry=1000;setRealtime('connected');void refreshMembers(session.token);}
          if(event.type==='admin.invalidate'&&event.topic==='members')void refreshMembers(session.token);
        });
-       socket.onclose=event=>{
+       socket.onclose=e=>{
          if(!active)return;
          setRealtime('reconnecting');socket=null;
-         if(event.code===4003){setSession(null);setError('La sesión administrativa fue revocada.');return;}
-         retryTimer=setTimeout(connect,retry);retry=Math.min(retry*2,15000);
+         if(e.code===4003){setSession(null);setError('Tu sesión administrativa fue revocada.');return;}
+         timer=setTimeout(reconnect,retry);retry=Math.min(15000,retry*2);
        };
        socket.onerror=()=>{if(active)setRealtime('reconnecting');};
      }catch{
-       if(!active)return;
-       retryTimer=setTimeout(connect,retry);retry=Math.min(retry*2,15000);
+       timer=setTimeout(reconnect,retry);retry=Math.min(15000,retry*2);
      }
    };
-   const onResume=()=>{
+   const resume=()=>{
      if(!active)return;
      if(document.hidden||!navigator.onLine){socket?.close();return;}
-     refreshLatest();
-     if(!socket||socket.readyState===WebSocket.CLOSED)connect();
+     void adminVerify(session.token).then(()=>void refreshMembers(session.token)).catch(()=>setSession(null));
+     if(!socket||socket.readyState===WebSocket.CLOSED)reconnect();
    };
-   const expireAfter=Math.max(0,Date.parse(session.expiresAt)-Date.now());
-   const expiryTimer=setTimeout(()=>{
-     if(active){setSession(null);setError('La sesión administrativa expiró.');}
-   },Number.isFinite(expireAfter)?expireAfter:0);
-   document.addEventListener('visibilitychange',onResume);
-   window.addEventListener('online',onResume);
-   window.addEventListener('offline',onResume);
-   connect();
+   const duration=Math.max(0,Date.parse(session.expiresAt)-Date.now());
+   const expiryTimer=setTimeout(()=>{if(active){setSession(null);setError('La sesión administrativa expiró.');}},duration);
+   document.addEventListener('visibilitychange',resume);
+   window.addEventListener('online',resume);
+   window.addEventListener('offline',resume);
+   reconnect();
    return()=>{
-     active=false;clearTimeout(expiryTimer);
-     if(retryTimer)clearTimeout(retryTimer);
-     document.removeEventListener('visibilitychange',onResume);
-     window.removeEventListener('online',onResume);
-     window.removeEventListener('offline',onResume);
+     active=false;clearTimeout(expiryTimer);if(timer)clearTimeout(timer);
+     document.removeEventListener('visibilitychange',resume);
+     window.removeEventListener('online',resume);
+     window.removeEventListener('offline',resume);
      socket?.close();
    };
- },[session,refresh,refreshMembers]);
- async function login(e:FormEvent){
-  e.preventDefault();if(processing||!password)return;
-  setProcessing(true);setError('');
-  try{
-    const next=await adminLogin(password);
-    setPassword('');
-    setSession(next);
-  }catch(e){setError(e instanceof Error?e.message:'No se pudo iniciar sesión');}
-  finally{setProcessing(false);}
+ },[session,refreshMembers]);
+ async function login(event:FormEvent){
+   event.preventDefault();if(busy||!password)return;
+   setBusy(true);setError('');
+   try{const next=await adminLogin(password);setPassword('');setSession(next);}
+   catch(e){setError(e instanceof Error?e.message:'No se pudo iniciar sesión');}
+   finally{setBusy(false);}
  }
  async function logout(){
-  if(!session)return;
-  const value=session.token;
-  setSession(null);setRows([]);setMembers([]);setListReady(false);setMembersReady(false);setError('');
-  try{await adminLogout(value);}catch{/* The client token is discarded even while offline. */}
+   if(!session)return;
+   const token=session.token;
+   setSession(null);setMembers([]);setLoaded(false);setError('');setNotice('');setName('');
+   try{await adminLogout(token);}catch{/* In-memory session is discarded even when offline. */}
  }
- async function action(item:AdminDeviceRequest,verb:'approve'|'deny'|'revoke'){
-  if(!session||pendingId)return;
-  if(verb==='revoke'&&!window.confirm('¿Revocar únicamente este dispositivo?'))return;
-  setPendingId(item.request_id);setError('');
-  try{await adminDeviceAction(session.token,item.request_id,verb);await refresh(session.token);}
-  catch(e){setError(e instanceof Error?e.message:'No se pudo ejecutar la acción');}
-  finally{setPendingId('');}
+ async function addMember(event:FormEvent){
+   event.preventDefault();if(!session||busy||!name.trim())return;
+   setBusy(true);setError('');setNotice('');
+   try{
+     const result=await adminCreateMember(session.token,name.trim());
+     setName('');
+     setNotice('Nombre autorizado: '+result.member.display_name);
+     await refreshMembers(session.token);
+   }catch(e){setError(e instanceof Error?e.message:'No se pudo añadir el miembro');}
+   finally{setBusy(false);}
  }
- const interactive=section==='requests'||section==='devices';
- if(readiness==='loading')return <div className="a-panel" role="status">Comprobando disponibilidad administrativa…</div>;
- if(readiness!=='enabled')return <div className="a-panel a-admin-lock" role="status">
-  <h2>Autorización del Administrador</h2>
-  <p className="a-detail">{readiness==='disabled'?
-  'La autenticación administrativa aún no está activada en el servidor. El Chat y sus sesiones actuales permanecen intactos.':
-  'No se pudo consultar la disponibilidad administrativa. Revisa tu conexión.'}</p>
- </div>;
+ // Keep the Administrator's verified session when changing navigation sections.
+ if(section!=='access')return null;
+ if(readiness==='loading')return <section className="a-panel">Comprobando el acceso administrativo…</section>;
+ if(readiness!=='enabled')return <section className="a-panel">
+   <h2>Acceso de Administrador</h2>
+   <p className="a-detail">{readiness==='disabled'?'Acceso administrativo todavía no configurado.':'No se pudo verificar la conexión al Administrador.'}</p>
+ </section>;
  if(!session)return <section className="a-panel a-admin-lock">
-  <h2>Acceso de Administrador</h2>
-  <p className="a-detail">La administración requiere una credencial independiente de los nombres del Chat. No se guardará en el teléfono.</p>
-  <form className="a-admin-login" onSubmit={e=>void login(e)}>
-   <label htmlFor="admin-password">Credencial de administración</label>
-   <input id="admin-password" type="password" autoComplete="off" value={password}
-    onChange={e=>setPassword(e.target.value)} required minLength={40}/>
-   <button type="submit" disabled={processing}>{processing?'Verificando…':'Entrar al Administrador'}</button>
-  </form>
-  {error&&<p role="alert" className="a-admin-error">{error}</p>}
+   <h2>Entrar al Administrador</h2>
+   <p className="a-detail">Inicia sesión para crear y autorizar músicos. La contraseña no se guarda en el teléfono.</p>
+   <form className="a-admin-login" onSubmit={login}>
+     <label htmlFor="admin-password">Contraseña de Administrador</label>
+     <input id="admin-password" type="password" autoComplete="off" value={password}
+       onChange={event=>setPassword(event.target.value)} required minLength={40}/>
+     <button type="submit" disabled={busy}>{busy?'Verificando…':'Entrar'}</button>
+   </form>
+   {error&&<p role="alert" className="a-admin-error">{error}</p>}
  </section>;
- const visible=section==='requests'?rows.filter(x=>x.status==='pending'):rows.filter(x=>x.status==='approved'||x.status==='revoked');
- return <section className="a-panel a-admin-private">
-  <div className="a-admin-toolbar"><div><h2>Administrador autorizado</h2>
-   <p className="a-detail">Sesión temporal · Los cambios son validados por Cloudflare · {realtime==='connected'?'Sincronización automática activa':'Reconectando sincronización automática'}</p></div>
-   <div className="a-admin-toolbar-actions"><button type="button" onClick={()=>void refresh(session.token)}>Actualizar</button>
-    <button type="button" onClick={()=>void logout()}>Cerrar sesión</button></div>
-  </div>
-  {error&&<p role="alert" className="a-admin-error">{error}</p>}
-  {interactive&&<div className="a-admin-records">
-    <h3>{section==='requests'?'Solicitudes pendientes':'Dispositivos aprobados o revocados'}</h3>
-    {!listReady?<p className="a-detail">Consultando datos privados…</p>:visible.length===0?
-     <p className="a-detail">No hay registros en esta categoría.</p>:
-     visible.map(item=><div key={item.request_id} className="a-admin-record">
-      <div><strong>{item.display_name}</strong><span>{item.device_label} · {when(item.created_at)}</span>
-       <small>Estado: {item.status}</small></div>
-      <div className="a-admin-record-buttons">{item.status==='pending'?
-       <><button type="button" disabled={!!pendingId} onClick={()=>void action(item,'approve')}>Aprobar</button>
-         <button type="button" disabled={!!pendingId} onClick={()=>void action(item,'deny')}>Rechazar</button></>:
-       item.status==='approved'?<button type="button" disabled={!!pendingId} onClick={()=>void action(item,'revoke')}>Revocar dispositivo</button>:null}
-      </div>
-     </div>)}
-   </div>}
-  {section==='members'&&<div className="a-admin-records">
-    <h3>Músicos de HAVANA NICE V2</h3>
-    {!membersReady?<p className="a-detail">Consultando integrantes…</p>:
-      members.length===0?<p className="a-detail">Sin integrantes registrados.</p>:
-      members.map(person=><div key={person.actor_id} className="a-admin-record">
-        <div><strong>{person.display_name}</strong>
-          <span>{person.active===1?'Autorizado':'Acceso suspendido'}</span>
-          <small>Credenciales vigentes: {person.session_count} (no equivale a teléfonos conectados ahora)</small>
-        </div>
-      </div>)}
-  </div>}
-  {section==='security'&&<p className="a-detail">Sesión administrativa verificada. Los controles adicionales de dispositivos estarán disponibles tras la etapa S01/S02.</p>}
-  {section==='overview'&&<p className="a-detail">Administrador conectado al servicio V2. La gestión de dispositivos permanece bajo verificación de permisos.</p>}
- </section>;
+ return <div className="a-access-workspace">
+   <section className="a-panel a-admin-private">
+     <div className="a-admin-toolbar">
+       <div><h2>Administrador autorizado</h2>
+         <p className="a-detail">{realtime==='connected'?'Sincronización automática activa':'Conectando con Cloudflare…'}</p></div>
+       <div className="a-admin-toolbar-actions">
+         <button type="button" onClick={()=>void refreshMembers(session.token)}>Actualizar</button>
+         <button type="button" onClick={()=>void logout()}>Cerrar sesión</button>
+       </div>
+     </div>
+   </section>
+   <section className="a-panel a-member-add">
+     <h2>Añadir miembro</h2>
+     <p className="a-detail">Escribe el nombre que quieres autorizar. Solo los nombres creados aquí podrán entrar al Chat de músicos.</p>
+     <form className="a-member-form" onSubmit={addMember}>
+       <label htmlFor="new-musician-name">Nombre del músico</label>
+       <input id="new-musician-name" type="text" value={name}
+         onChange={event=>setName(event.target.value)} autoCapitalize="words"
+         autoCorrect="off" maxLength={28} placeholder="Ej. María José" required/>
+       <button type="submit" disabled={busy||!name.trim()}>{busy?'Guardando…':'Añadir y autorizar'}</button>
+     </form>
+     {notice&&<p className="a-member-notice" role="status">{notice}</p>}
+     {error&&<p className="a-admin-error" role="alert">{error}</p>}
+   </section>
+   <section className="a-panel a-member-list">
+     <div className="a-member-heading">
+       <h2>Músicos autorizados</h2><span>{loaded?members.filter(person=>person.active===1).length:'—'}</span>
+     </div>
+     {!loaded?<p className="a-detail">Cargando integrantes…</p>:
+       members.length===0?<p className="a-detail">Todavía no hay miembros registrados. Añade el primero arriba.</p>:
+       <div className="a-member-rows">{members.map(person=><div className="a-member-row" key={person.actor_id}>
+         <div className="a-member-avatar" aria-hidden="true">{person.display_name.charAt(0).toUpperCase()}</div>
+         <div className="a-member-identity"><strong>{person.display_name}</strong><small>{person.active===1?'Autorizado':'Inactivo'}</small></div>
+         <span className={person.active===1?'a-member-status on':'a-member-status'}>{person.active===1?'Activo':'Inactivo'}</span>
+       </div>)}</div>}
+   </section>
+ </div>;
 }
