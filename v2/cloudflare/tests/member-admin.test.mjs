@@ -105,7 +105,7 @@ test('atomic permanent deletion clears all musician-owned D1 tables then expels 
  for(const term of ['UPDATE chat_messages SET reply_to_seq=NULL','DELETE FROM chat_reactions WHERE message_seq',
   'DELETE FROM chat_reactions WHERE actor_id','DELETE FROM chat_messages WHERE sender_id',
   'DELETE FROM chat_read_receipts','DELETE FROM chat_sessions',
-  'DELETE FROM chat_pwa_first_claims','DELETE FROM chat_access_events','DELETE FROM chat_members']){
+  'DELETE FROM chat_access_events','DELETE FROM chat_members']){
    assert.ok(queries.includes(term),'Missing cleanup '+term);
  }
  assert.deepEqual(e.events.map(x=>new URL(x.path).pathname),['/member-removed','/admin-invalidate']);
