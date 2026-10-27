@@ -82,7 +82,7 @@ jobs:
           grep -q '"database":"ok"' /tmp/havana-health.json
           grep -q '"schemaVersion":"foundation-v1"' /tmp/havana-health.json
 
-      - name: Verify Administrator bootstrap is enabled but private APIs remain protected
+      - name: Verify Admin enabled and device observe mode without granting new access
         shell: bash
         run: |
           set -euo pipefail
@@ -96,12 +96,13 @@ jobs:
           STATUS="$(curl --silent --show-error --output /tmp/v2-admin-members-denied.json --write-out '%{http_code}' "$BASE/api/chat/admin/members")"
           test "$STATUS" = "401"
           grep -q 'No autorizado' /tmp/v2-admin-members-denied.json
-          STATUS="$(curl --silent --show-error --output /tmp/v2-admin-requests-disabled.json --write-out '%{http_code}' "$BASE/api/chat/admin/device-requests")"
-          test "$STATUS" = "503"
-          STATUS="$(curl --silent --show-error --output /tmp/v2-device-disabled.json --write-out '%{http_code}' \
-            --header 'Content-Type: application/json' --data '{"displayName":"invalid-not-allowed"}' "$BASE/api/chat/device/request")"
-          test "$STATUS" = "503"
-          grep -q '"error"' /tmp/v2-device-disabled.json
+          STATUS="$(curl --silent --show-error --output /tmp/v2-admin-requests-denied.json --write-out '%{http_code}' "$BASE/api/chat/admin/device-requests")"
+          test "$STATUS" = "401"
+          grep -q 'No autorizado' /tmp/v2-admin-requests-denied.json
+          STATUS="$(curl --silent --show-error --output /tmp/v2-device-unknown.json --write-out '%{http_code}' \
+            --header 'Content-Type: application/json' --data '{"displayName":"ci_unknown_user"}' "$BASE/api/chat/device/request")"
+          test "$STATUS" = "403"
+          grep -q 'Nombre no autorizado' /tmp/v2-device-unknown.json
 
       - name: Verify new Administrator WebSocket rejects unauthorized clients
         shell: bash
