@@ -8,7 +8,7 @@
     "deploy": "wrangler deploy",
     "typecheck": "tsc --noEmit",
     "test:media": "node --test tests/media-drive.test.mjs",
-    "test:security": "node --test tests/device-approval.test.mjs tests/member-admin.test.mjs",
+    "test:security": "node --test tests/device-approval.test.mjs tests/member-admin.test.mjs tests/single-installation.test.mjs",
     "test:admin-auth": "node --test tests/admin-auth.test.mjs"
   },
   "devDependencies": {
