@@ -87,7 +87,8 @@ test('original musician offline storage and Chat remain intact',()=>{
 test('Administrator can explicitly close other sessions but cannot clear the current one',()=>{
  const ui=read('../src/AdminChatAccess.tsx');
  const api=read('../src/admin-api.ts');
- assert.match(ui,/adminOtherSessions\(session\.token\)/);
+ assert.match(ui,/adminOtherSessions\(token\)/);
+ assert.match(ui,/refreshOtherSessions\(session\.token\)/);
  assert.match(ui,/adminRevokeOtherSessions\(session\.token\)/);
  assert.match(ui,/window\.confirm\(/);
  assert.match(ui,/Cerrar otras sesiones/);
