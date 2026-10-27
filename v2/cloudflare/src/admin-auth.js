@@ -1,6 +1,7 @@
 // HAVANA NICE V2: server-only administrator login and short-lived access sessions.
 // No password, bearer or hash is embedded in the PWA. All switches default off.
 // Call this endpoint only after 0010_chat_admin_sessions.sql was applied.
+import {notifyAdminClients} from './admin-realtime.js';
 const encoder=new TextEncoder();
 const HOUR=60*60*1000;
 const ATTEMPT_WINDOW=15*60*1000;
@@ -52,6 +53,26 @@ export async function handleAdminSessionApi(request,env,url,origin,respond){
    return reply({enabled:adminLoginConfigured(env)});
  }
  if(!adminLoginConfigured(env))return reply({error:'Inicio de administrador aún no configurado'},503);
+ // Inventory and revoke only OTHER sessions; never reveal tokens or IP addresses.
+ if(url.pathname==='/api/chat/admin/auth/sessions'&&request.method==='GET'){
+   if(!await verifyAdminSession(request,env))return reply({error:'No autorizado'},401);
+   const currentHash=await hash(tokenFromRequest(request));
+   const row=await env.DB.prepare(
+     'SELECT COUNT(*) AS others FROM chat_admin_sessions WHERE revoked_at IS NULL AND expires_at>? AND token_hash<>?'
+   ).bind(Date.now(),currentHash).first();
+   return reply({others:Number(row?.others||0)});
+ }
+ if(url.pathname==='/api/chat/admin/auth/revoke-others'&&request.method==='POST'){
+   if(!await verifyAdminSession(request,env))return reply({error:'No autorizado'},401);
+   const currentHash=await hash(tokenFromRequest(request));
+   const result=await env.DB.prepare(
+     'UPDATE chat_admin_sessions SET revoked_at=? WHERE revoked_at IS NULL AND expires_at>? AND token_hash<>?'
+   ).bind(Date.now(),Date.now(),currentHash).run();
+   // Durable Object rechecks its Administrator socket tokens on invalidation.
+   // It closes all revoked connections and preserves this current session.
+   await notifyAdminClients(env,'members');
+   return reply({ok:true,revoked:Number(result.meta?.changes||0)});
+ }
  if(url.pathname==='/api/chat/admin/auth/session'&&request.method==='GET'){
    if(!await verifyAdminSession(request,env))return reply({error:'No autorizado'},401);
    return reply({ok:true});
@@ -60,6 +81,7 @@ export async function handleAdminSessionApi(request,env,url,origin,respond){
    if(!await verifyAdminSession(request,env))return reply({error:'No autorizado'},401);
    await env.DB.prepare('UPDATE chat_admin_sessions SET revoked_at=? WHERE token_hash=? AND revoked_at IS NULL')
      .bind(Date.now(),await hash(tokenFromRequest(request))).run();
+   await notifyAdminClients(env,'members');
    return reply({ok:true});
  }
  if(url.pathname!=='/api/chat/admin/auth/session'||request.method!=='POST')
