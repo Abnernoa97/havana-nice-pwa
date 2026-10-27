@@ -179,3 +179,22 @@ test('Admin never labels Chrome reduced historical K as a real phone model',()=>
  assert.match(app,/event\.device_model&&event\.device_model!=='K'/);
  assert.match(app,/Modelo no disponible/);
 });
+
+test('musician trash waits for authenticated D1 preview and blocks media before confirmation',()=>{
+ const ui=read('../src/AdminChatAccess.tsx');
+ const api=read('../src/admin-api.ts');
+ const server=read('../../../cloudflare/src/member-admin.js');
+ const route=read('../../../cloudflare/src/index.ts');
+ const preview=ui.indexOf('await adminDeletionPreview(session.token,person.actor_id)');
+ const approve=ui.indexOf('const approved=window.confirm(',preview);
+ const perform=ui.indexOf('await adminRemoveMember(session.token,person.actor_id,person.display_name)',approve);
+ assert.ok(preview>0&&approve>preview&&perform>approve,'Impact must be read and confirmed before deletion');
+ assert.match(ui,/!preview.canDelete\|\|preview.counts.mediaAssets>0/);
+ assert.match(ui,/Mensajes propios:/);
+ assert.match(ui,/Sesiones:/);
+ assert.match(api,/adminDeletionPreview\(token:string,actorId:string\)/);
+ assert.match(api,/authenticated\(token\)/);
+ assert.match(server,/impact.mediaAssets>0/);
+ assert.match(server,/member-delete-preview/);
+ assert.match(route,/api\/chat\/admin\/member-delete-preview/);
+});
