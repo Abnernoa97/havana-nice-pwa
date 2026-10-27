@@ -397,7 +397,7 @@ export default {
         ).bind(username,actorId,displayName).run();
         if(Number(created.meta?.changes)!==1)return respond({error:'Este nombre ya existe en el Administrador.'},409,origin);
         await notifyAdminClients(env,'members');
-        return respond({member:{actor_id:actorId,username,display_name:displayName,active:1,session_count:0}},201,origin);
+        return respond({member:{actor_id:actorId,username,display_name:displayName,active:1,session_count:0,single_device_mode:1,installation_bound:0}},201,origin);
       }
       // No bearer tokens, device secrets or private message history are returned.
       const members = await env.DB.prepare(
