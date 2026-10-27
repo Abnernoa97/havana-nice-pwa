@@ -210,9 +210,11 @@ test('member data inspection can be verified without pressing irreversible trash
  assert.doesNotMatch(body,/adminRemoveMember\(|window\.confirm\(/,'Inspector must never mutate or confirm a delete');
  assert.match(app,/Ver datos asociados/);
  assert.match(app,/Consulta de solo lectura\. No elimina ni modifica información/);
- assert.match(app,/impact\[person\.actor_id\]\.counts\.mediaAssets/);
- assert.match(app,/impact\[person\.actor_id\]\.counts\.sessions/);
- assert.match(app,/impact\[person\.actor_id\]\.counts\.historyEvents/);
+ assert.match(app,/function MemberImpactSummary/);
+ assert.match(app,/counts\.mediaAssets/);
+ assert.match(app,/counts\.sessions/);
+ assert.match(app,/counts\.historyEvents/);
+ assert.match(app,/name=\{person\.display_name\} preview=\{impact\[person\.actor_id\]\}/);
  assert.match(api,/method:'POST',body:JSON\.stringify\(\{actorId,confirmName\}\)/);
  assert.match(api,/return api<AdminDeletionPreview>/);
  assert.match(api,/authenticated\(token\)/);
