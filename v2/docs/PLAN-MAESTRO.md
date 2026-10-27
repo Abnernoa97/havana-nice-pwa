@@ -77,10 +77,12 @@
 - **Acceso nuevo:** `chat_single_device_owners` y `chat_duplicate_login_alerts` son las únicas tablas adicionales específicas de instalación y alertas.
 - **Limpieza definitiva realizada:** eliminados del código y D1 el flujo de pedir/aprobar teléfonos y la inscripción experimental PWA. No hay botones, endpoints ni tablas de ese mecanismo; las sesiones del Chat que existían continúan intactas.
 - **CI:** pruebas de tipado, autenticación independiente, restricción de duplicados, bloqueo de endpoints borrados y conservación de WebSocket/Chat; exigir SUCCESS antes de distribuciones.
+- **Avance S02 verificado (27/10):** commit `5199a3af795a402e5a042e10ee10cd771777f6a4`; Foundation CI `40552356302` SUCCESS, repetido con éxito tras desplegar; Cloudflare Pages desplegado para ese commit; Worker V2 versión `fc65de5a-323c-4351-bf4f-c70c8bd86748` al 100 %. La ruta DELETE ya no puede dejar huérfana la credencial titular; libera únicamente el Administrador. Eliminada además una interrupción accidental del guardado de borradores PWA causada por eventos de escritura ajenos. D1 se volvió a leer: 6 músicos activos, 10 sesiones, 45 mensajes, 0 titulares nuevos y 0 alertas, sin mutaciones de prueba.
+- **Protección pendiente antes de migrar a los seis músicos:** revisar la retención local de borradores/cola no enviados ante una revocación o restauración 401; los clientes actuales eliminan su estado local en esas circunstancias. No confundir mensajes ya guardados en D1 con borradores offline. Resolver y validar antes de migrar cuentas reales; no publicar APK sin las pruebas correspondientes.
 
 ## 6. Siguiente secuencia de trabajo — S02
 
-1. Verificar versión final de Worker y CI sin rutas antiguas.
+1. **Verificado 27/10:** Worker V2, Pages, CI nuevo y repetición post-despliegue SUCCESS, D1 sin rutas/tablas antiguas ni pérdida de músicos/sesiones/mensajes. Continuar vigilando regresiones.
 2. Crear un usuario temporal **desde el propio Administrador** y probar: primera entrada → bloqueo de segundo navegador aun con primero offline → alerta → liberar desde Admin → nueva entrada → restauración.
 3. Migrar cada músico actual sin perder sus sesiones o borradores mediante una única lógica y una única actualización Android. No forzar la migración con una elección de token por intuición.
 4. Después continuar Administración Chat, Repertorio y Calendario simultáneamente en PWA/Android/Admin, siempre con backend y contrato compartidos.
