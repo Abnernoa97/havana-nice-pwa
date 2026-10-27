@@ -31,6 +31,15 @@ export default function AdminChatAccess({section}:{section:Section}){
    return()=>{document.documentElement.dataset.adminSessionActive='false';};
  },[session]);
 
+ const refreshOtherSessions=useCallback(async(token:string)=>{
+   try{
+     const data=await adminOtherSessions(token);
+     setOtherSessions(data.others);
+   }catch(reason){
+     if(isAdminUnauthorized(reason)){setSession(null);setError('Tu sesión de Administrador expiró.');}
+     else setOtherSessions(null);
+   }
+ },[]);
  const refreshMembers=useCallback(async(token:string)=>{
    try{const data=await adminMembers(token);setMembers(data.members);setLoaded(true);}
    catch(e){
@@ -50,13 +59,12 @@ export default function AdminChatAccess({section}:{section:Section}){
    if(!Number.isFinite(expiry)||expiry<=Date.now()){setSession(null);return;}
    void adminVerify(session.token).then(()=>{
      void refreshMembers(session.token);
-     void adminOtherSessions(session.token).then(data=>setOtherSessions(data.others))
-       .catch(()=>setOtherSessions(null));
+     void refreshOtherSessions(session.token);
    }).catch(reason=>{
      if(isAdminUnauthorized(reason)){setSession(null);setError('Tu sesión de Administrador expiró.');}
      else setError('No se pudo verificar la conexión. Tu sesión permanece abierta para reintentar.');
    });
- },[session,refreshMembers]);
+ },[session,refreshMembers,refreshOtherSessions]);
  useEffect(()=>{
    if(!session){setRealtime('waiting');return;}
    let active=true,socket:WebSocket|null=null,timer:ReturnType<typeof setTimeout>|null=null;
@@ -67,7 +75,7 @@ export default function AdminChatAccess({section}:{section:Section}){
      try{
        socket=openAdminRealtime(session.token,event=>{
          if(!active)return;
-         if(event.type==='admin.ready'){retry=1000;setRealtime('connected');void refreshMembers(session.token);}
+         if(event.type==='admin.ready'){retry=1000;setRealtime('connected');void refreshMembers(session.token);void refreshOtherSessions(session.token);}
          if(event.type==='admin.invalidate'&&event.topic==='members')void refreshMembers(session.token);
        });
        socket.onclose=e=>{
@@ -84,7 +92,7 @@ export default function AdminChatAccess({section}:{section:Section}){
    const resume=()=>{
      if(!active)return;
      if(document.hidden||!navigator.onLine){socket?.close();return;}
-     void adminVerify(session.token).then(()=>void refreshMembers(session.token)).catch(reason=>{
+     void adminVerify(session.token).then(()=>{void refreshMembers(session.token);void refreshOtherSessions(session.token);}).catch(reason=>{
        if(!active)return;
        if(isAdminUnauthorized(reason)){setSession(null);setError('Tu sesión administrativa expiró.');}
        else setError('Sin conexión temporal. La sesión sigue abierta; se actualizará al reconectar.');
@@ -104,7 +112,7 @@ export default function AdminChatAccess({section}:{section:Section}){
      window.removeEventListener('offline',resume);
      socket?.close();
    };
- },[session,refreshMembers]);
+ },[session,refreshMembers,refreshOtherSessions]);
  async function login(event:FormEvent){
    event.preventDefault();if(busy||!password)return;
    setBusy(true);setError('');
@@ -201,7 +209,7 @@ export default function AdminChatAccess({section}:{section:Section}){
        <div><h2>Administrador autorizado</h2>
          <p className="a-detail">{realtime==='connected'?'Sincronización automática activa':'Conectando con Cloudflare…'}</p></div>
        <div className="a-admin-toolbar-actions">
-         <button type="button" onClick={()=>void refreshMembers(session.token)}>Actualizar</button>
+         <button type="button" onClick={()=>{void refreshMembers(session.token);void refreshOtherSessions(session.token);}}>Actualizar</button>
          <button type="button" onClick={()=>void logout()}>Cerrar sesión</button>
        </div>
      </div>
