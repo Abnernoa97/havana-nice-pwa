@@ -10,11 +10,14 @@ class FakeD1{
    this.member={actor_id:actor,display_name:'Prueba Uno',single_device_mode:1};
  }
  prepare(sql){
-   return {bind:(...args)=>({
-     first:async()=>this.first(sql,args),run:async()=>this.run(sql,args),
-     all:async()=>this.all(sql,args),
-     sql,args
-   })};
+   return {
+     all:async()=>this.all(sql,[]),
+     bind:(...args)=>({
+       first:async()=>this.first(sql,args),run:async()=>this.run(sql,args),
+       all:async()=>this.all(sql,args),
+       sql,args
+     })
+   };
  }
  async batch(statements){
    const first=statements[0],second=statements[1];
