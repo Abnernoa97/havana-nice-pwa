@@ -182,7 +182,10 @@ export class ChatRoom {
         this.send(server, { type: 'chat.error', error: 'Delivery failed' });
       }));
     });
+    let socketClosed=false;
     const cleanup = () => {
+      if(socketClosed)return;
+      socketClosed=true;
       this.state.waitUntil(recordMemberEvent(this.env,actorId,'disconnect',request,deviceDetails).catch(()=>{}));
       this.sockets.delete(server);
       this.members.delete(server);
