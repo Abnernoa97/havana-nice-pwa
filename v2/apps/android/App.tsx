@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import {
   HAVANA_V2_DEV_API_BASE_URL, fetchBackendHealth, getChatSnapshot, getOlderChatMessages, searchChatMessages, lastReadByOther, messageDeliveryLabel, newClientMessageId,
-  reconcileChatMessages, reconcileReactions, reconcileUpdatedMessage, startNamedChatSession, restoreNamedChatSession,
+  reconcileChatMessages, reconcileReactions, reconcileUpdatedMessage, reconcileDeletedMessage, reconcileChatSnapshot, startNamedChatSession, restoreNamedChatSession,
   type ChatMessage, type ChatServerEvent, type ChatSession, type ChatReaction, type ChatEmoji, type ChatReadReceipt,
 } from '@havana/shared';
 import { loadNativeLocalChat, saveNativeLocalChat } from './chatStorage';
