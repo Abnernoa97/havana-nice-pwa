@@ -89,7 +89,7 @@ export function adminReleaseInstallation(token:string,actorId:string,confirmName
  return api<{ok:boolean;revokedSessions:number}>('/api/chat/admin/release-installation',
   authenticated(token,{method:'POST',body:JSON.stringify({actorId,confirmName})}));
 }
-export type AdminRealtimeEvent={type:'admin.ready'}|{type:'admin.invalidate';topic:'requests'|'members'};
+export type AdminRealtimeEvent={type:'admin.ready'}|{type:'admin.invalidate';topic:'members'};
 export function openAdminRealtime(token:string,onEvent:(event:AdminRealtimeEvent)=>void):WebSocket{
  if(!/^[A-Za-z0-9_-]{40,128}$/.test(token))throw new Error('Sesión administrativa inválida');
  const url=API.replace(/^http/,'ws')+'/ws/admin';
@@ -98,7 +98,7 @@ export function openAdminRealtime(token:string,onEvent:(event:AdminRealtimeEvent
   try{
    const value=JSON.parse(String(event.data)) as Partial<AdminRealtimeEvent>;
    if(value.type==='admin.ready')onEvent({type:'admin.ready'});
-   if(value.type==='admin.invalidate'&&(value.topic==='requests'||value.topic==='members'))
+   if(value.type==='admin.invalidate'&&value.topic==='members')
      onEvent({type:'admin.invalidate',topic:value.topic});
   }catch{/* Unrecognized server event: ignore; privileged API remains authoritative. */}
  });
