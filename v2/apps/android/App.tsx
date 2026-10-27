@@ -745,7 +745,7 @@ export default function App() {
                 onPress={()=>void loadOlder()}><Text style={styles.loadMoreText}>{loadingOlder?'Cargando…':'Cargar mensajes anteriores'}</Text></Pressable>:null}
               {results!==null?<Text style={styles.searchCount}>{results.length} resultado(s)</Text>:null}
               {!messages.length ? <Text style={styles.empty}>¡Hola! Envía el primer mensaje. Aparecerá en los dos dispositivos.</Text> : null}
-              {(results??messages).map(message => {
+              {(results??messages).filter(message=>!message.deletedAt).map(message => {
                 const mine = message.senderId === session.actorId;
                 return (
                   <SwipeableBubble
@@ -758,11 +758,11 @@ export default function App() {
                     {!mine && <Text style={styles.sender}>{message.senderName}</Text>}
                     {message.replyToSeq ? (
                       <Text style={[styles.replyLabel,mine && styles.mineMeta]}>
-                        ↪ {(messages.find(m=>m.seq===message.replyToSeq)?.deletedAt ? 'Mensaje eliminado' : (messages.find(m=>m.seq===message.replyToSeq)?.text.slice(0,70)||'Mensaje anterior'))}
+                        ↪ {messages.find(m=>m.seq===message.replyToSeq)?.text.slice(0,70)||'Mensaje anterior'}
                       </Text>
                     ) : null}
-                    <Text style={[styles.bubbleText,mine && styles.mineText,message.deletedAt && styles.deletedText]}>
-                      {message.deletedAt?'Mensaje eliminado':message.text}
+                    <Text style={[styles.bubbleText,mine && styles.mineText]}>
+                      {message.text}
                     </Text>
                     {message.seq>0 && !message.deletedAt && reactions.some(r=>r.messageSeq===message.seq) ? (
                       <View style={styles.reactionBadges}>
