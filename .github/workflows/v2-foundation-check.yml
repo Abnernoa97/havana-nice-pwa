@@ -82,24 +82,26 @@ jobs:
           grep -q '"database":"ok"' /tmp/havana-health.json
           grep -q '"schemaVersion":"foundation-v1"' /tmp/havana-health.json
 
-      - name: Verify staged Administrator is disabled without credentials
+      - name: Verify Administrator bootstrap is enabled but private APIs remain protected
         shell: bash
         run: |
           set -euo pipefail
           BASE="https://havana-nice-v2-dev.soloaplicaciones97.workers.dev"
           STATUS="$(curl --silent --show-error --fail --output /tmp/v2-admin-status.json --write-out '%{http_code}' "$BASE/api/chat/admin/auth/status")"
           test "$STATUS" = "200"
-          grep -q '"enabled":false' /tmp/v2-admin-status.json
+          grep -q '"enabled":true' /tmp/v2-admin-status.json
+          STATUS="$(curl --silent --show-error --output /tmp/v2-admin-session-denied.json --write-out '%{http_code}' "$BASE/api/chat/admin/auth/session")"
+          test "$STATUS" = "401"
+          grep -q 'No autorizado' /tmp/v2-admin-session-denied.json
+          STATUS="$(curl --silent --show-error --output /tmp/v2-admin-members-denied.json --write-out '%{http_code}' "$BASE/api/chat/admin/members")"
+          test "$STATUS" = "401"
+          grep -q 'No autorizado' /tmp/v2-admin-members-denied.json
+          STATUS="$(curl --silent --show-error --output /tmp/v2-admin-requests-disabled.json --write-out '%{http_code}' "$BASE/api/chat/admin/device-requests")"
+          test "$STATUS" = "503"
           STATUS="$(curl --silent --show-error --output /tmp/v2-device-disabled.json --write-out '%{http_code}' \
             --header 'Content-Type: application/json' --data '{"displayName":"invalid-not-allowed"}' "$BASE/api/chat/device/request")"
           test "$STATUS" = "503"
           grep -q '"error"' /tmp/v2-device-disabled.json
-          STATUS="$(curl --silent --show-error --output /tmp/v2-admin-denied.json --write-out '%{http_code}' "$BASE/api/chat/admin/device-requests")"
-          test "$STATUS" = "503"
-          grep -q '"error"' /tmp/v2-admin-denied.json
-          STATUS="$(curl --silent --show-error --output /tmp/v2-admin-members-denied.json --write-out '%{http_code}' "$BASE/api/chat/admin/members")"
-          test "$STATUS" = "401"
-          grep -q '"No autorizado"' /tmp/v2-admin-members-denied.json
 
       - name: Verify new Administrator WebSocket rejects unauthorized clients
         shell: bash
