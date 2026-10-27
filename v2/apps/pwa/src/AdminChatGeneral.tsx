@@ -24,11 +24,19 @@ export default function AdminChatGeneral({token,connected,liveEvent,onExpired}:P
  const wasInitial=useRef(true);
  const prepend=useRef<{height:number;top:number}|null>(null);
  const live=useRef(true);
+ const removedSeq=useRef<Set<number>>(new Set());
  const load=useCallback(async()=>{
   try{
    const result=await adminChatMessages(token);
    if(!live.current)return;
-   setMessages(old=>bySequence(old,result.messages));
+   // The newest server page is authoritative; do not restore already-erased bubbles.
+   setMessages(old=>{
+    const newest=result.messages.at(-1)?.seq??0;
+    const oldest=result.messages[0]?.seq??Infinity;
+    const retained=old.filter(m=>!m.deletedAt&&!removedSeq.current.has(m.seq)
+      &&(m.seq<oldest||m.seq>newest));
+    return bySequence(retained,result.messages.filter(m=>!m.deletedAt&&!removedSeq.current.has(m.seq)));
+   });
    setReactions(old=>[...old.filter(r=>!result.messages.some(m=>m.seq===r.messageSeq)),...result.reactions]);
    setHasMore(result.hasMore);
    setError('');
@@ -54,8 +62,13 @@ export default function AdminChatGeneral({token,connected,liveEvent,onExpired}:P
  useEffect(()=>{
   if(!liveEvent)return;
   if(liveEvent.type==='admin.chat.message'||liveEvent.type==='admin.chat.updated'){
-   setMessages(old=>bySequence(old,[liveEvent.message]));
-   if(liveEvent.message.deletedAt)setReactions(old=>old.filter(r=>r.messageSeq!==liveEvent.message.seq));
+   if(!removedSeq.current.has(liveEvent.message.seq))
+    setMessages(old=>bySequence(old,[liveEvent.message]).filter(m=>!m.deletedAt));
+  }else if(liveEvent.type==='admin.chat.deleted'){
+   removedSeq.current.add(liveEvent.seq);
+   setMessages(old=>old.filter(m=>m.seq!==liveEvent.seq&&!m.deletedAt)
+     .map(m=>m.replyToSeq===liveEvent.seq?{...m,replyToSeq:null}:m));
+   setReactions(old=>old.filter(r=>r.messageSeq!==liveEvent.seq));
   }else if(liveEvent.type==='admin.chat.reaction'){
    const {messageSeq,actorId,emoji,active}=liveEvent;
    setReactions(old=>{
@@ -91,7 +104,8 @@ export default function AdminChatGeneral({token,connected,liveEvent,onExpired}:P
   setOlderBusy(true);
   try{
    const data=await adminChatMessages(token,messages[0]!.seq);
-   setMessages(old=>bySequence(data.messages,old));
+   setMessages(old=>bySequence(data.messages.filter(m=>!m.deletedAt&&!removedSeq.current.has(m.seq)),old)
+    .filter(m=>!m.deletedAt&&!removedSeq.current.has(m.seq)));
    setReactions(old=>[...data.reactions,...old.filter(r=>!data.messages.some(m=>m.seq===r.messageSeq))]);
    setHasMore(data.hasMore);
   }catch(reason){
@@ -106,7 +120,9 @@ export default function AdminChatGeneral({token,connected,liveEvent,onExpired}:P
   setDeleting(message.seq);setError('');
   try{
    const result=await adminDeleteChatMessage(token,message.seq);
-   setMessages(old=>bySequence(old,[result.message]));
+   removedSeq.current.add(result.seq);
+   setMessages(old=>old.filter(m=>m.seq!==result.seq&&!m.deletedAt)
+     .map(m=>m.replyToSeq===result.seq?{...m,replyToSeq:null}:m));
    setReactions(old=>old.filter(r=>r.messageSeq!==message.seq));
   }catch(reason){
    if(isAdminUnauthorized(reason))onExpired();
@@ -136,21 +152,21 @@ export default function AdminChatGeneral({token,connected,liveEvent,onExpired}:P
     !messages.length?<p className="a-chat-wait">Todavía no hay mensajes.</p>:
     messages.map((m,i)=>{
      const previous=messages[i-1];
-     const adjacent=previous&&previous.senderId===m.senderId&&!previous.deletedAt&&
+     const adjacent=previous&&previous.senderId===m.senderId&&
        Date.parse(m.sentAt)-Date.parse(previous.sentAt)<300000;
      const icons=reactions.filter(r=>r.messageSeq===m.seq);
      return <div className="a-chat-message-row" key={m.seq}>
-      <article className={'a-chat-bubble'+(m.deletedAt?' deleted':'')}>
+      <article className="a-chat-bubble">
        {!adjacent&&<strong className="a-chat-author">{m.senderName}</strong>}
        {m.replyToSeq!==null&&<small className="a-chat-reply">Responde al mensaje #{m.replyToSeq}</small>}
-       <p>{m.deletedAt?'Mensaje eliminado':m.text}</p>
+       <p>{m.text}</p>
        <div className="a-chat-message-footer">
         <time dateTime={m.sentAt}>{dateTime(m.sentAt)}</time>
-        {m.editedAt&&!m.deletedAt&&<span> · editado</span>}
-        {icons.length>0&&!m.deletedAt&&<span className="a-chat-reactions">{icons.map(r=>r.emoji).join(' ')}</span>}
+        {m.editedAt&&<span> · editado</span>}
+        {icons.length>0&&<span className="a-chat-reactions">{icons.map(r=>r.emoji).join(' ')}</span>}
        </div>
       </article>
-      {!m.deletedAt&&<button type="button" className="a-chat-delete"
+      {<button type="button" className="a-chat-delete"
        title="Eliminar para todos" aria-label={'Eliminar mensaje de '+m.senderName}
        disabled={deleting!==null} onClick={()=>void erase(m)}>
        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
