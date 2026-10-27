@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit",
     "test:media": "node --test tests/media-drive.test.mjs",
     "test:security": "node --test tests/member-admin.test.mjs tests/single-installation.test.mjs",
-    "test:admin-auth": "node --test tests/admin-auth.test.mjs"
+    "test:admin-auth": "node --test tests/admin-auth.test.mjs",
+    "test:admin-chat": "node --test tests/admin-chat.test.mjs"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20261023.1",

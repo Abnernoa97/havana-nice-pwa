@@ -90,7 +90,7 @@ export default function AdminChatGeneral({token,connected,liveEvent,onExpired}:P
   prepend.current={height:node.scrollHeight,top:node.scrollTop};
   setOlderBusy(true);
   try{
-   const data=await adminChatMessages(token,messages[0].seq);
+   const data=await adminChatMessages(token,messages[0]!.seq);
    setMessages(old=>bySequence(data.messages,old));
    setReactions(old=>[...data.reactions,...old.filter(r=>!data.messages.some(m=>m.seq===r.messageSeq))]);
    setHasMore(data.hasMore);
