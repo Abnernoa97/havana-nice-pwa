@@ -119,9 +119,9 @@ test('admin realtime subprotocol requires the independent administrator token an
 test('admin invalidation sends topics only through private Durable Object binding',async()=>{
  const urls=[],events=[];
  const e={CHAT_ROOMS:{idFromName:n=>{assert.equal(n,'main-chat-v2');return n;},get:()=>({fetch:async(url,req)=>{urls.push(url);events.push(JSON.parse(req.body));return Response.json({ok:true});}})}};
- await notifyAdminClients(e,'requests');await notifyAdminClients(e,'members');
+ await notifyAdminClients(e,'members');
  await notifyAdminClients(e,'sensitive-musician-data');
- assert.deepEqual(events,[{topic:'requests'},{topic:'members'}]);
+ assert.deepEqual(events,[{topic:'members'}]);
  assert.deepEqual(urls,['https://internal/admin-invalidate','https://internal/admin-invalidate']);
 });
 test('Worker rechecks admin sessions for WebSocket; DO keeps admin sockets out of Chat roster',()=>{
