@@ -69,35 +69,63 @@ export default function AdminChatAccess({section}:{section:Section}){
    if(!session){setRealtime('waiting');return;}
    let active=true,socket:WebSocket|null=null,timer:ReturnType<typeof setTimeout>|null=null;
    let retry=1000;
+   const clearRetry=()=>{
+     if(timer!==null){clearTimeout(timer);timer=null;}
+   };
    const reconnect=()=>{
      if(!active||document.hidden||!navigator.onLine)return;
+     // One Admin socket at a time: avoid duplicates when online/foreground fires
+     // while a connection is still opening or an old close event is pending.
+     if(socket&&(socket.readyState===WebSocket.OPEN||socket.readyState===WebSocket.CONNECTING))return;
+     clearRetry();
      setRealtime('reconnecting');
      try{
-       socket=openAdminRealtime(session.token,event=>{
-         if(!active)return;
+       const opened=openAdminRealtime(session.token,event=>{
+         if(!active||socket!==opened)return;
          if(event.type==='admin.ready'){retry=1000;setRealtime('connected');void refreshMembers(session.token);void refreshOtherSessions(session.token);}
          if(event.type==='admin.invalidate'&&event.topic==='members')void refreshMembers(session.token);
        });
-       socket.onclose=e=>{
-         if(!active)return;
-         setRealtime('reconnecting');socket=null;
+       socket=opened;
+       opened.onclose=e=>{
+         // Ignore a stale socket closed by offline/background transitions.
+         if(!active||socket!==opened)return;
+         socket=null;
+         setRealtime('reconnecting');
          if(e.code===4003){setSession(null);setError('Tu sesión administrativa fue revocada.');return;}
-         timer=setTimeout(reconnect,retry);retry=Math.min(15000,retry*2);
+         if(!document.hidden&&navigator.onLine){
+           clearRetry();
+           timer=setTimeout(()=>{timer=null;reconnect();},retry);
+           retry=Math.min(15000,retry*2);
+         }
        };
-       socket.onerror=()=>{if(active)setRealtime('reconnecting');};
+       opened.onerror=()=>{if(active&&socket===opened)setRealtime('reconnecting');};
      }catch{
-       timer=setTimeout(reconnect,retry);retry=Math.min(15000,retry*2);
+       if(active&&!document.hidden&&navigator.onLine){
+         clearRetry();
+         timer=setTimeout(()=>{timer=null;reconnect();},retry);
+         retry=Math.min(15000,retry*2);
+       }
      }
    };
    const resume=()=>{
      if(!active)return;
-     if(document.hidden||!navigator.onLine){socket?.close();return;}
+     if(document.hidden||!navigator.onLine){
+       clearRetry();
+       const previous=socket;
+       socket=null; // The next foreground/online event may connect immediately.
+       if(previous&&previous.readyState!==WebSocket.CLOSED)previous.close();
+       setRealtime('reconnecting');
+       return;
+     }
      void adminVerify(session.token).then(()=>{void refreshMembers(session.token);void refreshOtherSessions(session.token);}).catch(reason=>{
        if(!active)return;
        if(isAdminUnauthorized(reason)){setSession(null);setError('Tu sesión administrativa expiró.');}
        else setError('Sin conexión temporal. La sesión sigue abierta; se actualizará al reconectar.');
      });
-     if(!socket||socket.readyState===WebSocket.CLOSED)reconnect();
+     if(!socket||socket.readyState===WebSocket.CLOSING||socket.readyState===WebSocket.CLOSED){
+       socket=null;
+       reconnect();
+     }
    };
    const duration=Math.max(0,Date.parse(session.expiresAt)-Date.now());
    const expiryTimer=setTimeout(()=>{if(active){setSession(null);setError('La sesión administrativa expiró.');}},duration);
