@@ -18,6 +18,7 @@ export default function AdminChatAccess({section}:{section:Section}){
  const [expanded,setExpanded]=useState('');
  const [history,setHistory]=useState<Record<string,AdminMemberHistory>>({});
  const [historyLoading,setHistoryLoading]=useState('');
+ const [historyErrors,setHistoryErrors]=useState<Record<string,string>>({});
  const [removing,setRemoving]=useState('');
  const [otherSessions,setOtherSessions]=useState<number|null>(null);
  const [sessionsBusy,setSessionsBusy]=useState(false);
@@ -122,12 +123,14 @@ export default function AdminChatAccess({section}:{section:Section}){
    setExpanded(person.actor_id);
    if(!session)return;
    setHistoryLoading(person.actor_id);
-   setError('');
+   setHistory(previous=>{const next={...previous};delete next[person.actor_id];return next;});
+   setHistoryErrors(previous=>{const next={...previous};delete next[person.actor_id];return next;});
    try{
      const value=await adminMemberHistory(session.token,person.actor_id);
      setHistory(previous=>({...previous,[person.actor_id]:value}));
-   }catch(e){setError(e instanceof Error?e.message:'No se pudo cargar el historial');}
-   finally{setHistoryLoading('');}
+   }catch{
+     setHistoryErrors(previous=>({...previous,[person.actor_id]:'No se pudo consultar el historial en Cloudflare. Cierra y vuelve a abrir para reintentar.'}));
+   }finally{setHistoryLoading(current=>current===person.actor_id?'':current);}
  }
  async function removeMember(person:AdminMember){
    if(!session||removing||busy)return;
@@ -138,6 +141,9 @@ export default function AdminChatAccess({section}:{section:Section}){
    setRemoving(person.actor_id);setError('');setNotice('');
    try{
      await adminRemoveMember(session.token,person.actor_id,person.display_name);
+     // This local update happens ONLY after the server confirmed deletion.
+     // A later list refresh can fail without falsely showing a deleted member.
+     setMembers(previous=>previous.filter(item=>item.actor_id!==person.actor_id));
      setHistory(previous=>{const next={...previous};delete next[person.actor_id];return next;});
      if(expanded===person.actor_id)setExpanded('');
      await refreshMembers(session.token);
@@ -161,6 +167,10 @@ export default function AdminChatAccess({section}:{section:Section}){
    setBusy(true);setError('');setNotice('');
    try{
      const result=await adminCreateMember(session.token,name.trim());
+     // Confirmed by D1: keep the new member visible if a follow-up GET fails.
+     setMembers(previous=>previous.some(item=>item.actor_id===result.member.actor_id)
+       ?previous:[...previous,result.member].sort((a,b)=>a.display_name.localeCompare(b.display_name,'es')));
+     setLoaded(true);
      setName('');
      setNotice('Nombre autorizado: '+result.member.display_name);
      await refreshMembers(session.token);
@@ -243,6 +253,7 @@ export default function AdminChatAccess({section}:{section:Section}){
          {expanded===person.actor_id&&<div className="a-member-history">
            <h3>Historial de accesos</h3>
            {historyLoading===person.actor_id?<p>Cargando datos desde Cloudflare…</p>:
+             historyErrors[person.actor_id]?<p className="a-admin-error" role="alert">{historyErrors[person.actor_id]}</p>:
              !history[person.actor_id]?<p>Sin datos de historial disponibles.</p>:
              <>
                <p className="a-member-count">Entradas registradas: <strong>{history[person.actor_id]?.entries ?? 0}</strong></p>
