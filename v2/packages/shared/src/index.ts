@@ -192,6 +192,23 @@ export async function checkChatDeviceEnrollment(
  if(!value.token||!value.actorId||!value.expiresAt)throw new Error('Autorización incompleta');
  return value;
 }
+/** PWA-specific name login; only the first device can be claimed without Admin.
+ * The legacy named-login endpoint remains available to the installed native app
+ * during the staged rollout, so this is NOT global enforcement yet. */
+export async function startPwaFirstDeviceSession(
+ displayName:string,apiBaseUrl=HAVANA_V2_DEV_API_BASE_URL,
+):Promise<ChatSession>{
+ const response=await fetch(`${apiBaseUrl}/api/chat/pwa/session`,{
+   method:'POST',headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({displayName}),
+ });
+ const data=await response.json() as ChatSession & {error?:string;code?:string};
+ if(response.status===403&&data.code==='device_approval_required')throw new DeviceApprovalRequiredError();
+ if(!response.ok)throw new Error(data.error||'No se pudo verificar el dispositivo');
+ if(!data.token||!data.actorId||!data.expiresAt)throw new Error('Acceso incompleto');
+ return data;
+}
+
 export async function startNamedChatSession(
   displayName: string,
   apiBaseUrl = HAVANA_V2_DEV_API_BASE_URL,

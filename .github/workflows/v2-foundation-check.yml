@@ -103,6 +103,10 @@ jobs:
             --header 'Content-Type: application/json' --data '{"displayName":"ci_unknown_user"}' "$BASE/api/chat/device/request")"
           test "$STATUS" = "403"
           grep -q 'Nombre no autorizado' /tmp/v2-device-unknown.json
+          STATUS="$(curl --silent --show-error --output /tmp/v2-pwa-name-guard.json --write-out '%{http_code}' \
+            --header 'Content-Type: application/json' --data '{"displayName":"andy"}' "$BASE/api/chat/pwa/session")"
+          test "$STATUS" = "403"
+          grep -q '"code":"device_approval_required"' /tmp/v2-pwa-name-guard.json
 
       - name: Verify new Administrator WebSocket rejects unauthorized clients
         shell: bash

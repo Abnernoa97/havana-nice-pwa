@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { handleChatMedia, mediaReadiness } from './drive-media.js';
 import { deviceGateEnabled, handleDeviceApprovalApi } from './device-approval.js';
+import { handlePwaFirstDeviceSession } from './pwa-first-device.js';
 import { handleAdminSessionApi, verifyAdminSession } from './admin-auth.js';
 import { adminSocketToken, adminTokenRequest } from './admin-realtime.js';
 // HAVANA NICE V2 isolated Worker. Only D1-authorized musician names may enroll.
@@ -337,6 +338,9 @@ export default {
     }
     if (url.pathname.startsWith('/api/chat/device/') || url.pathname.startsWith('/api/chat/admin/device-requests')) {
       return handleDeviceApprovalApi(request,env,url,origin,respond,normalizeMusicianName,ROOM);
+    }
+    if (url.pathname === '/api/chat/pwa/session') {
+      return handlePwaFirstDeviceSession(request,env,origin,respond,normalizeMusicianName);
     }
     if (url.pathname === '/api/chat/session' && request.method === 'POST') {
       if (deviceGateEnabled(env)) return respond({ code:'device_approval_required', error: 'Este dispositivo necesita autorización. Solicita acceso desde este teléfono.' }, 403, origin);

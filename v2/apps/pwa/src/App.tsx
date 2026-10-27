@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   fetchBackendHealth, getChatSnapshot, getOlderChatMessages, searchChatMessages, lastReadByOther, messageDeliveryLabel, newClientMessageId,
-  openChatSocket, reconcileChatMessages, startNamedChatSession, restoreNamedChatSession,
+  openChatSocket, reconcileChatMessages, startPwaFirstDeviceSession, restoreNamedChatSession,
   DeviceApprovalRequiredError, requestChatDeviceEnrollment, checkChatDeviceEnrollment, usablePendingChatEnrollment, type PendingChatDeviceEnrollment,
   type BackendHealth, type ChatMessage, type ChatServerEvent, type ChatSession,
   reconcileReactions, reconcileUpdatedMessage, type ChatReaction, type ChatEmoji, type ChatReadReceipt,
@@ -463,26 +463,18 @@ export default function App() {
     retryCount.current=0;
     reconnect(next);
   }
-  // S01 observe: request permission explicitly from a NEW PWA browser/device,
-  // without requiring enforce or disrupting the existing named Chat sessions.
-  // The same enrollment flow is also used later when enforce rejects a login.
+  // PWA uses the dedicated first-device route; familiar names cannot issue a
+  // new named session, even in observe mode. Native is upgraded separately.
   async function beginDeviceEnrollment(displayName:string){
     const pending=await requestChatDeviceEnrollment(displayName,'PWA · HAVANA NICE V2');
     await savePendingEnrollment(pending); // commit locally before changing screen
     setEnrollment(pending);
   }
-  async function requestDeviceEnrollment(){
-    if(!name.trim()||joining||enrollment)return;
-    setJoining(true);setError('');
-    try{await beginDeviceEnrollment(name.trim());}
-    catch(e){setError(e instanceof Error?e.message:'No se pudo solicitar acceso');}
-    finally{setJoining(false);}
-  }
   async function join(){
     if(!name.trim()||joining||enrollment)return;
     setJoining(true);setError('');
     try{
-      const next=await startNamedChatSession(name.trim());
+      const next=await startPwaFirstDeviceSession(name.trim());
       acceptApprovedSession(next);
     }catch(reason){
       if(reason instanceof DeviceApprovalRequiredError){
@@ -625,22 +617,14 @@ export default function App() {
             {error&&<p className="chat-error" role="alert">{error}</p>}
           </> : <>
           <h2>Bienvenido.</h2>
-          <p>Escribe tu nombre autorizado la primera vez. Después entrarás directamente desde este dispositivo.</p>
+          <p>Escribe tu nombre autorizado. Si ya existe otro dispositivo registrado con ese nombre, el Administrador deberá aprobar este acceso.</p>
           <form onSubmit={event => { event.preventDefault(); void join(); }}>
             <label htmlFor="chat-name">Tu nombre</label>
             <input id="chat-name" maxLength={28} autoComplete="nickname" autoCapitalize="none" value={name} onChange={event => setName(event.target.value)} placeholder="Tu nombre" />
-            <button type="submit" disabled={joining || !name.trim()}>{joining ? 'Conectando…' : 'Entrar al chat'}</button>
-            <div className="join-enrollment-trial">
-              <p>Prueba de teléfonos nuevos: solicita permiso antes de entrar. No bloquea los accesos existentes mientras el Administrador verifica el sistema.</p>
-              <button className="join-enrollment-request" type="button"
-                disabled={joining || !name.trim()}
-                onClick={()=>void requestDeviceEnrollment()}>
-                {joining?'Enviando solicitud…':'Solicitar autorización de este dispositivo (prueba)'}
-              </button>
-            </div>
+            <button type="submit" disabled={joining || !name.trim()}>{joining ? 'Verificando dispositivo…' : 'Continuar'}</button>
           </form>
           {error && <p className="chat-error" role="alert">{error}</p>}
-          <small>La solicitud de prueba debe aprobarse en el Administrador antes de entrar por esta vía.</small>
+          <small>El primer dispositivo de un integrante nuevo puede registrarse una sola vez. Los siguientes necesitan autorización.</small>
           </>}
         </section>
       ) : (

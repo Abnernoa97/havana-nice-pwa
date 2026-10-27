@@ -26,9 +26,6 @@ h1 span { font-weight:400; }
 .join-panel input { width:100%; border:1px solid #d4cabc; background:#fffaf2; padding:15px 14px; border-radius:14px; margin-bottom:10px; color:#171713; font-size:16px; }
 .join-panel button { border:0; border-radius:14px; padding:16px; background:#1a1a16; color:white; font-weight:700; }
 .join-panel small { color:#716a60; margin-top:18px; }
-.join-enrollment-trial { border-top:1px solid #d4cabc; margin-top:9px; padding-top:16px; }
-.join-enrollment-trial p { margin:0 0 12px; color:#68655e; font-size:13px; line-height:1.45; }
-.join-panel .join-enrollment-request { background:transparent; border:1px solid #a49a8d; color:#26231e; width:100%; font-size:14px; }
 .chat-error { color:#a8322f!important; font-size:14px; }
 .header-actions{display:flex;align-items:flex-end;flex-direction:column;gap:8px;max-width:58%}
 .search-toggle{font-size:12px;font-weight:700;color:#79563f;border:1px solid #d6cbbc;background:transparent;border-radius:12px;padding:5px 9px}

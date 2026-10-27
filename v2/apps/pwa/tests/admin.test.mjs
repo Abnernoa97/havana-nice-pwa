@@ -101,20 +101,28 @@ test('Admin Chat receives authenticated realtime changes without trusting push c
  assert.doesNotMatch(api,/localStorage\.|sessionStorage\.|indexedDB\./);
 });
 
-test('S01 observe enrollment is explicitly available only on logged-out PWA, without changing native Android',()=>{
+test('PWA cannot bypass Administrator by pressing name-login after device revocation',()=>{
  const pwa=read('../src/App.tsx');
+ const shared=read('../../../packages/shared/src/index.ts');
+ const backend=read('../../../cloudflare/src/index.ts');
+ const handler=read('../../../cloudflare/src/pwa-first-device.js');
+ const migration=read('../../../cloudflare/migrations/0011_chat_pwa_first_claims.sql');
  const android=read('../../android/App.tsx');
- const styles=read('../src/styles.css');
- assert.match(pwa,/async function requestDeviceEnrollment\(\)/);
+ assert.match(pwa,/startPwaFirstDeviceSession\(name\.trim\(\)\)/);
+ assert.doesNotMatch(pwa,/startNamedChatSession/);
+ assert.match(pwa,/DeviceApprovalRequiredError/);
  assert.match(pwa,/await beginDeviceEnrollment\(name\.trim\(\)\)/);
- assert.match(pwa,/const pending=await requestChatDeviceEnrollment\(displayName,'PWA · HAVANA NICE V2'\)/);
  assert.match(pwa,/await savePendingEnrollment\(pending\)/);
- assert.match(pwa,/type="button"[\s\S]{0,140}onClick=\{\(\)=>void requestDeviceEnrollment\(\)\}/);
- assert.match(pwa,/Solicitar autorización de este dispositivo \(prueba\)/);
- assert.match(pwa,/\!session \? \(/);
- assert.match(pwa,/if\(!name\.trim\(\)\|\|joining\|\|enrollment\)return/);
- assert.match(styles,/\.join-panel \.join-enrollment-request/);
- // The installed native app keeps its original join and pending storage; no APK release.
- assert.match(android,/loadNativePendingEnrollment/);
- assert.doesNotMatch(android,/Solicitar autorización de este dispositivo \(prueba\)/);
+ assert.doesNotMatch(pwa,/Solicitar autorización de este dispositivo \(prueba\)/);
+ assert.match(shared,/\/api\/chat\/pwa\/session/);
+ assert.match(shared,/data\.code==='device_approval_required'/);
+ assert.match(backend,/handlePwaFirstDeviceSession\(request,env/);
+ assert.match(handler,/INSERT OR IGNORE INTO chat_pwa_first_claims/);
+ assert.match(handler,/env\.DB\.batch\(\[/);
+ assert.match(handler,/device_approval_required/);
+ assert.match(handler,/notifyAdminClients/);
+ assert.match(migration,/SELECT actor_id,NULL/);
+ assert.match(migration,/actor_id TEXT PRIMARY KEY/);
+ // No APK or native code change: legacy Android retains its entry API.
+ assert.match(android,/startNamedChatSession\(name\.trim\(\)\)/);
 });
