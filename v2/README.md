@@ -1,27 +1,34 @@
-# HAVANA NICE V2
+# HAVANA NICE V2 — ÚNICA LÍNEA DE DESARROLLO
 
-Nueva aplicación privada HAVANA NICE, aislada de la aplicación oficial.
+**Fuente de verdad:** [Plan Maestro](docs/PLAN-MAESTRO.md) y [Continuidad Exacta](docs/CONTINUIDAD-EXACTA.md). No reintroducir decisiones, pruebas ni pantallas descartadas. Última revisión del acceso: 27 de octubre de 2026.
 
-**Fuente única y obligatoria:** [PLAN MAESTRO V2](docs/PLAN-MAESTRO.md). Este README solo resume la arquitectura; los requisitos, prioridades, avances, auditorías y reglas completas viven en el Plan Maestro.
+## Arquitectura que debe mantenerse
 
-## Arquitectura oficial · 26 de octubre de 2026
+- Una sola rama V2 de desarrollo: `havana-nice-v2-foundation`. `main` y el sitio HAVANA NICE original son otra línea existente y NO se modifican.
+- Un solo backend V2: Worker `havana-nice-v2-dev`, base D1 `havana-nice-v2-dev` y Durable Object `CHAT_ROOMS`.
+- Chat Android 100 % React Native, sin WebView, conservando firma del paquete `com.havananice.v2`, sesiones SQLite, historial y borradores; el dispositivo instalado de referencia usa 0.0.4. No reinstalar.
+- Chat iPhone PWA, sincronizado con el Chat nativo mediante contratos, mensajes, sesión y WebSocket del mismo Worker/D1.
+- Administrador real e independiente en `/admin.html`; un único formulario «Acceso a músicos». Los módulos Admin Chat, Calendario, Repertorio y Más están planificados, aún sin datos reales.
+- `/visual.html` es únicamente una **maqueta sin datos privados ni permisos de Chat o Administrador** destinada a futuros módulos no-Chat de Android WebView/PWA (H02–H04). No es una segunda puerta de ingreso.
+- R2 descartado; medios privados solo mediante una solución de almacenamiento autorizada y presupuestada. No activar Google Drive/puentes ni servicios de pago por presunción.
 
-- **Android: Chat 100 % nativo** mediante React Native/Expo. Todo el Chat Android —burbujas, escritura, teclado, gestos, historial, caché SQLite, cola offline y WebSockets— permanece nativo. No migrarlo a WebView ni eliminar su implementación funcional.
-- **Android: pantallas NO-Chat visuales por PWA** dentro de una WebView controlada: Home, Calendario, Repertorio, avisos, perfiles, ajustes visuales y Administrador. Las modificaciones CSS, tipográficas y de estructura de estas pantallas se publican sin nueva APK.
-- **Android: funciones del sistema nativas** donde aportan valor: FCM, almacenamiento seguro, archivos, cámara, multimedia, permisos, navegación, background y ciclo de vida.
-- **iPhone:** PWA instalada desde Safari, con su propia interfaz de Chat web y las mismas pantallas PWA compartidas de los demás módulos. Sin app nativa iOS de pago.
-- **Backend compartido:** Cloudflare Worker V2, D1 y Durable Objects/WebSockets. Las dos versiones del Chat comparten reglas, mensajes, permisos, eventos y almacenamiento remoto, aunque dibujen sus interfaces con tecnologías diferentes.
-- **Media:** futuro puente privado HAVANA NICE V2 ↔ HAVANA CLOUD ↔ Google Drive, solo con aislamiento, autorización y presupuesto 0 MXN verificados; R2 descartado.
-- **Producción protegida:** no modificar `main`, HAVANA NICE oficial, HAVANA CLOUD, FAMILIA NOA ni otros proyectos.
+## Acceso a músicos actual — sin mecanismos paralelos
 
-## Estado actual y continuidad
+1. El Administrador autenticado crea el nombre en `POST /api/chat/admin/members` (no existe autoservicio de registro).
+2. La entrada nueva de músico se realiza **solo** con `POST /api/chat/session`, nombre exacto normalizado y registro activo en D1. No contraseñas por músico, solicitudes de teléfonos, aprobaciones individuales ni otros formularios.
+3. `GET /api/chat/session` revalida el token persistente del mismo cliente. `DELETE /api/chat/session` no puede soltar la vinculación del único dispositivo nuevo; solo el Administrador puede liberar la instalación.
+4. Los músicos nuevos tienen `single_device_mode=1`: el primer cliente queda vinculado y un segundo recibe `409 name_already_bound`, con alerta para Administrador.
+5. **Excepción temporal protegida:** los seis músicos originales (Andy, Fer, Jali, Noa, Orly y Rafa) siguen con `single_device_mode=0` y credenciales anteriores. No migrar ni invalidar automáticamente, ni anunciar que ya tienen protección por instalación. La adaptación se tratará en H03/Q01 preservando todo.
+6. El login del Administrador, con un secreto servidor independiente y sesiones separadas, es intencionado y no constituye una segunda entrada de músicos.
 
-El Chat Android **ya está implementado en React Native** y se mantiene. El Chat PWA de iPhone está implementado, con validaciones y mejoras aún pendientes. La integración de la WebView Android para las otras pantallas está **aprobada, pero todavía no desarrollada**. Continuar primero con el menú de mensajes estilo WhatsApp, borrado, swipe para responder, reconexión y sincronización entre dispositivos.
+**S02 aceptado** por el propietario tras prueba física con `Prueba 2` (bloqueo en segundo teléfono, alerta Admin y vinculación verificadas); no repetir pruebas de seguridad sin motivo. **Estado: 12/27 hitos, M01 siguiente.**
 
-La primera entrada por nombre autorizado funciona. Seguridad avanzada de dispositivos, fotografías, multimedia, push, Home, Calendario, Repertorio y Admin V2 todavía requieren desarrollo o validación.
+## Limpieza y archivos históricos
 
-- Rama V2: `havana-nice-v2-foundation`.
-- APK publicadas: rama `havana-nice-v2-apk-downloads`.
-- No generar APK por cambios exclusivos de PWA. Cambios en el Chat Android nativo o funciones del sistema pueden requerir actualizar la APK **sin desinstalar ni perder datos**.
+- El código de aprobación antigua de teléfonos, peticiones individuales y contraseñas de laboratorio **no forma parte de la aplicación V2 actual**. El guard de CI prohíbe revivir sus rutas.
+- Las migraciones SQL aplicadas NO se borran: documentan cómo crear el esquema sin perder datos.
+- Los archivos de la raíz del repositorio que no están en `v2/` pertenecen a la línea histórica `main`. Cloudflare Pages de V2 usa raíz de compilación `v2`; no borrar aquí archivos de la aplicación original por confundirlos con la versión nueva.
+- El archivo `cloudflare/src/havana-cloud-bridge-client.js` no participa actualmente en el Worker desplegado; es una propuesta de integración futura para multimedia, **no** un acceso alternativo y no debe activarse sin decisión sobre almacenamiento.
+- No crear otra rama, otro backend, login paralelo, APK de prueba innecesaria ni cambios destructivos de datos.
 
-**No crear planes paralelos.** Todas las decisiones deben corregirse y consolidarse directamente en [PLAN-MAESTRO.md](docs/PLAN-MAESTRO.md).
+**Próxima funcionalidad:** M01 — fotos privadas reales, respetando Chat nativo Android, Chat PWA iPhone, el Administrador y una sola API.

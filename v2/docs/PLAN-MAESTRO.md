@@ -80,6 +80,19 @@
 - **Avance S02 verificado (27/10):** commit `5199a3af795a402e5a042e10ee10cd771777f6a4`; Foundation CI `40552356302` SUCCESS, repetido con éxito tras desplegar; Cloudflare Pages desplegado para ese commit; Worker V2 versión `fc65de5a-323c-4351-bf4f-c70c8bd86748` al 100 %. La ruta DELETE ya no puede dejar huérfana la credencial titular; libera únicamente el Administrador. Eliminada además una interrupción accidental del guardado de borradores PWA causada por eventos de escritura ajenos. D1 se volvió a leer: 6 músicos activos, 10 sesiones, 45 mensajes, 0 titulares nuevos y 0 alertas, sin mutaciones de prueba.
 - **Protección pendiente en H03/Q01, no bloqueante para M01:** revisar la retención local de borradores/cola no enviados ante revocación o restauración 401; los clientes actuales pueden limpiar esos datos. No confundir mensajes ya guardados en D1 con borradores offline. Resolver antes de migrar las seis cuentas reales; no publicar APK sin QA correspondiente.
 
+## Auditoría de rutas y limpieza del acceso · 27/10/2026
+
+**Comprobación del código, Cloudflare Pages, Worker y D1 (lectura, sin cambios de datos):**
+
+- Entrada de músicos única: `POST /api/chat/session` mediante nombre autorizado; `GET` es solo restauración y `DELETE` es cierre. Alta de nombres solo por Admin autenticado `POST /api/chat/admin/members`. Administración tiene su propia autenticación privilegiada separada; no existe otra entrada para músicos.
+- Flujos desechados de aprobación individual de teléfonos y claves de laboratorio ausentes del árbol `v2/` actual; la base D1 ya no contiene tablas de esos flujos. Se reforzó `audit-guard.mjs` para impedir rutas paralelas y altas que omitan `single_device_mode=1`.
+- Cloudflare Pages compilado **desde `v2`**, rama `havana-nice-v2-foundation`, y Worker actual versión `fc65de5a-323c-4351-bf4f-c70c8bd86748`. No usa los JS históricos del directorio raíz ni `main`.
+- Tablas D1 vigentes: `chat_members`, `chat_sessions`, `chat_single_device_owners`, `chat_duplicate_login_alerts`, `chat_admin_sessions`, `chat_admin_login_limits`, historial, mensajes, reacciones, lecturas, metadatos y multimedia planificada. Ninguna tabla verificada de aprobación antigua. `_cf_KV` es interna; no eliminarla.
+- Conteos en el momento de la inspección: **7 nombres (6 originales + Prueba 2), 12 sesiones, 46 mensajes, 1 instalación vinculada y 1 alerta**. Los seis originales siguen modo legado `single_device_mode=0`, no afirmar que están protegidos contra duplicados.
+- Inventario: la maqueta pública `/visual.html` es preliminar y no expone Chat/Administración, pero **no debe usarse como puerta de entrada a futuros módulos con datos privados** hasta coordinar sesión en H03. El puente de HAVANA CLOUD es código futuro no conectado; no crea acceso actual. Ninguno debe eliminarse como «basura» sin resolver sus tareas futuras.
+- Se actualizaron README, comentarios del almacenamiento Android, textos obsoletos de maquetas y el nombre de la prueba de CI. **No se eliminaron datos, tablas, módulos funcionales, carpetas históricas ni sesiones**, y no se generó APK. Mantener la diferencia entre origen heredado y V2; no borrar `main`.
+- La próxima funcionalidad sigue siendo **M01**. La transición de seis credenciales históricas y cualquier protección de datos offline en revocaciones se conserva como tarea posterior H03/Q01, sin bloquear M01 ni reabrir S02.
+
 ## 6. Próxima secuencia: M01 · Fotos privadas en Chat
 
 1. **S02 ACEPTADO el 27/10 por el propietario:** `Prueba 2` inició desde un teléfono; otro rechazado con mensaje de nombre vinculado; Admin mostró alerta 27/10 11:58 a. m.; D1 confirmó 1 vinculación y 1 alerta. No añadir pruebas de seguridad no solicitadas. El mecanismo de liberación permanece disponible, pero no se ensayó físicamente.

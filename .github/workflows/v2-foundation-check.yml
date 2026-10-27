@@ -56,7 +56,7 @@ jobs:
       - name: Validate independent administrator authentication
         run: npm run test:admin-auth -w @havana/cloudflare
 
-      - name: Validate staged device approval security
+      - name: Validate one-installation access and administrator removal
         run: npm run test:security -w @havana/cloudflare
 
       - name: Prevent private API caching in iPhone PWA

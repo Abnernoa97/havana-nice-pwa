@@ -1,8 +1,9 @@
 import Storage from 'expo-sqlite/kv-store';
 import {type ChatMessage,type ChatSession} from '@havana/shared';
 
-// Private sandbox database in the isolated V2 Android package. Lab sessions
-// expire after 12 hours; permanent authentication requires secure token storage.
+// Private app sandbox in the isolated V2 Android package.
+// Persist the currently authorized named Chat session and offline state.
+// The server (D1) verifies the token on restoration; local storage alone never grants access.
 export interface NativeLocalChat {
   session: ChatSession;
   outbox: ChatMessage[];

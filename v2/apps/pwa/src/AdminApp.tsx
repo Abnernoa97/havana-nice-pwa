@@ -78,7 +78,7 @@ export default function AdminApp(){
        <AdminChatAccess section={tab}/>
        {tab!=='access'&&<section className="a-panel a-module-next">
          <h2>{current.name}</h2>
-         <p>Esta sección se desarrollará después de terminar Acceso a músicos. Por ahora no hay funciones activas.</p>
+         <p>Este módulo se desarrollará conforme al Plan Maestro. Por ahora no hay funciones activas.</p>
          <button type="button" onClick={()=>setTab('access')}>Volver a Acceso a músicos</button>
        </section>}
        <footer>HAVANA NICE V2 · Administrador único</footer>

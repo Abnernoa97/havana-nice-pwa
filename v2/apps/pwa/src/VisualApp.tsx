@@ -61,8 +61,8 @@ export default function VisualApp() {
         {active==='notices'&&<Placeholder title="Avisos en preparación" description="Las comunicaciones y los estados leído/no leído se habilitarán con su almacenamiento y permisos."/>}
         {active==='settings'&&<Placeholder title="Ajustes en preparación" description="Las preferencias se habilitarán cuando puedan guardarse de forma segura para cada integrante."/>}
         {active==='admin'&&<>
-          <div className="visual-restricted">ACCESO ADMINISTRATIVO AÚN NO HABILITADO</div>
-          <Placeholder title="Administración en preparación" description="El panel de músicos, dispositivos, eventos, repertorios y autorizaciones estará protegido por roles verificados en el servidor. No hay funciones administrativas públicas."/>
+          <div className="visual-restricted">ADMINISTRACIÓN SEPARADA DE ESTA VISTA PRELIMINAR</div>
+          <Placeholder title="Administración en preparación" description="El Administrador real ya gestiona el acceso de músicos en /admin.html. Esta maqueta no abre una segunda entrada ni muestra información privada."/>
         </>}
       </main>
     </div>
