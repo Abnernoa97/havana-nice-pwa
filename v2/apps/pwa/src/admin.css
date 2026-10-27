@@ -63,3 +63,30 @@
  .a-title h1{font-size:clamp(30px,9vw,43px)}
  .a-access-workspace{gap:12px}
 }
+
+/* Musician access: verified per-member audit accordion and destructive action. */
+.a-member-group{border-top:1px solid #e5d9c9}
+.a-member-group .a-member-row{border-top:0;padding:12px 0;gap:10px;flex-wrap:nowrap}
+.a-member-expand{display:flex;align-items:center;gap:12px;text-align:left;min-width:0;flex:1;border:0;background:transparent;padding:0;color:inherit}
+.a-member-expand .a-member-identity{flex:1}
+.a-member-chevron{font-size:22px;color:#80776a;min-width:14px}
+.a-member-delete{border:1px solid #d5c4c0;border-radius:10px;width:38px;height:38px;flex-shrink:0;display:grid;place-items:center;color:#ac514b;background:#fff8f3}
+.a-member-delete:hover{background:#f8eae5;border-color:#ad665d}
+.a-member-delete:disabled{opacity:.45}
+.a-member-history{margin:0 0 14px 51px;padding:12px 14px;background:#f3ebdf;border-radius:12px;min-width:0}
+.a-member-history h3{font-size:13px;margin:0 0 11px}
+.a-member-history p{font-size:12px;color:#6f6357;line-height:1.6}
+.a-member-count strong{font-size:18px}
+.a-member-events{display:grid;gap:0;max-height:380px;overflow:auto}
+.a-member-event{border-top:1px solid #dcd0c1;padding:12px 0;display:grid;gap:5px}
+.a-member-event strong{font-size:12px;font-weight:700;line-height:1.45}
+.a-member-event span,.a-member-history small{font-size:11px;color:#766b60;line-height:1.4;overflow-wrap:anywhere}
+@media(max-width:750px){
+ .a-member-group .a-member-row{gap:7px}
+ .a-member-expand{gap:9px}
+ .a-member-avatar{width:35px;height:35px;border-radius:10px;font-size:16px}
+ .a-member-delete{width:34px;height:34px}
+ .a-member-status{padding:5px 6px;font-size:10px}
+ .a-member-identity strong{font-size:13px}
+ .a-member-history{margin-left:0}
+}
