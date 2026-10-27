@@ -726,6 +726,13 @@ Hallazgos y acciones documentados:
 
 **Certificación formal: 10 de 27 hitos.** S01, S02 y P04 continúan abiertos hasta QA físico y diseño completo de seguridad. No retomar calendarios, repertorio ni chat admin antes de terminar esta etapa.
 
+### Depuración segura — ejecución 6, 27/10/2026 · recuperación Admin WebSocket tras bloqueo y red
+
+- **Problema confirmado en código:** el Administrador cerraba su socket al pasar a segundo plano o quedarse sin red, pero podía dejarlo temporalmente en estado `CLOSING` mientras `resume()` solo reconectaba en `CLOSED`. Un callback tardío podía sobrescribir la referencia del socket nuevo o agotar el temporizador offline, dejando la sincronización sin restablecer.
+- **Corrección exclusiva PWA Admin:** al perder visibilidad o conexión, cancela el reintento anterior, desvincula el socket activo y lo cierra; al volver, verifica sesión y reconecta con un único socket. Ignora callbacks `onclose` de conexiones anteriores, evita sockets simultáneos durante `OPEN/CONNECTING`, y reintenta con retroceso cuando hay Internet. No cambia tokens, D1, Worker ni Android.
+- **Verificación:** CI Foundation `40467420874` **SUCCESS** (TypeScript, seguridad Admin, build PWA, export Android, pruebas del backend y endpoints existentes); Cloudflare Pages desplegó el SHA `8a9f8f8ce4c93d112531b74f9cd1ea466f661696` con estado `success`. La ejecución no distribuyó una APK nueva. `main` original permaneció `3f2d2379d0ed855a025d8e7162cd5c00cd2a8be9` intacto.
+- **Pendiente de certificación física:** comprobar en Administrador autenticado la transición Wi-Fi/datos/segundo plano y el indicador «Sincronización automática activa»; verificar que el historial `Prueba 1` registre conexiones reales desde otro teléfono. No tocar los seis músicos, no borrar datos D1; respaldo externo todavía pendiente. **Tablero permanece 10/27; S01/S02/P04 abiertos.**
+
 ### Procedimiento permanente
 
 1. Leer este plan y el HEAD de `havana-nice-v2-foundation`.
