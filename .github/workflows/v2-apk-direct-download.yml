@@ -5,10 +5,9 @@ on:
     branches:
       - havana-nice-v2-foundation
     paths:
+      # Do not publish another APK while we are refining Admin/PWA or
+      # shared contracts. Stage native changes explicitly under Android.
       - 'v2/apps/android/**'
-      - 'v2/packages/shared/**'
-      - 'v2/package-lock.json'
-      - '.github/workflows/v2-android-apk.yml'
   workflow_dispatch:
 
 permissions:
