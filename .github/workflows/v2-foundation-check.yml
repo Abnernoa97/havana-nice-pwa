@@ -124,6 +124,25 @@ jobs:
           test "$STATUS" = "403"
           grep -q '"code":"device_approval_required"' /tmp/v2-pwa-name-guard.json
 
+      - name: Verify unknown and malformed musician names never receive a session
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE="https://havana-nice-v2-dev.soloaplicaciones97.workers.dev"
+          # Neither test is an account creation: both should fail before createSession().
+          STATUS="$(curl --silent --show-error --output /tmp/v2-unknown-musician.json --write-out '%{http_code}' \
+            --header 'Content-Type: application/json' \
+            --data '{"displayName":"HNV2CIUnknown20261027"}' "$BASE/api/chat/session")"
+          test "$STATUS" = "403"
+          grep -q 'todavía no está autorizado' /tmp/v2-unknown-musician.json
+          ! grep -q '"token"' /tmp/v2-unknown-musician.json
+          STATUS="$(curl --silent --show-error --output /tmp/v2-invalid-musician.json --write-out '%{http_code}' \
+            --header 'Content-Type: application/json' \
+            --data '{"displayName":"<script>admin</script>"}' "$BASE/api/chat/session")"
+          test "$STATUS" = "400"
+          ! grep -q '"token"' /tmp/v2-invalid-musician.json
+          # Never attempt a valid name in CI; doing so would create a real session.
+
       - name: Verify new Administrator WebSocket rejects unauthorized clients
         shell: bash
         run: |
