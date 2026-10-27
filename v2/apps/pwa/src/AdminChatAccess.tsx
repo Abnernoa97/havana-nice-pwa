@@ -1,6 +1,6 @@
 import {useCallback,useEffect,useState,type FormEvent} from 'react';
-import {adminAvailability,adminLogin,adminLogout,adminVerify,adminOtherSessions,adminRevokeOtherSessions,adminMembers,adminCreateMember,adminMemberHistory,adminDeletionPreview,adminRemoveMember,openAdminRealtime,
- type AdminSession,type AdminMember,type AdminMemberHistory,type AdminDeletionPreview,isAdminUnauthorized} from './admin-api';
+import {adminAvailability,adminLogin,adminLogout,adminVerify,adminOtherSessions,adminRevokeOtherSessions,adminMembers,adminCreateMember,adminMemberHistory,adminDeletionPreview,adminRemoveMember,adminDuplicateLogins,adminReviewDuplicateLogin,adminReleaseInstallation,openAdminRealtime,
+ type AdminSession,type AdminMember,type AdminMemberHistory,type AdminDeletionPreview,type AdminDuplicateLoginAlert,isAdminUnauthorized} from './admin-api';
 
 type Section='access'|'chat'|'repertoire'|'calendar'|'more';
 type Readiness='loading'|'disabled'|'enabled'|'error';
@@ -46,6 +46,9 @@ export default function AdminChatAccess({section}:{section:Section}){
  const [removing,setRemoving]=useState('');
  const [otherSessions,setOtherSessions]=useState<number|null>(null);
  const [sessionsBusy,setSessionsBusy]=useState(false);
+ const [duplicateAlerts,setDuplicateAlerts]=useState<AdminDuplicateLoginAlert[]>([]);
+ const [duplicateBusy,setDuplicateBusy]=useState('');
+ const [releaseBusy,setReleaseBusy]=useState('');
  const [realtime,setRealtime]=useState<'waiting'|'connected'|'reconnecting'>('waiting');
  // Prevent frontend updates from interrupting authorized admin sessions.
  // The marker contains no credential; actual tokens stay in React memory only.
@@ -55,6 +58,15 @@ export default function AdminChatAccess({section}:{section:Section}){
    return()=>{document.documentElement.dataset.adminSessionActive='false';};
  },[session]);
 
+ const refreshDuplicateAlerts=useCallback(async(token:string)=>{
+   try{
+     const data=await adminDuplicateLogins(token);
+     setDuplicateAlerts(data.alerts);
+   }catch(reason){
+     if(isAdminUnauthorized(reason)){setSession(null);setError('Tu sesión de Administrador expiró.');}
+     else setError('No se pudieron actualizar las alertas de acceso.');
+   }
+ },[]);
  const refreshOtherSessions=useCallback(async(token:string)=>{
    try{
      const data=await adminOtherSessions(token);
@@ -84,11 +96,12 @@ export default function AdminChatAccess({section}:{section:Section}){
    void adminVerify(session.token).then(()=>{
      void refreshMembers(session.token);
      void refreshOtherSessions(session.token);
+     void refreshDuplicateAlerts(session.token);
    }).catch(reason=>{
      if(isAdminUnauthorized(reason)){setSession(null);setError('Tu sesión de Administrador expiró.');}
      else setError('No se pudo verificar la conexión. Tu sesión permanece abierta para reintentar.');
    });
- },[session,refreshMembers,refreshOtherSessions]);
+ },[session,refreshMembers,refreshOtherSessions,refreshDuplicateAlerts]);
  useEffect(()=>{
    if(!session){setRealtime('waiting');return;}
    let active=true,socket:WebSocket|null=null,timer:ReturnType<typeof setTimeout>|null=null;
@@ -106,8 +119,8 @@ export default function AdminChatAccess({section}:{section:Section}){
      try{
        const opened=openAdminRealtime(session.token,event=>{
          if(!active||socket!==opened)return;
-         if(event.type==='admin.ready'){retry=1000;setRealtime('connected');void refreshMembers(session.token);void refreshOtherSessions(session.token);}
-         if(event.type==='admin.invalidate'&&event.topic==='members')void refreshMembers(session.token);
+         if(event.type==='admin.ready'){retry=1000;setRealtime('connected');void refreshMembers(session.token);void refreshOtherSessions(session.token);void refreshDuplicateAlerts(session.token);}
+         if(event.type==='admin.invalidate'&&event.topic==='members'){void refreshMembers(session.token);void refreshDuplicateAlerts(session.token);}
        });
        socket=opened;
        opened.onclose=e=>{
@@ -141,7 +154,7 @@ export default function AdminChatAccess({section}:{section:Section}){
        setRealtime('reconnecting');
        return;
      }
-     void adminVerify(session.token).then(()=>{void refreshMembers(session.token);void refreshOtherSessions(session.token);}).catch(reason=>{
+     void adminVerify(session.token).then(()=>{void refreshMembers(session.token);void refreshOtherSessions(session.token);void refreshDuplicateAlerts(session.token);}).catch(reason=>{
        if(!active)return;
        if(isAdminUnauthorized(reason)){setSession(null);setError('Tu sesión administrativa expiró.');}
        else setError('Sin conexión temporal. La sesión sigue abierta; se actualizará al reconectar.');
@@ -164,7 +177,7 @@ export default function AdminChatAccess({section}:{section:Section}){
      window.removeEventListener('offline',resume);
      socket?.close();
    };
- },[session,refreshMembers,refreshOtherSessions]);
+ },[session,refreshMembers,refreshOtherSessions,refreshDuplicateAlerts]);
  async function login(event:FormEvent){
    event.preventDefault();if(busy||!password)return;
    setBusy(true);setError('');
@@ -176,7 +189,7 @@ export default function AdminChatAccess({section}:{section:Section}){
    if(!session)return;
    const token=session.token;
    setSession(null);setMembers([]);setLoaded(false);setError('');setNotice('');setName('');setOtherSessions(null);
-   setExpanded('');setHistory({});setHistoryErrors({});setImpact({});setImpactErrors({});
+   setExpanded('');setHistory({});setHistoryErrors({});setImpact({});setImpactErrors({});setDuplicateAlerts([]);
    try{await adminLogout(token);}catch{/* In-memory session is discarded even when offline. */}
  }
  async function toggleMember(person:AdminMember){
@@ -256,6 +269,31 @@ export default function AdminChatAccess({section}:{section:Section}){
    }catch(e){setError(e instanceof Error?e.message:'No se pudieron cerrar otras sesiones');}
    finally{setSessionsBusy(false);}
  }
+ async function reviewDuplicateAlert(id:string){
+   if(!session||duplicateBusy)return;
+   setDuplicateBusy(id);
+   try{
+     await adminReviewDuplicateLogin(session.token,id);
+     setDuplicateAlerts(previous=>previous.map(a=>a.id===id?{...a,reviewed_at:Date.now()}:a));
+   }catch(reason){setError(reason instanceof Error?reason.message:'No se pudo marcar la alerta');}
+   finally{setDuplicateBusy('');}
+ }
+ async function releaseInstallation(person:AdminMember){
+   if(!session||releaseBusy||person.single_device_mode!==1||person.installation_bound!==1)return;
+   if(!window.confirm(
+     '¿Liberar el dispositivo vinculado a '+person.display_name+'?\n\n'+
+     'Se cerrarán sus sesiones actuales. El primer dispositivo que vuelva a entrar con este nombre podrá vincularse. '+
+     'No se borrarán sus mensajes, reacciones ni historial.'
+   ))return;
+   setReleaseBusy(person.actor_id);setError('');setNotice('');
+   try{
+     const result=await adminReleaseInstallation(session.token,person.actor_id,person.display_name);
+     setMembers(previous=>previous.map(m=>m.actor_id===person.actor_id?{...m,installation_bound:0,session_count:0}:m));
+     setNotice('Dispositivo de '+person.display_name+' liberado. Credenciales cerradas: '+result.revokedSessions+'.');
+     void refreshMembers(session.token);
+   }catch(reason){setError(reason instanceof Error?reason.message:'No se pudo liberar el dispositivo');}
+   finally{setReleaseBusy('');}
+ }
  async function addMember(event:FormEvent){
    event.preventDefault();if(!session||busy||!name.trim())return;
    setBusy(true);setError('');setNotice('');
@@ -295,7 +333,7 @@ export default function AdminChatAccess({section}:{section:Section}){
        <div><h2>Administrador autorizado</h2>
          <p className="a-detail">{realtime==='connected'?'Sincronización automática activa':'Conectando con Cloudflare…'}</p></div>
        <div className="a-admin-toolbar-actions">
-         <button type="button" onClick={()=>{void refreshMembers(session.token);void refreshOtherSessions(session.token);}}>Actualizar</button>
+         <button type="button" onClick={()=>{void refreshMembers(session.token);void refreshOtherSessions(session.token);void refreshDuplicateAlerts(session.token);}}>Actualizar</button>
          <button type="button" onClick={()=>void logout()}>Cerrar sesión</button>
        </div>
      </div>
@@ -307,9 +345,23 @@ export default function AdminChatAccess({section}:{section:Section}){
        </button>}
      </div>
    </section>
+   {duplicateAlerts.some(a=>a.reviewed_at===null)&&<section className="a-panel a-admin-duplicate-alerts" role="region" aria-label="Intentos de acceso duplicado">
+     <h2><span aria-hidden="true">⚠</span> Intentos de acceso duplicado</h2>
+     <p className="a-detail">Otro dispositivo intentó entrar con un nombre ya vinculado. Su acceso fue rechazado.</p>
+     {duplicateAlerts.filter(a=>a.reviewed_at===null).map(a=><div className="a-duplicate-alert" key={a.id}>
+       <div><strong>{a.display_name}</strong>
+         <small>{new Date(a.attempted_at).toLocaleString('es-MX',{dateStyle:'medium',timeStyle:'short'})}</small>
+         <small>{a.platform} · {a.operating_system} · {a.device_name}</small>
+       </div>
+       <button type="button" disabled={duplicateBusy===a.id} onClick={()=>void reviewDuplicateAlert(a.id)}>
+         {duplicateBusy===a.id?'Guardando…':'Marcar revisada'}
+       </button>
+     </div>)}
+     {duplicateAlerts.filter(a=>a.reviewed_at===null).length===60&&<small>Se muestran las 60 alertas más recientes. El historial continúa en Cloudflare.</small>}
+   </section>}
    <section className="a-panel a-member-add">
      <h2>Añadir miembro</h2>
-     <p className="a-detail">Escribe el nombre que quieres autorizar. Solo los nombres creados aquí podrán entrar al Chat de músicos.</p>
+     <p className="a-detail">Solo los nombres creados aquí podrán entrar al Chat. Los músicos nuevos vincularán su primer dispositivo automáticamente, sin claves ni aprobaciones adicionales.</p>
      <form className="a-member-form" onSubmit={addMember}>
        <label htmlFor="new-musician-name">Nombre del músico</label>
        <input id="new-musician-name" type="text" value={name}
@@ -362,6 +414,19 @@ export default function AdminChatAccess({section}:{section:Section}){
                <small>{history[person.actor_id]?.since}</small>
              </>}
            <div className="a-member-impact">
+             {person.single_device_mode===1?
+               <div className="a-member-installation">
+                 <strong>{person.installation_bound===1?'Dispositivo único vinculado':'Dispositivo aún sin vincular'}</strong>
+                 <small>{person.installation_bound===1?
+                   'Este nombre no puede iniciar sesión desde otro dispositivo. Los intentos se notificarán aquí.':
+                   'El primer acceso a este nombre quedará vinculado a una sola instalación.'}</small>
+                 {person.installation_bound===1&&<button type="button"
+                   disabled={!!releaseBusy||!!removing} onClick={()=>void releaseInstallation(person)}>
+                   {releaseBusy===person.actor_id?'Liberando…':'Liberar dispositivo'}
+                 </button>}
+               </div>:
+               <small>Acceso anterior protegido: la vinculación a un dispositivo se habilitará tras verificar la migración sin perder sesiones.</small>}
+
              <button type="button" onClick={()=>void inspectMemberData(person)}
                disabled={impactLoading===person.actor_id||!!removing}
                aria-label={'Consultar datos asociados a '+person.display_name}>
