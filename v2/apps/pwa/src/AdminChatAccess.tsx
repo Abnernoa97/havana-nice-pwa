@@ -5,6 +5,26 @@ import {adminAvailability,adminLogin,adminLogout,adminVerify,adminOtherSessions,
 type Section='access'|'chat'|'repertoire'|'calendar'|'more';
 type Readiness='loading'|'disabled'|'enabled'|'error';
 
+function MemberImpactSummary({name,preview}:{name:string;preview:AdminDeletionPreview}){
+ const {counts,canDelete}=preview;
+ return <div className="a-member-impact-summary" role="status">
+   <strong>Datos asociados a {name}</strong>
+   <dl>
+     <div><dt>Sesiones</dt><dd>{counts.sessions}</dd></div>
+     <div><dt>Mensajes</dt><dd>{counts.messages}</dd></div>
+     <div><dt>Reacciones</dt><dd>{counts.reactions}</dd></div>
+     <div><dt>Lecturas</dt><dd>{counts.receipts}</dd></div>
+     <div><dt>Historial</dt><dd>{counts.historyEvents}</dd></div>
+     <div><dt>Solicitudes antiguas</dt><dd>{counts.deviceRequests}</dd></div>
+     <div><dt>Activaciones PWA antiguas</dt><dd>{counts.firstClaims}</dd></div>
+     <div><dt>Archivos multimedia</dt><dd>{counts.mediaAssets}</dd></div>
+   </dl>
+   {canDelete?
+     <small>Sin archivos multimedia pendientes de eliminación externa.</small>:
+     <p className="a-admin-error">La eliminación está bloqueada para proteger los archivos multimedia externos.</p>}
+ </div>;
+}
+
 export default function AdminChatAccess({section}:{section:Section}){
  const [readiness,setReadiness]=useState<Readiness>('loading');
  const [session,setSession]=useState<AdminSession|null>(null);
@@ -348,22 +368,8 @@ export default function AdminChatAccess({section}:{section:Section}){
              </button>
              <small>Consulta de solo lectura. No elimina ni modifica información.</small>
              {impactErrors[person.actor_id]&&<p className="a-admin-error" role="alert">{impactErrors[person.actor_id]}</p>}
-             {impact[person.actor_id]&&<div className="a-member-impact-summary" role="status">
-               <strong>Datos asociados a {person.display_name}</strong>
-               <dl>
-                 <div><dt>Sesiones</dt><dd>{impact[person.actor_id].counts.sessions}</dd></div>
-                 <div><dt>Mensajes</dt><dd>{impact[person.actor_id].counts.messages}</dd></div>
-                 <div><dt>Reacciones</dt><dd>{impact[person.actor_id].counts.reactions}</dd></div>
-                 <div><dt>Lecturas</dt><dd>{impact[person.actor_id].counts.receipts}</dd></div>
-                 <div><dt>Historial</dt><dd>{impact[person.actor_id].counts.historyEvents}</dd></div>
-                 <div><dt>Solicitudes antiguas</dt><dd>{impact[person.actor_id].counts.deviceRequests}</dd></div>
-                 <div><dt>Activaciones PWA antiguas</dt><dd>{impact[person.actor_id].counts.firstClaims}</dd></div>
-                 <div><dt>Archivos multimedia</dt><dd>{impact[person.actor_id].counts.mediaAssets}</dd></div>
-               </dl>
-               {impact[person.actor_id].canDelete?
-                 <small>Sin archivos multimedia pendientes de eliminación externa.</small>:
-                 <p className="a-admin-error">La eliminación está bloqueada para proteger los archivos multimedia externos.</p>}
-             </div>}
+             {impact[person.actor_id]&&<MemberImpactSummary
+               name={person.display_name} preview={impact[person.actor_id]}/>}
            </div>
          </div>}
        </div>)}</div>}
