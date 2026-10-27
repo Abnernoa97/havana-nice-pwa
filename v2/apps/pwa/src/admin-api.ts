@@ -100,11 +100,12 @@ export function adminChatMessages(token:string,beforeSeq?:number){
  return api<AdminChatSnapshot>('/api/chat/admin/messages'+before,authenticated(token));
 }
 export function adminDeleteChatMessage(token:string,seq:number){
- return api<{ok:boolean;message:AdminChatMessage}>('/api/chat/admin/messages/'+encodeURIComponent(String(seq)),
+ return api<{ok:boolean;seq:number}>('/api/chat/admin/messages/'+encodeURIComponent(String(seq)),
   authenticated(token,{method:'DELETE'}));
 }
 export type AdminChatStreamEvent=
  |{type:'admin.chat.message'|'admin.chat.updated';message:AdminChatMessage}
+ |{type:'admin.chat.deleted';seq:number}
  |{type:'admin.chat.reaction';messageSeq:number;actorId:string;emoji:string;active:boolean}
  |{type:'admin.chat.presence';users:{actorId:string;displayName:string}[]}
  |{type:'admin.chat.typing';actorId:string;senderName:string;active:boolean;expiresAt:number}
@@ -125,6 +126,8 @@ export function openAdminRealtime(token:string,onEvent:(event:AdminRealtimeEvent
      if(data.message&&Number.isSafeInteger(data.message.seq))
        onEvent({type:value.type,message:data.message});
    }
+   if(value.type==='admin.chat.deleted'&&Number.isSafeInteger((value as {seq?:number}).seq))
+     onEvent(value as AdminChatStreamEvent);
    if(value.type==='admin.chat.presence'&&Array.isArray((value as {users?:unknown}).users))
      onEvent(value as AdminChatStreamEvent);
    if(value.type==='admin.chat.reaction'||value.type==='admin.chat.typing'||value.type==='admin.chat.read')
