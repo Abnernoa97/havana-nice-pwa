@@ -52,13 +52,11 @@ async function memberDeletionImpact(env,actorId){
   '(SELECT COUNT(*) FROM chat_messages WHERE sender_id=?) AS messages,'+
   '(SELECT COUNT(*) FROM chat_reactions WHERE actor_id=? OR message_seq IN (SELECT seq FROM chat_messages WHERE sender_id=?)) AS reactions,'+
   '(SELECT COUNT(*) FROM chat_read_receipts WHERE actor_id=?) AS receipts,'+
-  '(SELECT COUNT(*) FROM chat_device_requests WHERE actor_id=?) AS deviceRequests,'+
-  '(SELECT COUNT(*) FROM chat_pwa_first_claims WHERE actor_id=?) AS firstClaims,'+
   '(SELECT COUNT(*) FROM chat_access_events WHERE actor_id=?) AS historyEvents,'+
   '(SELECT COUNT(*) FROM v2_media_assets WHERE sender_id=?) AS mediaAssets'
- ).bind(actorId,actorId,actorId,actorId,actorId,actorId,actorId,actorId,actorId).first();
+ ).bind(actorId,actorId,actorId,actorId,actorId,actorId,actorId).first();
  const counts={};
- for(const key of ['sessions','messages','reactions','receipts','deviceRequests','firstClaims','historyEvents','mediaAssets'])
+ for(const key of ['sessions','messages','reactions','receipts','historyEvents','mediaAssets'])
    counts[key]=Math.max(0,Number(row?.[key]||0));
  return counts;
 }
@@ -125,8 +123,6 @@ export async function handleAdminMemberManagement(request,env,url,origin,respond
    env.DB.prepare('DELETE FROM chat_messages WHERE sender_id=?').bind(actorId),
    env.DB.prepare('DELETE FROM chat_read_receipts WHERE actor_id=?').bind(actorId),
    env.DB.prepare('DELETE FROM chat_sessions WHERE actor_id=?').bind(actorId),
-   env.DB.prepare('DELETE FROM chat_device_requests WHERE actor_id=?').bind(actorId),
-   env.DB.prepare('DELETE FROM chat_pwa_first_claims WHERE actor_id=?').bind(actorId),
    env.DB.prepare('DELETE FROM chat_access_events WHERE actor_id=?').bind(actorId),
    env.DB.prepare('DELETE FROM chat_duplicate_login_alerts WHERE actor_id=?').bind(actorId),
    env.DB.prepare('DELETE FROM chat_single_device_owners WHERE actor_id=?').bind(actorId),
