@@ -15,8 +15,6 @@ function MemberImpactSummary({name,preview}:{name:string;preview:AdminDeletionPr
      <div><dt>Reacciones</dt><dd>{counts.reactions}</dd></div>
      <div><dt>Lecturas</dt><dd>{counts.receipts}</dd></div>
      <div><dt>Historial</dt><dd>{counts.historyEvents}</dd></div>
-     <div><dt>Solicitudes antiguas</dt><dd>{counts.deviceRequests}</dd></div>
-     <div><dt>Activaciones PWA antiguas</dt><dd>{counts.firstClaims}</dd></div>
      <div><dt>Archivos multimedia</dt><dd>{counts.mediaAssets}</dd></div>
    </dl>
    <small>Las credenciales registradas no equivalen a teléfonos conectados en este momento. Las reacciones incluyen las vinculadas al músico o a sus mensajes.</small>
@@ -247,7 +245,7 @@ export default function AdminChatAccess({section}:{section:Section}){
        '· Reacciones: '+counts.reactions+'\n'+
        '· Lecturas: '+counts.receipts+'\n'+
        '· Eventos de historial: '+counts.historyEvents+'\n'+
-       '· Solicitudes de dispositivos: '+counts.deviceRequests+'\n\n'+
+       '\n'+
        'Se cerrarán sus conexiones activas. Esta acción NO se puede deshacer.'
      );
      if(!approved)return;
