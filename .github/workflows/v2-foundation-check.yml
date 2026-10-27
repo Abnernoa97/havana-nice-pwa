@@ -101,6 +101,25 @@ jobs:
           test "$STATUS" = "401"
           grep -q '"No autorizado"' /tmp/v2-admin-members-denied.json
 
+      - name: Verify new Administrator WebSocket rejects unauthorized clients
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE="https://havana-nice-v2-dev.soloaplicaciones97.workers.dev"
+          STATUS="$(curl --silent --show-error --output /tmp/v2-admin-ws-no-origin.json --write-out '%{http_code}' "$BASE/ws/admin")"
+          test "$STATUS" = "403"
+          STATUS="$(curl --silent --show-error --output /tmp/v2-admin-ws-no-upgrade.json --write-out '%{http_code}' \
+            "$BASE/ws/admin" -H "Origin: https://havana-nice-v2-dev.pages.dev")"
+          test "$STATUS" = "426"
+          STATUS="$(curl --silent --show-error --output /tmp/v2-admin-ws-denied.json --write-out '%{http_code}' \
+            "$BASE/ws/admin" \
+            -H "Origin: https://havana-nice-v2-dev.pages.dev" \
+            -H "Upgrade: websocket" -H "Connection: Upgrade" \
+            -H "Sec-WebSocket-Version: 13" -H "Sec-WebSocket-Key: SGF2YW5hTmljZVYyVGVzdCE=" \
+            -H "Sec-WebSocket-Protocol: havana-v2-admin, admin.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")"
+          test "$STATUS" = "401"
+          grep -q "No autorizado" /tmp/v2-admin-ws-denied.json
+
       - name: Verify live Durable Object
         shell: bash
         run: |
