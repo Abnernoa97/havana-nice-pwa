@@ -16,8 +16,7 @@ class FakeDB{
       if(sql.startsWith('SELECT actor_id FROM chat_members'))return this.members.get(args[0])||null;
       if(sql.startsWith('SELECT COUNT(*) AS entries'))return {entries:2};
       if(sql.includes('AS mediaAssets') && sql.includes('FROM v2_media_assets')){
-        return {sessions:2,messages:3,reactions:1,receipts:1,deviceRequests:0,
-          firstClaims:1,historyEvents:4,mediaAssets:this.mediaAssets};
+        return {sessions:2,messages:3,reactions:1,receipts:1,historyEvents:4,mediaAssets:this.mediaAssets};
       }
       throw Error('Unexpected first: '+sql);
     },
@@ -105,7 +104,7 @@ test('atomic permanent deletion clears all musician-owned D1 tables then expels 
  const queries=e.DB.statements.map(x=>x.sql).join('\n');
  for(const term of ['UPDATE chat_messages SET reply_to_seq=NULL','DELETE FROM chat_reactions WHERE message_seq',
   'DELETE FROM chat_reactions WHERE actor_id','DELETE FROM chat_messages WHERE sender_id',
-  'DELETE FROM chat_read_receipts','DELETE FROM chat_sessions','DELETE FROM chat_device_requests',
+  'DELETE FROM chat_read_receipts','DELETE FROM chat_sessions',
   'DELETE FROM chat_pwa_first_claims','DELETE FROM chat_access_events','DELETE FROM chat_members']){
    assert.ok(queries.includes(term),'Missing cleanup '+term);
  }
@@ -176,8 +175,7 @@ test('member delete preview requires Admin auth and never mutates data',async()=
  assert.equal(result.body.displayName,'Orly');
  assert.equal(result.body.canDelete,true);
  assert.deepEqual(result.body.counts,{
-  sessions:2,messages:3,reactions:1,receipts:1,deviceRequests:0,
-  firstClaims:1,historyEvents:4,mediaAssets:0
+  sessions:2,messages:3,reactions:1,receipts:1,historyEvents:4,mediaAssets:0
  });
  assert.equal(e.DB.statements.length,0);
  assert.equal(e.DB.members.size,1);
