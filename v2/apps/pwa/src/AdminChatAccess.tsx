@@ -20,6 +20,13 @@ export default function AdminChatAccess({section}:{section:Section}){
  const [historyLoading,setHistoryLoading]=useState('');
  const [removing,setRemoving]=useState('');
  const [realtime,setRealtime]=useState<'waiting'|'connected'|'reconnecting'>('waiting');
+ // Prevent frontend updates from interrupting authorized admin sessions.
+ // The marker contains no credential; actual tokens stay in React memory only.
+ useEffect(()=>{
+   document.documentElement.dataset.adminSessionActive=session?'true':'false';
+   if(!session)window.dispatchEvent(new Event('havana-admin-session-ended'));
+   return()=>{document.documentElement.dataset.adminSessionActive='false';};
+ },[session]);
 
  const refreshMembers=useCallback(async(token:string)=>{
    try{const data=await adminMembers(token);setMembers(data.members);setLoaded(true);}
