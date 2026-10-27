@@ -90,3 +90,14 @@
 .a-admin-session-security strong{font-weight:700;color:#292a23}
 .a-admin-session-security button{background:transparent;border:1px solid #c4b5a3;border-radius:10px;padding:10px 12px;font-size:12px;color:#302921}
 .a-admin-session-security button:disabled{opacity:.5}
+
+/* Read-only D1 musician audit; deliberately separate from the trash action. */
+.a-member-impact{border-top:1px solid #dccfbd;margin-top:14px;padding-top:14px;display:grid;gap:8px}
+.a-member-impact>button{justify-self:start;border:1px solid #c9b9a4;border-radius:10px;background:#fff9f0;color:#302a23;padding:10px 13px;font-weight:650;font-size:12px}
+.a-member-impact>button:disabled{opacity:.5}
+.a-member-impact-summary{margin-top:6px;padding:13px;border:1px solid #d3c6b6;border-radius:10px;background:#fffaf2;display:grid;gap:10px}
+.a-member-impact-summary>strong{font-size:12px}
+.a-member-impact-summary dl{margin:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 15px}
+.a-member-impact-summary dl div{display:flex;justify-content:space-between;gap:8px;border-bottom:1px solid #e8dfd3;padding:4px 0}
+.a-member-impact-summary dt{font-size:11px;color:#766a5d}
+.a-member-impact-summary dd{margin:0;font-size:12px;font-weight:700;font-variant-numeric:tabular-nums}
