@@ -3,7 +3,7 @@ import {
   fetchBackendHealth, getChatSnapshot, getOlderChatMessages, searchChatMessages, lastReadByOther, messageDeliveryLabel, newClientMessageId,
   openChatSocket, reconcileChatMessages, startNamedChatSession, restoreNamedChatSession,
   type BackendHealth, type ChatMessage, type ChatServerEvent, type ChatSession,
-  reconcileReactions, reconcileUpdatedMessage, type ChatReaction, type ChatEmoji, type ChatReadReceipt,
+  reconcileReactions, reconcileUpdatedMessage, reconcileDeletedMessage, reconcileChatSnapshot, type ChatReaction, type ChatEmoji, type ChatReadReceipt,
 } from '@havana/shared';
 import { loadLocalChat, saveLocalChat } from './local';
 import SwipeMessage, {type MessageAnchor} from './SwipeMessage';
@@ -33,6 +33,7 @@ export default function App() {
   const [menuMessage,setMenuMessage] = useState<ChatMessage | null>(null);
   const [menuAnchor,setMenuAnchor] = useState<MessageAnchor|null>(null);
   const socket = useRef<WebSocket | null>(null);
+  const removedSeq = useRef<Set<number>>(new Set());
   const activeSession = useRef<ChatSession | null>(null);
   const outbox = useRef<Map<string, ChatMessage>>(new Map());
   const ackTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
@@ -98,7 +99,7 @@ export default function App() {
     scrollOlderOnce.current=true;
     try {
       const data=await getOlderChatMessages(session,oldest);
-      setMessages(prev=>reconcileChatMessages(data.messages,prev));
+      setMessages(prev=>reconcileChatMessages(prev,data.messages.filter(m=>!removedSeq.current.has(m.seq))));
       setHasMore(data.hasMore);
       setReactions(prev=>[...data.reactions.filter(x=>!prev.some(y=>y.messageSeq===x.messageSeq&&y.actorId===x.actorId&&y.emoji===x.emoji)),...prev]);
     } catch(e) { setError(e instanceof Error?e.message:'No se pudo cargar más mensajes'); }
@@ -229,7 +230,7 @@ export default function App() {
       setReactions(reactionHistory);
       setReceipts(readHistory);
       setHasMore(more);
-      setMessages(before => reconcileChatMessages(before, history));
+      setMessages(before => reconcileChatSnapshot(before,history.filter(m=>!removedSeq.current.has(m.seq))));
       sendReadReceipt(Math.max(0,...history.map(m=>m.seq)));
       flushOutbox();
     }).catch(e => {
@@ -309,6 +310,14 @@ export default function App() {
             setMenuMessage(current=>current?.seq===value.message.seq?null:current);
           }
           setError('');
+        } else if (value.type === 'chat.deleted') {
+          removedSeq.current.add(value.seq);
+          setMessages(before=>reconcileDeletedMessage(before,value.seq));
+          setSearchResults(before=>before?.filter(m=>m.seq!==value.seq)??null);
+          setReactions(before=>before.filter(r=>r.messageSeq!==value.seq));
+          setReplyTo(current=>current?.seq===value.seq?null:current);
+          setMenuMessage(current=>current?.seq===value.seq?null:current);
+          setEditing(current=>current?.seq===value.seq?null:current);
         } else if (value.type === 'chat.read') {
           setReceipts(before=>[
             ...before.filter(r=>r.actorId!==value.actorId),
@@ -319,7 +328,7 @@ export default function App() {
           setReactions(before => reconcileReactions(before, value));
         } else if (value.type === 'chat.message') {
           confirm(value.message);
-          setMessages(before => reconcileChatMessages(before, [value.message]));
+          setMessages(before => removedSeq.current.has(value.message.seq)?before:reconcileChatMessages(before, [value.message]));
           sendReadReceipt(value.message.seq);
           flushOutbox();
         } else if (value.type === 'chat.revoked') {
@@ -601,7 +610,7 @@ export default function App() {
               onClick={()=>void loadOlder()}>{loadingOlder?'Cargando…':'Cargar mensajes anteriores'}</button>}
             {searchResults!==null&&<p className="search-count">{searchResults.length} resultado(s) en historial</p>}
             {messages.length === 0 && <p className="empty-chat">¡Hola! Escribe el primer mensaje.</p>}
-            {(searchResults??messages).map(message => {
+            {(searchResults??messages).filter(message=>!message.deletedAt).map(message => {
               const mine = message.senderId === session.actorId;
               return <SwipeMessage className={mine?'bubble mine':'bubble theirs'}
                 key={message.senderId+':'+message.clientMessageId}
@@ -609,9 +618,9 @@ export default function App() {
                 onLongPress={anchor=>showMessageMenu(message,anchor)}>
                 {!mine&&<span className="sender">{message.senderName}</span>}
                 {message.replyToSeq&&<div className="reply-original">
-                  ↪ {(messages.find(m=>m.seq===message.replyToSeq)?.deletedAt ? 'Mensaje eliminado' : (messages.find(m=>m.seq===message.replyToSeq)?.text.slice(0,70)||'Mensaje anterior'))}
+                  ↪ {messages.find(m=>m.seq===message.replyToSeq)?.text.slice(0,70)||'Mensaje anterior'}
                 </div>}
-                <div className={message.deletedAt?'deleted-message':''}>{message.deletedAt?'Mensaje eliminado':message.text}</div>
+                <div>{message.text}</div>
                 {message.seq>0&&!message.deletedAt&&reactions.some(r=>r.messageSeq===message.seq)&&
                   <div className="reaction-counts">
                     {(['❤️','😂','👍'] as ChatEmoji[])
