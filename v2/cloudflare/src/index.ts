@@ -4,6 +4,7 @@ import { deviceGateEnabled, handleDeviceApprovalApi } from './device-approval.js
 import { handlePwaFirstDeviceSession } from './pwa-first-device.js';
 import { handleAdminSessionApi, verifyAdminSession } from './admin-auth.js';
 import { adminSocketToken, adminTokenRequest, notifyAdminClients } from './admin-realtime.js';
+import {handleAdminMemberManagement,recordMemberEvent,readMemberDevice} from './member-admin.js';
 // HAVANA NICE V2 isolated Worker. Only D1-authorized musician names may enroll.
 // Random durable device credentials are issued once and validated against D1 on every request.
 const encoder = new TextEncoder();
@@ -46,10 +47,11 @@ function normalizeMusicianName(value) {
   const name = value.trim().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ');
   return /^[a-z][a-z0-9 _-]{0,27}$/.test(name) ? name : '';
 }
-async function createSession(env, member) {
+async function createSession(env, member, request) {
   const token = b64(crypto.getRandomValues(new Uint8Array(32)));
   await env.DB.prepare('INSERT INTO chat_sessions (token_hash, actor_id, display_name, expires_at) VALUES (?, ?, ?, ?)')
     .bind(await sha256(token), member.actor_id, member.display_name, MEMBER_SESSION_EXPIRY).run();
+  await recordMemberEvent(env,member.actor_id,'login',request).catch(()=>{});
   return { token, actorId: member.actor_id, displayName: member.display_name, expiresAt: new Date(MEMBER_SESSION_EXPIRY).toISOString() };
 }
 async function verifySession(env, token) {
@@ -92,6 +94,21 @@ export class ChatRoom {
   }
   async fetch(request) {
     if (new URL(request.url).pathname === '/health') return Response.json({ ok: true, durableObject: 'ChatRoom', environment: this.env.HAVANA_ENV || 'development' });
+    if (new URL(request.url).pathname === '/member-removed' && request.method === 'POST') {
+      let data=null;
+      try{data=await request.json();}catch{}
+      if(typeof data?.actorId!=='string'||!/^member:[a-z0-9_-]{1,40}$/i.test(data.actorId))
+        return respond({error:'Invalid member'},400);
+      for(const [socket,member] of this.members.entries()){
+        if(member.actorId!==data.actorId)continue;
+        this.send(socket,{type:'chat.revoked',error:'Tu acceso fue eliminado por el Administrador'});
+        try{socket.close(4003,'Member removed');}catch{}
+        this.sockets.delete(socket);this.members.delete(socket);this.typingSent.delete(socket);
+      }
+      this.broadcast({type:'chat.presence',users:this.onlineUsers()});
+      await this.invalidateAdmins('members');
+      return respond({ok:true},200);
+    }
     if (new URL(request.url).pathname === '/device-revoked' && request.method === 'POST') {
       let data=null;
       try {data=await request.json();}catch{}
@@ -145,6 +162,8 @@ export class ChatRoom {
     server.accept();
     this.sockets.add(server);
     this.members.set(server, {actorId, name, enrollmentToken, enrollmentId:session.enrollmentId??null});
+    const deviceDetails=readMemberDevice(request);
+    await recordMemberEvent(this.env,actorId,'connect',request,deviceDetails).catch(()=>{});
     server.send(JSON.stringify({ type: 'chat.ready', at: new Date().toISOString(), users: this.onlineUsers() }));
     this.broadcast({ type: 'chat.presence', users: this.onlineUsers() });
     void this.invalidateAdmins('members').catch(()=>{}); // report roster/session activity, not musician data
@@ -164,6 +183,7 @@ export class ChatRoom {
       }));
     });
     const cleanup = () => {
+      this.state.waitUntil(recordMemberEvent(this.env,actorId,'disconnect',request,deviceDetails).catch(()=>{}));
       this.sockets.delete(server);
       this.members.delete(server);
       this.typingSent.delete(server);
@@ -322,6 +342,9 @@ export default {
       return handleChatMedia(request, env, session, url, origin, respond);
     }
     if (url.pathname === '/realtime/health') return env.CHAT_ROOMS.get(env.CHAT_ROOMS.idFromName('foundation-health')).fetch('https://internal/health');
+    if (url.pathname === '/api/chat/admin/member-history' || url.pathname === '/api/chat/admin/remove-member') {
+      return handleAdminMemberManagement(request,env,url,origin,respond,ROOM);
+    }
     if (url.pathname === '/api/chat/admin/members') {
       if (request.method !== 'GET' && request.method !== 'POST') return respond({error:'Método no permitido'},405,origin);
       if (!await verifyAdminSession(request,env)) return respond({error:'No autorizado'},401,origin);
@@ -369,7 +392,7 @@ export default {
         'SELECT username,actor_id,display_name FROM chat_members WHERE username=? AND active=1'
       ).bind(username).first();
       if (!member) return respond({ error: 'Tu nombre todavía no está autorizado. Solicita acceso al administrador.' }, 403, origin);
-      return respond(await createSession(env, member), 200, origin);
+      return respond(await createSession(env, member,request), 200, origin);
     }
     if (url.pathname === '/api/chat/session' && request.method === 'GET') {
       const token = (request.headers.get('authorization') || '').replace(/^Bearer\s+/i, '');
