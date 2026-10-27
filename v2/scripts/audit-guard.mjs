@@ -182,7 +182,13 @@ present(pwa,/editPending\.current=\{seq:editing\.seq,text\}/,'PWA must await edi
 present(android,/Conexión interrumpida\. El texto editado sigue disponible/,'Android must retain edit on disconnect');
 present(pwa,/Conexión interrumpida\. El texto editado sigue disponible/,'PWA must retain edit on disconnect');
 present(worker,/own\.sender_id !== senderId/,'Server must restrict edit/delete to sender');
-present(worker,/\[mensaje eliminado\]/,'Server must leave tombstones on delete');
+const remove=read('cloudflare/src/message-removal.js');
+present(worker,/deleteChatMessageRecord\(this.env,input.seq\)/,'Musicians must use the canonical deletion');
+present(remove,/DELETE FROM chat_messages WHERE seq=\?/,'Deleting a message must remove its D1 record');
+present(remove,/UPDATE chat_messages SET reply_to_seq=NULL/,'Keep replies while detaching removed originals');
+present(worker,/chat.deleted/,'Chat must broadcast disappearance to clients');
+present(pwa,/reconcileDeletedMessage/,'iPhone Chat must remove bubbles');
+present(android,/reconcileDeletedMessage/,'Android Chat must remove bubbles');
 absent(pwa,/Cerrar reacciones|>＋<\/button>/,'Remove inert extra-reaction button in PWA');
 present(pwaStyles,/\.whatsapp-context\{position:absolute;/,
   'PWA menu must be anchored instead of centered');
