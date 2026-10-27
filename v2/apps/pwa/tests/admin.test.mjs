@@ -83,3 +83,26 @@ test('original musician offline storage and Chat remain intact',()=>{
  assert.match(read('../../android/chatStorage.ts'),/havana-v2-chat-local-v1/);
  assert.match(android,/loadNativePendingEnrollment/);
 });
+
+test('Administrator can explicitly close other sessions but cannot clear the current one',()=>{
+ const ui=read('../src/AdminChatAccess.tsx');
+ const api=read('../src/admin-api.ts');
+ assert.match(ui,/adminOtherSessions\(session\.token\)/);
+ assert.match(ui,/adminRevokeOtherSessions\(session\.token\)/);
+ assert.match(ui,/window\.confirm\(/);
+ assert.match(ui,/Cerrar otras sesiones/);
+ assert.match(api,/\/api\/chat\/admin\/auth\/sessions/);
+ assert.match(api,/\/api\/chat\/admin\/auth\/revoke-others/);
+ assert.doesNotMatch(api,/adminDeviceRequests\(|adminDeviceAction\(/);
+});
+test('Administrator frontend defers new versions while its session or unsaved form is active',()=>{
+ const main=read('../src/admin-main.tsx');
+ const admin=read('../src/AdminApp.tsx');
+ const access=read('../src/AdminChatAccess.tsx');
+ assert.match(main,/adminSessionActive==='true'/);
+ assert.match(main,/formHasDraft/);
+ assert.match(main,/adminUpdatePending='true'/);
+ assert.match(admin,/havana-admin-update-pending/);
+ assert.match(admin,/Se aplicará cuando cierres sesión/);
+ assert.match(access,/dataset\.adminSessionActive=session\?'true':'false'/);
+});
