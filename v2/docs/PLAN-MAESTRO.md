@@ -714,6 +714,18 @@ Hallazgos y acciones documentados:
 - **Prueba aplazada por el propietario:** usar segundo teléfono más adelante, abrir PWA Chat con nombre `Prueba 1`, cotejar fecha, dispositivo, SO/modelo con el acordeón Admin y D1; comprobar después la revocación únicamente de este músico de pruebas previa autorización explícita. No efectuar pruebas destructivas sobre Andy/Fer/Jali/Noa/Orly/Rafa.
 - **Copia externa D1:** aún NO descargada/validada. Los bookmarks de D1 Time Travel no son una copia independiente. Prohibida limpieza destructiva de datos históricos o ramas sin respaldo y revisión de dependencias. **Tablero 10/27, S01/S02/P04 abiertos.**
 
+### Depuración segura — ejecución 5, 27/10/2026 · verificación de accesos y borrado sin afectar clientes
+
+**Se mantuvo el Plan Maestro: primero «Acceso a músicos», sin intervenir Chat nativo, clientes instalados, otros módulos o `main` original.**
+
+- **Protección adicional probada en mocks de D1:** una credencial Admin revocada devuelve `401` tanto al solicitar historial como al intentar eliminar miembro; una eliminación confirmada impide nuevas escrituras de `login/connect/disconnect` por sockets antiguos que cerraran después; una segunda petición de eliminación y una lectura del miembro inexistente devuelven `404`; la detección de dispositivo no inventa modelo ni SO cuando el agente no lo proporciona. Las pruebas fueron añadidas a `v2/cloudflare/tests/member-admin.test.mjs`, **sin cambios en lógica Worker de producción**.
+- **GitHub Actions** `40462992311` **SUCCESS**, SHA `da9663a9a3e4a0dbef122f579f391d86a6e7341e`. Cloudflare Pages V2 `success`; Worker V2 sigue versión `54d761d5-2388-429a-b95c-1213f1651dac` al 100 %. El resultado es prueba automatizada (no prueba física de dispositivo).
+- **D1 verificada después de las pruebas:** 7 miembros (seis músicos + `Prueba 1` ya creado por el propietario), 10 sesiones de músicos, 45 mensajes y cero eventos en `chat_access_events`. No se eliminaron miembros, mensajes, sesiones, reacciones ni tablas en esta ejecución.
+- **Respaldo:** Cloudflare D1 exportó SQL mediante Time Travel con bookmark `000000bf-00000000-00005111-00ab603fe204b2a48bd8d5ae9ce5cff8` y bookmark posterior `000000c0-00000000-00005111-e3d31c70708a4ad872833bfbe3f319dd`. **No fue posible descargar/verificar un archivo SQL independiente** desde el entorno. No afirmar respaldo externo realizado ni desbloquear depuración destructiva por este resultado.
+- **Prueba pendiente por disponer de otro teléfono:** ingresar con `Prueba 1` en PWA de músicos, contrastar login/conexión/OS/modelo y fecha con D1 y acordeón Admin; prueba de eliminación/expulsión solo después de confirmar que no se afectarán los seis músicos y con backup externo verificado. Mientras tanto preservar `observe`, APK Android y los accesos actuales.
+
+**Certificación formal: 10 de 27 hitos.** S01, S02 y P04 continúan abiertos hasta QA físico y diseño completo de seguridad. No retomar calendarios, repertorio ni chat admin antes de terminar esta etapa.
+
 ### Procedimiento permanente
 
 1. Leer este plan y el HEAD de `havana-nice-v2-foundation`.
