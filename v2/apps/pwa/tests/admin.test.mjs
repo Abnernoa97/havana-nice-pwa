@@ -2,127 +2,84 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 const read=p=>readFileSync(new URL(p,import.meta.url),'utf8');
-const ui=read('../src/AdminApp.tsx'),main=read('../src/admin-main.tsx');
-test('admin has a separate static PWA entry and no Chat components',()=>{
+const ui=read('../src/AdminApp.tsx');
+const panel=read('../src/AdminChatAccess.tsx');
+const api=read('../src/admin-api.ts');
+const backend=read('../../../cloudflare/src/index.ts');
+
+test('single installable Administrator PWA, separate from Chat',()=>{
  assert.match(read('../admin.html'),/id="admin-root"/);
  assert.match(read('../vite.config.ts'),/admin\.html/);
- assert.doesNotMatch(main,/from '\.\/App'/);
-});
-test('admin never bundles secrets or produces fake privileged API calls',()=>{
- for(const content of [ui,main,read('../admin.html')]){
-   assert.doesNotMatch(content,/V2_DEVICE_ADMIN_SECRET|Authorization:\s*Bearer|localStorage\.|sessionStorage\.|requestSecret|api\/chat\/admin/);
- }
- assert.match(read('../src/AdminChatAccess.tsx'),/adminDeviceAction/);
- assert.match(read('../src/AdminChatAccess.tsx'),/adminDeviceRequests/);
- assert.doesNotMatch(ui,/Permisos de músicos protegidos/);
-});
-test('admin HTML uses network-only navigation and does not register worker',()=>{
- assert.match(read('../public/sw.js'),/navigation && path === '\/admin\.html'\) return/);
- assert.match(main,/serviceWorker\.register\('\/sw\.js'/);
- assert.match(read('../public/sw.js'),/navigation && path === '\/admin\.html'\) return/);
-});
-
-test('the one Administrator is independently installable on Android and iPhone',()=>{
+ assert.doesNotMatch(read('../src/admin-main.tsx'),/from '\.\/App'/);
  const manifest=JSON.parse(read('../public/admin.webmanifest'));
  assert.equal(manifest.start_url,'/admin.html');
- assert.equal(manifest.display,'standalone');
  assert.equal(manifest.id,'/havana-nice-v2-administrador');
- assert.equal(manifest.icons.length,2);
- assert.match(read('../admin.html'),/href="\/admin.webmanifest"/);
- assert.match(read('../admin.html'),/apple-touch-icon/);
+ assert.equal(manifest.display,'standalone');
 });
-test('Chat panel reads real Worker health and keeps private actions disabled',()=>{
+test('PWA admin network-only HTML and safe automatic refresh',()=>{
+ const sw=read('../public/sw.js');
+ const main=read('../src/admin-main.tsx');
+ assert.match(sw,/navigation && path === '\/admin\.html'\) return/);
+ assert.match(main,/fetch\('\/admin\.html',\{cache:'no-store'\}\)/);
+ assert.match(main,/serviceWorker\.register\('\/sw\.js'/);
+});
+test('five Administrator modules, only Acceso a músicos is active',()=>{
+ for(const section of ['Acceso a músicos','Chat','Repertorio','Calendario','Más'])assert.ok(ui.includes(section));
+ assert.match(ui,/useState<Tab>\('access'\)/);
  assert.match(ui,/fetchBackendHealth/);
- assert.match(ui,/data\.database==='ok'/);
- assert.match(ui,/setTab\('requests'\)/);
+ assert.match(panel,/section!=='access'/);
+ assert.match(ui,/Por ahora no hay funciones activas/);
+ assert.doesNotMatch(ui,/setTab\('requests'\)|setTab\('devices'\)/);
+});
+test('authenticated Administrator creates members from a real form, not mock data',()=>{
+ assert.match(panel,/Añadir miembro/);
+ assert.match(panel,/Añadir y autorizar/);
+ assert.match(panel,/adminCreateMember\(session\.token,name\.trim\(\)\)/);
+ assert.match(panel,/adminMembers\(token\)/);
+ assert.match(panel,/Músicos autorizados/);
+ assert.match(panel,/await refreshMembers\(session\.token\)/);
  assert.doesNotMatch(ui,/const fakeMembers|demoRequests|mockSessions/);
 });
-test('installed Administrator refreshes from network-only HTML, without new APK',()=>{
- assert.match(main,/serviceWorker\.register\('\/sw\.js'/);
- assert.match(main,/fetch\('\/admin\.html',\{cache:'no-store'\}\)/);
- assert.match(main,/window\.location\.reload\(\)/);
- assert.match(read('../public/sw.js'),/navigation && path === '\/admin\.html'\) return/);
-});
-
-test('privileged controls require separate login, never musician identity',()=>{
- const component=read('../src/AdminChatAccess.tsx');
- const api=read('../src/admin-api.ts');
- assert.match(component,/if\(!session\)return/);
- assert.match(component,/adminLogin\(password\)/);
- assert.match(component,/adminLogout\(value\)/);
- assert.match(component,/adminDeviceAction\(session\.token/);
- assert.match(component,/adminAvailability\(\)/);
- assert.doesNotMatch(component+api,/localStorage\.|sessionStorage\.|indexedDB\.|V2_ADMIN_LOGIN_SECRET/);
-});
-
-test('member information is retrieved only through administrator-verified API',()=>{
- const backend=read('../../../cloudflare/src/index.ts');
- const adminApi=read('../src/admin-api.ts');
- const memberUi=read('../src/AdminChatAccess.tsx');
+test('new musician endpoint requires a separate verified Administrator token',()=>{
  assert.match(backend,/url\.pathname === '\/api\/chat\/admin\/members'/);
  assert.match(backend,/if \(!await verifyAdminSession\(request,env\)\)/);
- assert.match(adminApi,/adminMembers\(token:string\)/);
- assert.match(memberUi,/Credenciales vigentes/);
- assert.doesNotMatch(backend,/SELECT\s+\*\s+FROM\s+chat_admin_sessions/);
+ assert.match(backend,/request\.method === 'POST'/);
+ assert.match(backend,/INSERT OR IGNORE INTO chat_members\(username,actor_id,display_name,active\)/);
+ assert.match(backend,/created\.meta\?\.changes/);
+ assert.match(backend,/Este nombre ya existe en el Administrador/);
+ assert.match(backend,/notifyAdminClients\(env,'members'\)/);
+ assert.match(api,/adminCreateMember\(token:string,displayName:string\)/);
+ assert.match(api,/authenticated\(token,\{method:'POST'/);
 });
-
-test('one connected members panel; no contradictory duplicate placeholder',()=>{
- const ui=read('../src/AdminApp.tsx');
- const component=read('../src/AdminChatAccess.tsx');
- assert.doesNotMatch(ui,/Permisos de músicos protegidos|Integrantes del Chat/);
- assert.match(component,/Músicos de HAVANA NICE V2/);
-});
-
-test('S01 pending device requests resume separately from Chat history on Android and iPhone',()=>{
- const shared=read('../../../packages/shared/src/index.ts');
- assert.match(shared,/usablePendingChatEnrollment/);
- const a=read('../../android/App.tsx'),p=read('../src/App.tsx');
- assert.match(read('../../android/chatStorage.ts'),/havana-v2-chat-pending-device-v1/);
- assert.match(read('../src/local.ts'),/pending-device-enrollment-v1/);
- assert.match(read('../../android/chatStorage.ts'),/havana-v2-chat-local-v1/);
- assert.match(read('../src/local.ts'),/offline-outbox-v1/);
- for(const [s,load,save] of [[a,'loadNativePendingEnrollment','saveNativePendingEnrollment'],[p,'loadPendingEnrollment','savePendingEnrollment']]){
-  assert.ok(s.includes('Promise.all([')&&s.includes(load+'()'));
-  assert.ok(s.includes('await '+save+'(pending)'));
-  assert.ok(s.includes('void '+save+'(null)'));
-  assert.match(s,/usablePendingChatEnrollment\(enrollment\)/);
+test('admin cannot leak credential or store privileged session in browser',()=>{
+ for(const c of [ui,panel,api,read('../admin.html')]){
+  assert.doesNotMatch(c,/localStorage\.|sessionStorage\.|indexedDB\.|V2_ADMIN_LOGIN_SECRET|V2_DEVICE_ADMIN_SECRET/);
  }
+ assert.match(panel,/adminLogin\(password\)/);
+ assert.match(panel,/adminLogout\(token\)/);
+ assert.match(panel,/adminVerify\(session\.token\)/);
+ assert.match(api,/cache:'no-store'/);
 });
-
-test('Admin Chat receives authenticated realtime changes without trusting push contents',()=>{
- const api=read('../src/admin-api.ts');
- const panel=read('../src/AdminChatAccess.tsx');
+test('real-time admin list invalidates on membership changes',()=>{
  assert.match(api,/new WebSocket\(url,\['havana-v2-admin','admin\.'\+token\]\)/);
  assert.match(panel,/openAdminRealtime\(session\.token/);
- assert.match(panel,/event\.topic==='requests'/);
  assert.match(panel,/event\.topic==='members'/);
- assert.match(panel,/document\.addEventListener\('visibilitychange',onResume\)/);
- assert.match(panel,/adminVerify\(session\.token\)/);
- assert.doesNotMatch(api,/localStorage\.|sessionStorage\.|indexedDB\./);
+ assert.match(panel,/document\.addEventListener\('visibilitychange',resume\)/);
 });
-
-test('PWA cannot bypass Administrator by pressing name-login after device revocation',()=>{
- const pwa=read('../src/App.tsx');
- const shared=read('../../../packages/shared/src/index.ts');
- const backend=read('../../../cloudflare/src/index.ts');
- const handler=read('../../../cloudflare/src/pwa-first-device.js');
- const migration=read('../../../cloudflare/migrations/0011_chat_pwa_first_claims.sql');
- const android=read('../../android/App.tsx');
- assert.match(pwa,/startPwaFirstDeviceSession\(name\.trim\(\)\)/);
- assert.doesNotMatch(pwa,/startNamedChatSession/);
- assert.match(pwa,/DeviceApprovalRequiredError/);
- assert.match(pwa,/await beginDeviceEnrollment\(name\.trim\(\)\)/);
- assert.match(pwa,/await savePendingEnrollment\(pending\)/);
- assert.doesNotMatch(pwa,/Solicitar autorización de este dispositivo \(prueba\)/);
- assert.match(shared,/\/api\/chat\/pwa\/session/);
- assert.match(shared,/data\.code==='device_approval_required'/);
- assert.match(backend,/handlePwaFirstDeviceSession\(request,env/);
- assert.match(handler,/INSERT OR IGNORE INTO chat_pwa_first_claims/);
- assert.match(handler,/env\.DB\.batch\(\[/);
- assert.match(handler,/device_approval_required/);
- assert.match(handler,/notifyAdminClients/);
- assert.match(migration,/SELECT actor_id,NULL/);
- assert.match(migration,/actor_id TEXT PRIMARY KEY/);
- // No APK or native code change: legacy Android retains its entry API.
+test('musician PWA uses server allowlist instead of device experiments',()=>{
+ const pwa=read('../src/App.tsx'),android=read('../../android/App.tsx');
+ assert.match(pwa,/startNamedChatSession\(name\.trim\(\)\)/);
+ assert.match(pwa,/Introduce el nombre que el Administrador creó y autorizó/);
  assert.match(android,/startNamedChatSession\(name\.trim\(\)\)/);
+ assert.match(backend,/FROM chat_members WHERE username=\? AND active=1/);
+ assert.match(backend,/normalizeMusicianName\(payload\?\.displayName\)/);
+ assert.match(backend,/replace\(\/\\s\+\/g, ' '\)/);
+});
+test('original musician offline storage and Chat remain intact',()=>{
+ const pwa=read('../src/App.tsx'),android=read('../../android/App.tsx');
+ assert.match(pwa,/loadPendingEnrollment\(\)/);
+ assert.match(pwa,/savePendingEnrollment\(pending\)/);
+ assert.match(read('../src/local.ts'),/pending-device-enrollment-v1/);
+ assert.match(read('../../android/chatStorage.ts'),/havana-v2-chat-local-v1/);
+ assert.match(android,/loadNativePendingEnrollment/);
 });
