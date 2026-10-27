@@ -50,6 +50,20 @@ export function adminMembers(token:string){
 export function adminCreateMember(token:string,displayName:string){
  return api<{member:AdminMember}>('/api/chat/admin/members',authenticated(token,{method:'POST',body:JSON.stringify({displayName})}));
 }
+export type AdminMemberHistoryEvent={
+ event_type:'login'|'connect'|'disconnect';occurred_at:number;
+ platform:string;operating_system:string;device_name:string;device_model:string|null;
+};
+export type AdminMemberHistory={
+ entries:number;events:AdminMemberHistoryEvent[];since:string;
+};
+export function adminMemberHistory(token:string,actorId:string){
+ return api<AdminMemberHistory>('/api/chat/admin/member-history?actorId='+encodeURIComponent(actorId),authenticated(token));
+}
+export function adminRemoveMember(token:string,actorId:string,confirmName:string){
+ return api<{ok:boolean;deleted:boolean}>('/api/chat/admin/remove-member',
+  authenticated(token,{method:'POST',body:JSON.stringify({actorId,confirmName})}));
+}
 
 export type AdminRealtimeEvent={type:'admin.ready'}|{type:'admin.invalidate';topic:'requests'|'members'};
 export function openAdminRealtime(token:string,onEvent:(event:AdminRealtimeEvent)=>void):WebSocket{
