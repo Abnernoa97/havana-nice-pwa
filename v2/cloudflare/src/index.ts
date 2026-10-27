@@ -4,6 +4,7 @@ import { handleAdminSessionApi, verifyAdminSession } from './admin-auth.js';
 import { adminSocketToken, adminTokenRequest, notifyAdminClients } from './admin-realtime.js';
 import {handleAdminMemberManagement,recordMemberEvent,readMemberDevice} from './member-admin.js';
 import {handleAdminChat} from './admin-chat.js';
+import {deleteChatMessageRecord} from './message-removal.js';
 import {claimFirstInstallation,auditDuplicateInstallation,closeUnboundChatSession,handleSingleInstallationAdmin} from './single-installation.js';
 // HAVANA NICE V2 isolated Worker. Only D1-authorized musician names may enroll.
 // Random durable device credentials are issued once and validated against D1 on every request.
@@ -134,14 +135,12 @@ export class ChatRoom {
       this.broadcast({type:'chat.presence',users:this.onlineUsers()});
       return respond({ok:true});
     }
-    if (new URL(request.url).pathname === '/admin-chat-message-updated' && request.method === 'POST') {
+    if (new URL(request.url).pathname === '/admin-chat-message-deleted' && request.method === 'POST') {
       let data=null;try{data=await request.json();}catch{}
       if(!Number.isSafeInteger(data?.seq)||data.seq<=0)return respond({error:'Invalid message'},400);
-      const row=await this.env.DB.prepare(
-        'SELECT seq,client_message_id,sender_id,sender_name,body,created_at,reply_to_seq,edited_at,deleted_at FROM chat_messages WHERE seq=?'
-      ).bind(data.seq).first();
-      if(!row||!row.deleted_at)return respond({error:'Message not deleted'},409);
-      this.broadcast({type:'chat.updated',message:mapMessage(row)});
+      const row=await this.env.DB.prepare('SELECT seq FROM chat_messages WHERE seq=?').bind(data.seq).first();
+      if(row)return respond({error:'Message still exists'},409);
+      this.broadcast({type:'chat.deleted',seq:data.seq});
       return respond({ok:true});
     }
     if (new URL(request.url).pathname === '/admin-invalidate' && request.method === 'POST') {
@@ -232,7 +231,7 @@ export class ChatRoom {
   }
   broadcastToAdmins(data){
     const types={
-      'chat.message':'admin.chat.message','chat.updated':'admin.chat.updated',
+      'chat.message':'admin.chat.message','chat.updated':'admin.chat.updated','chat.deleted':'admin.chat.deleted',
       'chat.reaction':'admin.chat.reaction','chat.presence':'admin.chat.presence',
       'chat.typing':'admin.chat.typing','chat.read':'admin.chat.read'
     };
@@ -314,12 +313,9 @@ export class ChatRoom {
           'UPDATE chat_messages SET body=?,edited_at=? WHERE seq=? AND sender_id=? AND deleted_at IS NULL'
         ).bind(input.text.trim(),now,input.seq,senderId).run();
       } else {
-        // chat_messages.body has CHECK(length(body) BETWEEN 1 AND 2000).
-        // Deletion must retain a nonempty tombstone, never write body=''.
-        await this.env.DB.prepare(
-          "UPDATE chat_messages SET body='[mensaje eliminado]',deleted_at=? WHERE seq=? AND sender_id=? AND deleted_at IS NULL"
-        ).bind(now,input.seq,senderId).run();
-        await this.env.DB.prepare('DELETE FROM chat_reactions WHERE message_seq=?').bind(input.seq).run();
+        if(await deleteChatMessageRecord(this.env,input.seq))
+          this.broadcast({type:'chat.deleted',seq:input.seq});
+        return;
       }
       const current = await this.env.DB.prepare(
         'SELECT seq,client_message_id,sender_id,sender_name,body,created_at,reply_to_seq,edited_at,deleted_at FROM chat_messages WHERE seq=?'
@@ -353,7 +349,7 @@ export class ChatRoom {
     const reply = input.replyToSeq === null || input.replyToSeq === undefined ? null : input.replyToSeq;
     if (reply !== null) {
       if (!Number.isSafeInteger(reply) || reply < 1) { this.send(socket,{type:'chat.error',error:'Invalid reply'}); return; }
-      const original = await this.env.DB.prepare('SELECT seq FROM chat_messages WHERE seq=?').bind(reply).first();
+      const original = await this.env.DB.prepare('SELECT seq FROM chat_messages WHERE seq=? AND deleted_at IS NULL').bind(reply).first();
       if (!original) { this.send(socket,{type:'chat.error',error:'Original message not found'}); return; }
     }
     const result = await this.env.DB.prepare(
@@ -489,10 +485,10 @@ export default {
       if (seq !== null && (!Number.isSafeInteger(seq) || seq < 0)) return respond({ error: 'Invalid cursor' }, 400, origin);
       if (seq !== null && earlier !== null) return respond({error:'Incompatible cursors'},400,origin);
       const query = earlier !== null
-        ? env.DB.prepare('SELECT seq,client_message_id,sender_id,sender_name,body,created_at,reply_to_seq,edited_at,deleted_at FROM chat_messages WHERE seq < ? ORDER BY seq DESC LIMIT ?').bind(earlier,MAX_HISTORY)
+        ? env.DB.prepare('SELECT seq,client_message_id,sender_id,sender_name,body,created_at,reply_to_seq,edited_at,deleted_at FROM chat_messages WHERE seq < ? AND deleted_at IS NULL ORDER BY seq DESC LIMIT ?').bind(earlier,MAX_HISTORY)
         : seq === null
-        ? env.DB.prepare('SELECT seq,client_message_id,sender_id,sender_name,body,created_at,reply_to_seq,edited_at,deleted_at FROM chat_messages ORDER BY seq DESC LIMIT ?').bind(MAX_HISTORY)
-        : env.DB.prepare('SELECT seq,client_message_id,sender_id,sender_name,body,created_at,reply_to_seq,edited_at,deleted_at FROM chat_messages WHERE seq > ? ORDER BY seq ASC LIMIT ?').bind(seq,MAX_HISTORY);
+        ? env.DB.prepare('SELECT seq,client_message_id,sender_id,sender_name,body,created_at,reply_to_seq,edited_at,deleted_at FROM chat_messages WHERE deleted_at IS NULL ORDER BY seq DESC LIMIT ?').bind(MAX_HISTORY)
+        : env.DB.prepare('SELECT seq,client_message_id,sender_id,sender_name,body,created_at,reply_to_seq,edited_at,deleted_at FROM chat_messages WHERE seq > ? AND deleted_at IS NULL ORDER BY seq ASC LIMIT ?').bind(seq,MAX_HISTORY);
       const rows = (await query.all()).results || [];
       if (seq === null || earlier !== null) rows.reverse();
       const messageSeqs = rows.map(row => row.seq);
