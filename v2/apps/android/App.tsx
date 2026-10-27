@@ -6,10 +6,9 @@ import {
 import {
   HAVANA_V2_DEV_API_BASE_URL, fetchBackendHealth, getChatSnapshot, getOlderChatMessages, searchChatMessages, lastReadByOther, messageDeliveryLabel, newClientMessageId,
   reconcileChatMessages, reconcileReactions, reconcileUpdatedMessage, startNamedChatSession, restoreNamedChatSession,
-  DeviceApprovalRequiredError, requestChatDeviceEnrollment, checkChatDeviceEnrollment, usablePendingChatEnrollment, type PendingChatDeviceEnrollment,
   type ChatMessage, type ChatServerEvent, type ChatSession, type ChatReaction, type ChatEmoji, type ChatReadReceipt,
 } from '@havana/shared';
-import { loadNativeLocalChat, saveNativeLocalChat, loadNativePendingEnrollment, saveNativePendingEnrollment } from './chatStorage';
+import { loadNativeLocalChat, saveNativeLocalChat } from './chatStorage';
 import SwipeableBubble, {type BubbleAnchor} from './SwipeableBubble';
 
 export default function App() {
@@ -23,8 +22,6 @@ export default function App() {
   const [error, setError] = useState('');
   const [connection, setConnection] = useState('desconectado');
   const [joining, setJoining] = useState(false);
-  const [enrollment,setEnrollment] = useState<PendingChatDeviceEnrollment|null>(null);
-  const [checkingEnrollment,setCheckingEnrollment] = useState(false);
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [reactions, setReactions] = useState<ChatReaction[]>([]);
   const [onlineCount, setOnlineCount] = useState(0);
@@ -467,10 +464,10 @@ export default function App() {
 
   useEffect(() => {
     disposed.current = false;
-    void Promise.all([loadNativeLocalChat(),loadNativePendingEnrollment()]).then(async ([saved,pending]) => {
+    void loadNativeLocalChat().then(async saved => {
       if (disposed.current) return;
       if (activeSession.current) {restoredStorage.current=true;persistLocal();return;}
-      if (!saved?.session || Date.parse(saved.session.expiresAt) <= Date.now()) {if(pending){setEnrollment(pending);setName(pending.displayName);}return;}
+      if (!saved?.session || Date.parse(saved.session.expiresAt) <= Date.now()) return;
       let approved:ChatSession | null = saved.session;
       try {approved = await restoreNamedChatSession(saved.session);}
       catch {approved = saved.session;} // Offline: retain local identity and retry once online
@@ -562,8 +559,6 @@ export default function App() {
     setReceipts([]);
     setResults(null);
     setHasMore(false);
-    setEnrollment(null);
-    void saveNativePendingEnrollment(null);
     setSession(next);
     activeSession.current=next;
     persistLocal();
@@ -571,35 +566,13 @@ export default function App() {
     connect(next);
   }
   async function join() {
-    if (!name.trim() || joining) return;
-    setJoining(true);
-    setError('');
-    try {
+    if(!name.trim()||joining)return;
+    setJoining(true);setError('');
+    try{
       const next=await startNamedChatSession(name.trim());
       acceptApprovedSession(next);
-    } catch(reason) {
-      if(reason instanceof DeviceApprovalRequiredError) {
-        try {
-          const pending=await requestChatDeviceEnrollment(name.trim(),'Android · HAVANA NICE V2');
-          await saveNativePendingEnrollment(pending);
-          setEnrollment(pending);
-        } catch(e) {setError(e instanceof Error?e.message:'No se pudo solicitar acceso');}
-      } else setError(reason instanceof Error?reason.message:'No se pudo entrar');
-    } finally {setJoining(false);}
-  }
-  async function checkEnrollment(){
-    if(!enrollment||checkingEnrollment)return;
-    if(!usablePendingChatEnrollment(enrollment)){
-      setEnrollment(null);void saveNativePendingEnrollment(null);setError('La solicitud venció. Puedes solicitar otra.');return;
-    }
-    setCheckingEnrollment(true);setError('');
-    try{
-      const result=await checkChatDeviceEnrollment(enrollment);
-      if('token' in result)acceptApprovedSession(result);
-      else setError('Todavía falta la aprobación del administrador.');
-    } catch(e) {
-      setError(e instanceof Error?e.message:'No se pudo revisar la autorización');
-    } finally {setCheckingEnrollment(false);}
+    }catch(reason){setError(reason instanceof Error?reason.message:'No se pudo entrar');}
+    finally{setJoining(false);}
   }
 
   function react(seq: number, emoji: ChatEmoji) {
@@ -712,17 +685,6 @@ export default function App() {
         {restoringAccess ? <View style={styles.login}><Text style={styles.description}>Abriendo HAVANA NICE…</Text></View> : !session ? (
           <View style={styles.login}>
             <Text style={styles.overline}>ACCESO HAVANA NICE</Text>
-            {enrollment ? <>
-              <Text style={styles.loginTitle}>Esperando autorización</Text>
-              <Text style={styles.description}>Solicitud enviada para {enrollment.displayName}. El administrador debe aprobar este teléfono desde HAVANA NICE V2.</Text>
-              <Pressable accessibilityRole="button" onPress={()=>void checkEnrollment()} disabled={checkingEnrollment} style={styles.joinButton}>
-                <Text style={styles.joinText}>{checkingEnrollment?'Comprobando…':'Comprobar autorización'}</Text>
-              </Pressable>
-              <Pressable accessibilityRole="button" onPress={()=>{setEnrollment(null);void saveNativePendingEnrollment(null);setError('');}} style={{paddingVertical:14}}>
-                <Text style={styles.footer}>Cancelar solicitud en este teléfono</Text>
-              </Pressable>
-              {error?<Text style={styles.error}>{error}</Text>:null}
-            </> : <>
             <Text style={styles.loginTitle}>Bienvenido.</Text>
             <Text style={styles.description}>Escribe tu nombre autorizado la primera vez. En este teléfono se recordará tu acceso.</Text>
             <Text style={styles.label}>Tu nombre</Text>
@@ -735,7 +697,6 @@ export default function App() {
             </Pressable>
             {error ? <Text style={styles.error}>{error}</Text> : null}
             <Text style={styles.footer}>Si no estás autorizado, consulta al administrador.</Text>
-            </>}
           </View>
         ) : (
           <>
