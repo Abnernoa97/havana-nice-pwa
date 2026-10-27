@@ -743,6 +743,10 @@ Hallazgos y acciones documentados:
 
 **Aún pendiente para cerrar hitos:** comprobar el cierre efectivo de una sesión activa al eliminar un integrante exclusivo de pruebas, impedir nueva entrada con el nombre eliminado, supervisar datos de otros músicos y tener una copia externa D1 verificable antes de una limpieza destructiva. Identificación exacta opcional de modelos requerirá metadatos confiables del dispositivo (p. ej., Client Hints permitidos), sin inventar ni extraer datos privados. **El tablero permanece 10/27; S01, S02, P04 abiertos.**
 
+### Validación física adicional — historial corregido de «Prueba 1» · 27/10/2026, 01:43 CDMX
+
+**Captura nueva del propietario en Administrador PWA:** al volver a abrir el acordeón de `Prueba 1`, se siguen viendo **1 entrada**, los mismos **2 eventos `connect` y 2 eventos `disconnect`**; aparecen las fechas y horas del 27/10 entre 01:32 y 01:33 a. m. y, en vez de los identificadores genéricos `Android 10; K` de Chrome, ahora se lee **`Android (versión no disponible)`** y **`Modelo no disponible`**. Se da por **confirmada físicamente la corrección de presentación y conservación del historial**, sin modificar D1. La prueba anterior contra D1 ya confirmó los cinco eventos exactos. **S01/S02/P04 permanecen abiertos**: resta comprobar desconexión efectiva e impedimento de reingreso después de eliminar un usuario de prueba, sin afectar a los seis músicos habituales. No ejecutar ese borrado sin ensayo controlado y respaldo independiente verificado. **Avance oficial sigue 10/27**.
+
 ### Procedimiento permanente
 
 1. Leer este plan y el HEAD de `havana-nice-v2-foundation`.
