@@ -141,3 +141,37 @@ test('Faster batches are strictly bounded: two original files concurrently, orde
  assert.match(read('apps/android/media-upload.ts'),/while\(offset<selected\.sizeBytes\)/);
  assert.match(read('apps/pwa/src/media-upload.ts'),/while\(offset<file\.size\)/);
 });
+
+test('Media-only bubbles remain visual across Chat PWA, native and Administrator',()=>{
+ const pwa=read('apps/pwa/src/App.tsx');
+ const android=read('apps/android/App.tsx');
+ const admin=read('apps/pwa/src/AdminChatGeneral.tsx');
+ assert.match(pwa,/!message\.media&&<div>\{message\.text\}<\/div>/);
+ assert.match(android,/!message\.media\?<Text/);
+ assert.match(admin,/!m\.media&&<p>\{m\.text\}<\/p>/);
+ assert.match(pwa,/message\.media&&<ChatMediaView/);
+ assert.match(admin,/m\.media&&<ChatMediaView/);
+ assert.match(android,/message\.media\?<NativeChatMediaView/);
+});
+test('Native photo uses a fully verified local cache and modal without a browser; video plays inline',()=>{
+ const native=read('apps/android/NativeChatMediaView.tsx');
+ const packageManifest=JSON.parse(read('apps/android/package.json'));
+ assert.equal(packageManifest.dependencies['expo-video'],'58.0.12');
+ assert.match(native,/useVideoPlayer/);
+ assert.match(native,/<VideoView player=\{player\} nativeControls/);
+ assert.match(native,/File\.downloadFileAsync/);
+ assert.match(native,/finished\.size!==media\.sizeBytes/);
+ assert.match(native,/cached\.exists&&cached\.size===media\.sizeBytes/);
+ assert.match(native,/<Modal visible=\{media\.kind==='photo'&&enlarged&&!!photo\}/);
+ assert.doesNotMatch(native,/Linking\.openURL|media\.name\} ·|Reproducir video/);
+ assert.match(native,/setPhoto\(cached\.uri\)/);
+});
+test('Web/Admin originals are fully downloaded once before opening, without forced gray letterboxes',()=>{
+ const web=read('apps/pwa/src/ChatMediaView.tsx');
+ const css=read('apps/pwa/src/styles.css');
+ assert.match(web,/await image\.blob\(\)/);
+ assert.match(web,/URL\.createObjectURL\(blob\)/);
+ assert.match(web,/<img src=\{ready\} alt="Fotografía ampliada"/);
+ assert.doesNotMatch(css,/\.hn-chat-photo\{[^}]*max-height:/);
+ assert.doesNotMatch(css,/\.hn-chat-video\{[^}]*aspect-ratio:4\/5/);
+});
