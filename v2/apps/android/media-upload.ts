@@ -22,7 +22,6 @@ export async function uploadNativeOriginal(
 ):Promise<void>{
  const original=new File(selected.uri);
  if(!original.exists||original.size!==selected.sizeBytes)throw Error('El archivo seleccionado ya no está disponible');
- {
   const prepare=()=>call(session,'/api/chat/media/start',{
    method:'POST',headers:{'content-type':'application/json'},
    body:JSON.stringify({clientId,batchId,batchIndex,kind:selected.kind,name:selected.name,
@@ -71,5 +70,4 @@ export async function uploadNativeOriginal(
    if(answer.complete)return;
   }
   throw Error('La transferencia terminó sin confirmación de almacenamiento');
- }
 }
