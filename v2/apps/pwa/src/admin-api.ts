@@ -92,6 +92,7 @@ export function adminReleaseInstallation(token:string,actorId:string,confirmName
 export type AdminChatMessage={
  seq:number;clientMessageId:string;senderId:string;senderName:string;text:string;
  sentAt:string;replyToSeq:number|null;editedAt:string|null;deletedAt:string|null;
+ media?:{assetId:string;kind:'photo'|'video';mimeType:string;sizeBytes:number;name:string}|null;
 };
 export type AdminChatReaction={messageSeq:number;actorId:string;emoji:string};
 export type AdminChatSnapshot={messages:AdminChatMessage[];reactions:AdminChatReaction[];hasMore:boolean};
