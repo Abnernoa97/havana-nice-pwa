@@ -112,7 +112,10 @@ test('Emoji stays enabled; microphone is informative until M03',()=>{
 test('Cloud is an untouched existing product: no proposed service binding or unused lab bridge',()=>{
  const config=JSON.parse(read('cloudflare/wrangler.jsonc'));
  assert.equal(config.name,'havana-nice-v2-dev');
- assert.deepEqual(config.services||[],[],'Do not bind or modify HAVANA CLOUD Worker to develop V2 Chat');
+ assert.equal(config.vars?.V2_CLOUD_LINK_ENABLED,'disabled','No upload credentials or requests enabled by default');
+ assert.deepEqual(config.services||[],[{
+  binding:'HAVANA_CLOUD_BRIDGE',service:'havana-nice-cloud'
+ }],'Caller-only V2 service binding may invoke the published Cloud endpoints without changing Cloud');
  assert.equal(existsSync(new URL('../cloudflare/src/havana-cloud-bridge-client.js',import.meta.url)),false,
    'Obsolete unused Cloud-private bridge module must remain deleted');
  const contract=read('cloudflare/src/unified-media.js');
