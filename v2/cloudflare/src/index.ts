@@ -1,5 +1,4 @@
 // @ts-nocheck
-import { handleChatMedia, mediaReadiness } from './drive-media.js';
 import {forwardHavanaPhotoToCloud} from './havana-cloud-bridge-client.js';
 import { handleAdminSessionApi, verifyAdminSession } from './admin-auth.js';
 import { adminSocketToken, adminTokenRequest, notifyAdminClients } from './admin-realtime.js';
@@ -381,7 +380,7 @@ export default {
     if (url.pathname === '/health') {
       let row = null, database = 'error';
       try { row = await env.DB.prepare('SELECT value FROM system_meta WHERE key = ?').bind('schema_version').first(); database = 'ok'; } catch {}
-      return respond({ ok: database === 'ok', app: 'havana-nice-v2', environment: env.HAVANA_ENV || 'development', database, schemaVersion: row?.value ?? null, realtime: 'configured', media: mediaReadiness(env).enabled ? 'google-drive-v2' : 'havana-cloud-private-bridge-pending', chat: 'authorized-members-persistent-device-sessions-realtime' }, database === 'ok' ? 200 : 503, origin);
+      return respond({ ok: database === 'ok', app: 'havana-nice-v2', environment: env.HAVANA_ENV || 'development', database, schemaVersion: row?.value ?? null, realtime: 'configured', media: 'havana-cloud-private-bridge-pending', chat: 'authorized-members-persistent-device-sessions-realtime' }, database === 'ok' ? 200 : 503, origin);
     }
     // M01 staging only: the proxy is disabled until D1 can commit an
     // attachment + message after HAVANA CLOUD confirms the actual photo.
@@ -391,11 +390,6 @@ export default {
       if (!session) return respond({error:'Unauthorized'},401,origin);
       const result=await forwardHavanaPhotoToCloud(env,request,session.actorId);
       return respond(result,result.status||503,origin);
-    }
-    if (url.pathname.startsWith('/api/chat/media/')) {
-      const session = await verifySession(env, (request.headers.get('authorization') || '').replace(/^Bearer\s+/i, ''));
-      if (!session) return respond({ error: 'Unauthorized' }, 401, origin);
-      return handleChatMedia(request, env, session, url, origin, respond);
     }
     if (url.pathname === '/realtime/health') return env.CHAT_ROOMS.get(env.CHAT_ROOMS.idFromName('foundation-health')).fetch('https://internal/health');
     if (url.pathname === '/api/chat/admin/member-history' || url.pathname === '/api/chat/admin/member-delete-preview' || url.pathname === '/api/chat/admin/remove-member') {
