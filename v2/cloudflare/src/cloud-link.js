@@ -10,6 +10,13 @@ const DEVICE=/^d1\.([0-9]{10,12})\.[0-9a-f-]{36}\.[A-Za-z0-9_-]{43}$/i;
 const VALID_CLOUD_PATHS=new Set(['/api/auth/login','/api/auth/device','/api/google/upload/session','/api/google/upload/chunk','/api/media/delete','/api/trash/delete']);
 const CLOUD_READ=/^\/api\/media\/[0-9a-f-]{36}\/content$/i;
 const RUNTIME_FLAG='enabled';
+// Each Worker isolate reuses one short-lived, server-only Cloud session.
+// Never serialize this cookie to D1, browser, logging or a musician token.
+const CLOUD_SESSION_CACHE_MS=2*60*1000;
+let cachedCloudSession=null;
+let pendingCloudSession=null;
+function discardCloudSession(){cachedCloudSession=null;pendingCloudSession=null;}
+
 
 const encode=bytes=>btoa(String.fromCharCode(...bytes)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
 const decode=value=>Uint8Array.from(atob(value.replace(/-/g,'+').replace(/_/g,'/')),x=>x.charCodeAt(0));
@@ -75,6 +82,7 @@ export async function handleCloudLinkAdmin(request,env,url,origin,respond){
  }
  if(!cloudLinkConfigured(env))return send({error:'Enlace a CLOUD todavía no configurado en V2'},503);
  if(url.pathname==='/api/chat/admin/cloud/disconnect'&&request.method==='POST'){
+  discardCloudSession();
   await env.DB.prepare('DELETE FROM chat_cloud_link WHERE id=1').run();
   return send({ok:true,linked:false});
  }
@@ -98,6 +106,7 @@ export async function handleCloudLinkAdmin(request,env,url,origin,respond){
   const result=await upstream.json();
   if(!DEVICE.test(result?.deviceToken||''))return send({error:'CLOUD no entregó acceso de dispositivo'},502);
   await writeToken(env,result.deviceToken);
+  discardCloudSession();
   return send({ok:true,linked:true});
  }catch{
   return send({error:'No se pudo establecer el enlace seguro con CLOUD'},503);
@@ -105,10 +114,7 @@ export async function handleCloudLinkAdmin(request,env,url,origin,respond){
 }
 // Only V2's backend calls this; never return owner cookie/device token or
 // Cloud account IDs to musicians. Caller must whitelist each media operation.
-export async function requestExistingCloud(env,path,options={}){
- if(!cloudLinkConfigured(env))throw Error('cloud_unavailable');
- const row=await readLink(env);
- if(!row||Number(row.expires_at)<=Date.now())throw Error('cloud_not_linked');
+async function authorizeExistingCloud(env,row,identity){
  const device=await decryptDeviceToken(env,row);
  const auth=await fetchCloud(env,'/api/auth/device',{
   method:'POST',headers:{'content-type':'application/json'},
@@ -117,14 +123,46 @@ export async function requestExistingCloud(env,path,options={}){
  if(!auth.ok)throw Error('cloud_link_expired');
  const authBody=await auth.json();
  const issued=auth.headers.get('set-cookie')||'';
- const cookie=/^hn_cloud_session=([^;\s]+)/.exec(issued)?.[0];
+ const cookie=/^hn_cloud_session=([^;\\s]+)/.exec(issued)?.[0];
  if(!cookie||!DEVICE.test(authBody?.deviceToken||''))throw Error('cloud_link_expired');
- // A normal request must not write D1 for every 4 MiB fragment. Refresh
- // the long-lived device grant only when expiration is close.
  if(Number(row.expires_at)<Date.now()+7*24*3600_000)
   await writeToken(env,authBody.deviceToken);
- const headers=new Headers(options.headers||{});
- headers.set('cookie',cookie);
- headers.delete('authorization');
- return fetchCloud(env,path,{...options,headers});
+ const result={identity,cookie,until:Date.now()+CLOUD_SESSION_CACHE_MS};
+ cachedCloudSession=result;
+ return result;
+}
+async function cloudSession(env,row){
+ const identity=row.iv+':'+row.encrypted_token;
+ if(cachedCloudSession?.identity===identity&&cachedCloudSession.until>Date.now())
+  return cachedCloudSession;
+ if(pendingCloudSession?.identity===identity)return pendingCloudSession.promise;
+ const promise=authorizeExistingCloud(env,row,identity);
+ const pending={identity,promise};pendingCloudSession=pending;
+ try{return await promise;}
+ finally{if(pendingCloudSession===pending)pendingCloudSession=null;}
+}
+export async function requestExistingCloud(env,path,options={}){
+ if(!cloudLinkConfigured(env))throw Error('cloud_unavailable');
+ const row=await readLink(env);
+ if(!row||Number(row.expires_at)<=Date.now()){
+  discardCloudSession();
+  throw Error('cloud_not_linked');
+ }
+ let auth=await cloudSession(env,row);
+ const call=async(cookie)=>{
+  const headers=new Headers(options.headers||{});
+  headers.set('cookie',cookie);
+  headers.delete('authorization');
+  return fetchCloud(env,path,{...options,headers});
+ };
+ let response=await call(auth.cookie);
+ if(response.status===401){
+  // Expired/revoked cookies are never trusted: one fresh device grant,
+  // then retry only the already-authorized, replayable original request.
+  cachedCloudSession=null;
+  auth=await cloudSession(env,row);
+  response=await call(auth.cookie);
+  if(response.status===401)discardCloudSession();
+ }
+ return response;
 }
