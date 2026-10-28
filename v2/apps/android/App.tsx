@@ -869,9 +869,9 @@ export default function App() {
                         ↪ {messages.find(m=>m.seq===message.replyToSeq)?.text.slice(0,70)||'Mensaje anterior'}
                       </Text>
                     ) : null}
-                    <Text style={[styles.bubbleText,mine && styles.mineText]}>
+                    {!message.media?<Text style={[styles.bubbleText,mine && styles.mineText]}>
                       {message.text}
-                    </Text>
+                    </Text>:null}
                     {message.media?<NativeChatMediaView media={message.media} session={session}/>:null}
                     {message.seq>0 && !message.deletedAt && reactions.some(r=>r.messageSeq===message.seq) ? (
                       <View style={styles.reactionBadges}>
