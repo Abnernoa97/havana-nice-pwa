@@ -3,13 +3,13 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 const read=name=>readFileSync(new URL('../'+name,import.meta.url),'utf8');
 
-test('One shared photo/video policy; uploading remains disabled',()=>{
+test('One shared photo/video original quality policy; runtime Worker controls enablement',()=>{
  const src=read('packages/shared/src/index.ts');
- assert.match(src,/CHAT_MEDIA_UPLOAD_ENABLED=false as const/);
+ assert.doesNotMatch(src,/CHAT_MEDIA_UPLOAD_ENABLED/);
  assert.match(src,/export type ChatMediaKind='photo'\|'video'/);
  assert.match(src,/export function validateChatMediaSelection/);
- assert.match(src,/25\*1024\*1024/);
- assert.match(src,/512\*1024\*1024/);
+ assert.match(src,/100\*1024\*1024/);
+ assert.match(src,/10\*1024\*1024\*1024/);
  assert.doesNotMatch(src,/audio\/mpeg|mimeTypes:\['audio\//);
 });
 
@@ -37,8 +37,8 @@ test('PWA attachment menu only offers Fotos and Video, with distinct media filte
   'mediaMenuOpen','mediaInputs','chat-attachments-popover button small']){
   assert.ok(!src.includes(old)&&!css.includes(old),'Obsolete source: '+old);
  }
- assert.match(src,/CHAT_MEDIA_UPLOAD_ENABLED/);
- assert.doesNotMatch(src,/uploadPhoto\(|uploadVideo\(|POST.*media\/upload/);
+ assert.match(src,/sendSelectedMedia/);
+ assert.match(read('apps/pwa/src/media-upload.ts'),/file.slice\(offset/);
 });
 
 test('PWA camera icon requests camera capture directly instead of media gallery',()=>{
@@ -52,7 +52,7 @@ test('PWA camera icon requests camera capture directly instead of media gallery'
  assert.doesNotMatch(src,/accept="image\/\*,video\/\*"\s*capture/);
  assert.match(src,/URL.createObjectURL\(file\)/);
  assert.match(src,/URL.revokeObjectURL\(mediaObjectUrl.current\)/);
- assert.match(src,/onSubmit=\{event=>\{event.preventDefault\(\);send\(\);\}\}/);
+ assert.match(src,/onSubmit=\{event=>\{event.preventDefault\(\);if\(selectedMedia/);
 });
 
 test('Android native: two gallery filters, camera direct, no legacy extra menu',()=>{
@@ -84,9 +84,10 @@ test('Android native: two gallery filters, camera direct, no legacy extra menu',
  for(const old of ['cameraSymbol','attachmentDescription','mediaMenuOpen','styles.mediaMenu',
   'styles.mediaPlus','styles.sendButton'])
   assert.ok(!src.includes(old),'Obsolete Android UI: '+old);
- assert.match(src,/CHAT_MEDIA_UPLOAD_ENABLED/);
- assert.match(src,/La subida a HAVANA CLOUD aún no está habilitada/);
- assert.doesNotMatch(src,/fetch\(.*(?:upload|media).*(?:POST|PUT)/);
+ assert.match(src,/sendSelectedMedia/);
+ assert.match(src,/quality:1/);
+ assert.equal(manifest.dependencies['expo-file-system'],'~58.0.11');
+ assert.match(read('apps/android/media-upload.ts'),/FileMode.ReadOnly/);
 });
 
 test('Emoji stays enabled; microphone is informative until M03',()=>{
