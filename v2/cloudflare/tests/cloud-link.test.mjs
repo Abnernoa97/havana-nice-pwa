@@ -10,14 +10,19 @@ const respond=(body,status)=>Response.json(body,{status:status||200});
 const api='https://v2.internal/api/chat/admin/cloud/';
 const req=(route,method='GET',body=null,token=adminToken)=>new Request(api+route,{
  method,headers:{Authorization:'Bearer '+token,...(body?{'content-type':'application/json'}:{})},
- body:body?JSON.stringify(body):undefined
+ body:body&&method!=='GET'&&method!=='HEAD'?JSON.stringify(body):undefined
 });
 function setup({bound=true,flag='enabled',passwordOk=true}={}){
  let rows=null,upstreamCalls=[],adminSessions=0;
  const env={
   V2_CLOUD_LINK_ENABLED:flag,V2_ADMIN_LOGIN_MODE:'enabled',
   V2_ADMIN_LOGIN_SECRET:'admin-secret-'.repeat(5),
-  DB:{prepare(sql){return {bind(...args){return {
+  DB:{prepare(sql){return {
+   async first(){
+    if(sql.includes('FROM chat_cloud_link'))return rows?{...rows}:null;
+    throw Error('Unexpected direct SELECT '+sql);
+   },
+   bind(...args){return {
    async first(){
     if(sql.includes('FROM chat_admin_sessions')){adminSessions++;return{expires_at:Date.now()+200000,revoked_at:null};}
     if(sql.includes('FROM chat_cloud_link'))return rows?{...rows}:null;
