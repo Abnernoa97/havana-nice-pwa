@@ -88,7 +88,7 @@ export async function handleUnifiedChatMedia(request,env,session,url,origin,resp
  if(!session)return reply({error:'No autorizado'},401);
  if(path==='/api/chat/media/status'&&request.method==='GET')
    return reply({enabled:mediaConfigured(env),maxPhotoBytes:TYPES.photo.max,
-     maxVideoBytes:TYPES.video.max,chunkBytes:CHUNK_BYTES});
+     maxVideoBytes:TYPES.video.max,chunkBytes:CHUNK_BYTES,maxFilesPerSend:MAX_BATCH_FILES});
  if(!mediaConfigured(env))return reply({error:'HAVANA CLOUD todavía no está enlazada'},503);
  if(path==='/api/chat/media/start'&&request.method==='POST'){
    let m;try{m=await request.json()}catch{return reply({error:'Archivo inválido'},400);}
