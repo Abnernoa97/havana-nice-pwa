@@ -1,8 +1,8 @@
 # HAVANA NICE V2 — CONTINUIDAD EXACTA Y ÚNICA
 
-**Continuidad única vigente — 28 de octubre de 2026, con auditoría técnica M04/M01/M02.** Este documento **REEMPLAZA POR COMPLETO** el contenido anterior, en la misma ubicación y rama, sin otra copia ni anexos históricos. Documento compañero único: [PLAN-MAESTRO.md](./PLAN-MAESTRO.md), que conserva el tablero original de 27 hitos y también ha sido sustituido, no duplicado.
+**Continuidad única vigente — 28 de octubre de 2026, QA físico Android 0.0.8 y APK correctiva 0.0.9.** Este documento **REEMPLAZA POR COMPLETO** el contenido anterior, en la misma ubicación y rama, sin otra copia ni anexos históricos. Documento compañero único: [PLAN-MAESTRO.md](./PLAN-MAESTRO.md), que conserva el tablero original de 27 hitos y también ha sido sustituido, no duplicado.
 
-> **LEER PRIMERO EN EL PRÓXIMO CHAT:** proyecto HAVANA NICE V2, **M04 visor multimedia es la prioridad actual**. Fotos y videos YA SE SUBEN a HAVANA CLOUD REAL y se ven en Chat PWA y Administrador; no volver a construir puente, no pedir revincular CLOUD, no decir que están deshabilitados. El usuario pidió fotos/videos **a tamaño natural solo el contenido visual**, sin rótulos «Foto»/«Video», nombres ni MB; videos en **Android nativo dentro del Chat**, fotos ampliadas **completas de una sola vez desde caché privada**, no abrir navegador ni recargar la foto por partes. Esas correcciones **YA ESTÁN CODIFICADAS** y la APK nativa **0.0.8 ya fue FIRMADA y DISTRIBUIDA**; solo falta su instalación/QA físico y cualquier ajuste que el usuario observe. Mantener 12/27 hasta QA real. **HAVANA CLOUD intocable.** En este turno se confirmó de nuevo la publicación de APK, Worker y Pages y la integridad de D1; **ninguna prueba física nueva del teléfono** se ha reportado.
+> **LEER PRIMERO EN EL PRÓXIMO CHAT:** proyecto HAVANA NICE V2, **M04 visor multimedia es la prioridad actual**. Fotos y videos YA SE SUBEN a HAVANA CLOUD REAL y se ven en Chat PWA y Administrador; no volver a construir puente, no pedir revincular CLOUD, no decir que están deshabilitados. El usuario pidió fotos/videos **a tamaño natural solo el contenido visual**, sin rótulos «Foto»/«Video», nombres ni MB; videos en **Android nativo dentro del Chat**, fotos ampliadas **completas de una sola vez desde caché privada**, no abrir navegador ni recargar la foto por partes. La APK 0.0.8 fue probada por el propietario: **fotografías correctas (NO TOCAR)**, videos con controles pero **imagen negra** y error `Creating blobs from 'ArrayBuffer' and 'ArrayBufferView' are not supported` al subir archivos. La APK **0.0.9 FIRMADA Y DISTRIBUIDA** corrige la fuente de ambos fallos; requiere QA real antes de afirmar solución física. Mantener 12/27 hasta QA real. **HAVANA CLOUD intocable.** En este turno se confirmó de nuevo la publicación de APK, Worker y Pages y la integridad de D1; **ninguna prueba física nueva del teléfono** se ha reportado.
 
 ## 1. Forma de trabajo obligatoria
 
@@ -29,7 +29,7 @@
 | Tiempo real | Durable Object `CHAT_ROOMS`, preservar namespace y sesiones |
 | CLOUD independiente | Repo `Abnernoa97/havana-nice-cloud` en `main`, Worker `havana-nice-cloud` versión `a5165b9e-b952-42b3-9468-e86da0190a11` al **100 %** (sin modificar) |
 | Enlace a CLOUD | `HAVANA_CLOUD_BRIDGE` Service Binding **solo declarado en Worker V2**, token cifrado en D1 V2; **ya hay 1 vínculo autorizado** |
-| Android | paquete `com.havananice.v2`, firmado con certificado ya vigente; **0.0.8/versionCode 8 DISPONIBLE** |
+| Android | paquete `com.havananice.v2`, certificado anterior conservado, **0.0.9/versionCode 9 DISPONIBLE**, pendiente QA físico |
 | Último control de D1 (lectura 28/10) | **58 mensajes, 10 fotos + 4 videos ready, 14/14 con archivo remoto confirmado y mensaje asociado, 1 vínculo CLOUD, 0 subidas activas**. Tres músicos en control previo; valores dinámicos |
 
 **Verificación 28/10:** Worker `havana-nice-v2-dev` conservaba versión 32 con 100 % del tráfico; Pages `havana-nice-v2-dev` desplegó correctamente la rama V2 (commit documental `d0115e1e4a16515d44cee9a781015a62ff58a560`). **Advertencia importante:** la PWA se publica automáticamente desde GitHub/Cloudflare Pages, pero ello NO significa que Android nativo se actualice solo. El Worker V2 actual 32 es real, está publicado y tiene rollback; no publicar un Worker nuevo para solucionar detalles de presentación si no cambia su backend. El Worker de CLOUD permanece separado e intocable.
@@ -70,40 +70,36 @@
 
 **Comprobaciones de código:** [Foundation CI 40725322822 SUCCESS](https://github.com/Abnernoa97/havana-nice-pwa/actions/runs/40725322822) y [Foundation CI del release 0.0.8 40725644879 SUCCESS](https://github.com/Abnernoa97/havana-nice-pwa/actions/runs/40725644879), cubriendo TypeScript, PWA, export Android y guardas. **NO equivalen a prueba física del visor en Android.**
 
-**Lo que NO se ha confirmado físicamente todavía:** reproducción correcta del video desde la APK nueva (inicio, pausa, audio, fullscreen, reabrir con URL expirada), fotos verticales/horizontales/HEIC, tamaño real adecuado en Android, regreso a la posición del Chat, gestos de zoom, caché al reiniciar y crecimiento de almacenamiento local. El código ya está hecho pero M04 permanece abierto. No afirmar que M04 se cerró o que se solucionó en el dispositivo hasta una captura/prueba del propietario.
+**QA físico ya recibido (Android 0.0.8):** fotos proporcionales y completas aceptadas; videos negros pese a controles; error de subida Blob desde ArrayBuffer. **QA pendiente (0.0.9):** video con fotogramas/sonido/pausa/búsqueda dentro del Chat, enviar una foto y video reales, retorno a la conversación y persistencia de caché. No asegurar que la corrección funciona físicamente por pasar CI.
 
-## 6. Android APKs y actualización segura — estado definitivo del corte
+## 6. Android 0.0.9 — APK vigente firmada y publicada; QA físico pendiente
 
-**ÚLTIMA APK NATIVA 0.0.8 DISPONIBLE, FIRMADA y PUBLICADA.** Verificada de nuevo el 28/10 mediante GitHub tree (77,006,027 bytes) y tres Actions de compilación, distribución y Foundation en `success`.
+**APK 0.0.9, versionCode 9, lista para instalar ENCIMA de 0.0.8.** La firma X.509 y paquete `com.havananice.v2` fueron verificados contra la APK anterior por el distribuidor de GitHub. **No desinstalar ni borrar caché/datos/sesión.**
 
-- Nombre: `HAVANA-NICE-V2-ANDROID-cbb9c61eead6.apk`.
-- **Enlace directo real:** https://raw.githubusercontent.com/Abnernoa97/havana-nice-pwa/havana-nice-v2-apk-downloads/HAVANA-NICE-V2-ANDROID-cbb9c61eead6.apk
-- Tamaño: **77,006,027 bytes**.
-- **SHA-256:** `e32d7254938b0f8056a21e6439f0e1c6666e8fa423318810aa54d32a60376d1c`.
-- Paquete: `com.havananice.v2`, **versionName 0.0.8, versionCode 8**.
-- Certificado X.509 del firmante: `fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c` **idéntico al de 0.0.7**.
-- Código fuente de build: `cbb9c61eead6f72cca2840468ffae1d32028779d`.
-- [Build APK 40725645026 SUCCESS](https://github.com/Abnernoa97/havana-nice-pwa/actions/runs/40725645026); [distribución 40725644945 SUCCESS](https://github.com/Abnernoa97/havana-nice-pwa/actions/runs/40725644945); Foundation `40725644879` SUCCESS. Verificador de firma mostró **versionCode 7→8**, mismo paquete y certificado. Archivo confirmado en rama `havana-nice-v2-apk-downloads` con checksum en `SHA256SUMS.txt`.
-- **Instalar ENCIMA** de la versión actual, **sin desinstalar, sin borrar caché ni datos ni desvincular músicos**. Si no instala, auditar certificado/versión en vez de sugerir desinstalar.
-- **No consta confirmación física de instalación de 0.0.8 por el propietario.** La 0.0.6 sí se probó físicamente; la 0.0.7 se distribuyó pero no asumir instalada.
+- **Enlace directo verificado HTTP 200:** https://raw.githubusercontent.com/Abnernoa97/havana-nice-pwa/havana-nice-v2-apk-downloads/HAVANA-NICE-V2-ANDROID-5f0cc631af2c.apk
+- Nombre: `HAVANA-NICE-V2-ANDROID-5f0cc631af2c.apk`; **77,006,359 bytes**.
+- SHA-256: `8513c412faa2cb764a748b6dfad7b79f6820e1f29b1c2e9dd09686823016a05b`.
+- Commit fuente: `5f0cc631af2c98db724a39de51f0fa13b9030675`.
+- [Foundation CI 40730744345](https://github.com/Abnernoa97/havana-nice-pwa/actions/runs/40730744345) **SUCCESS**, [APK 40730744349](https://github.com/Abnernoa97/havana-nice-pwa/actions/runs/40730744349) **SUCCESS**, [distribución 40730744330](https://github.com/Abnernoa97/havana-nice-pwa/actions/runs/40730744330) **SUCCESS**.
+- Paquete `com.havananice.v2`, versionName 0.0.9, versionCode 8→9. Fingerprint X.509 histórico `fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c`.
+- **Motivo:** video negro en Android 0.0.8 (controles sí cargaban) y fallo nativo de subida con `new Blob([piece])` / `ArrayBuffer`. Fuente 0.0.9 cambió video a `surfaceView` y añadió reintento; upload `File.slice(offset,...)` + `expo/fetch` sin copiar archivos completos a JS. Hasta 2 archivos en paralelo, fragmentos 4 MiB por archivo, reintentos e idempotencia conservados.
+- **Fotos: NO TOCAR.** El usuario las validó en 0.0.8; código de fotografías, PWA/Admin, Worker y HAVANA CLOUD no se modificaron.
 
-**APK anterior 0.0.7 firmada:** https://raw.githubusercontent.com/Abnernoa97/havana-nice-pwa/havana-nice-v2-apk-downloads/HAVANA-NICE-V2-ANDROID-041a5aa51f6b.apk, SHA-256 `9b071c5e89be860e2cca1154ab21c9cf2e8e47dbb606373e9e7ff79e018fca60`. Es solo antecedente de actualización, no punto actual de trabajo.
+**Instalación física y funcionamiento 0.0.9 NO probados aún.** No cerrar M01/M02/M04 hasta que el propietario confirme video visible/con audio y nuevo envío de fotos/videos. La APK anterior 0.0.8 fue la versión que mostró los defectos; no reinstalarla para resolverlos.
 
-**APK no instalada ni reproducida físicamente desde este nuevo control:** se necesita QA real en el teléfono; no modificar fuente nativa ni emitir 0.0.9 por el simple hecho de actualizar estos documentos.
-
-**Los workflows originales se mantienen:** `.github/workflows/v2-android-apk.yml`, `.github/workflows/v2-apk-direct-download.yml`, controles de versión y firma continua. No crear otro flujo de distribución ni APK por cada cambio de documentos.
+**Workflows originales:** `.github/workflows/v2-android-apk.yml` y `.github/workflows/v2-apk-direct-download.yml`, sin crear rutas paralelas.
 
 ## 7. Tablero vigente y prioridad ejecutiva
 
 **Estado oficial: 12/27 = 44,4 %**, no se altera sin QA real. **Cerrados:** `B01, B02, B03, B04, C01, C02, C03, C04, C05, H01, S01, S02`. **Abiertos:** `H02, H03, H04, M01, M02, M03, M04, M05, P01, P02, P03, P04, P05, Q01, Q02`. Ver detalles y casillas en el único [Plan Maestro](./PLAN-MAESTRO.md).
 
-**M01 fotos** y **M02 videos** ya almacenan originales reales y aparecen en Chat/Administrador/CLOUD. Aún abiertos porque el propietario pidió mejorar visualización/velocidad y falta QA de visor/streaming nativo. **M04 visor** es prioridad actual, aunque su fuente/CI sean exitosos. **M03 audio** aplazado. **P04 Admin** tiene Acceso a músicos y Chat General funcionales; falta calendario, repertorio y más. Resto del plan sin cambio de alcance.
+**M01 fotos:** 10 archivos originales confirmados, visor aceptado en 0.0.8; envío nuevo falló en nativo, corregido en código de 0.0.9, QA pendiente. **M02 videos:** 4 MP4 originales confirmados, video negro en nativo 0.0.8, código 0.0.9 corregido, QA pendiente. Ambos abiertos. **M04 visor** es prioridad actual, aunque su fuente/CI sean exitosos. **M03 audio** aplazado. **P04 Admin** tiene Acceso a músicos y Chat General funcionales; falta calendario, repertorio y más. Resto del plan sin cambio de alcance.
 
 ## 8. Acciones EXACTAS del siguiente chat (no distraerse)
 
 1. **Empezar desde HAVANA NICE V2 / M04**, con [Plan Maestro](./PLAN-MAESTRO.md) y este documento. No pedir relato anterior, requisitos de diseño, contraseña de CLOUD, ni pruebas antiguas de acceso de músicos.
-2. **Entregar directamente la APK 0.0.8 ya comprobada** si el usuario no la tiene instalada, usando la URL verificada arriba. Recordar **instalación SOBRE** la existente sin borrar caché. Confirmar únicamente qué muestra la app, no pedir reinstalación ni borrar datos.
-3. **QA visual real (pendiente del propietario):** (a) foto horizontal/vertical visible proporcional, sin nombre/MB/rótulos ni rectángulo gris; (b) tocar foto y verla completa *de una vez* en Modal sin Chrome, volver al mismo Chat y repetir desde caché; (c) video reproducido **dentro de Android**, con audio, pausa, avance y retorno al Chat; (d) contrastar Chat PWA y Admin y probar red lenta, reinicio, expiración de URL y gestos/zoom. **Si uno falla, corregir solo el código V2; no tocar CLOUD.**
+2. **Entregar APK 0.0.9 verificada** (enlace de §6), instalar encima de 0.0.8 preservando sesión, datos y caché. No pedir desinstalación ni reinstalar la 0.0.8.
+3. **QA físico real 0.0.9:** (a) fotos se mantienen intactas; (b) video MP4 muestra **imagen y sonido** dentro del Chat, controles y regreso sin Chrome; (c) envío de una foto y un video originales desde nativo **sin error Blob**, confirmación Chat/Admin/CLOUD; (d) después red, expiración, Range y gestos/zoom. Si algo falla, corregir solo código V2, CLOUD intocable.
 4. Si hay defecto, **corregir la única fuente V2** (sobre todo `NativeChatMediaView.tsx` / `ChatMediaView.tsx` y estilos); pasar CI y publicar APK de nuevo solo cuando haya cambios nativos, con misma firma y versionCode siguiente, sin crear otras apps. **No tocar HAVANA CLOUD para acelerar una imagen.**
 5. **D1 ya auditada en lectura:** 14/14 originales y mensajes confirmados, 0 subidas activas. Repetir en el mismo teléfono/red la subida de 2 fotos + 1 video y medir tiempo extremo a extremo; contrastar con la muestra D1 posterior al Worker 32 (fotos 17.0 s, videos 34.5 s, tamaños diferentes), revisar aparición Chat/Admin/CLOUD, Range y reintentos sin duplicados. **No borrar datos**.
 6. Marcar M01/M02/M04 solo después de pruebas físicas y guardar resultado **reemplazando estados en estos mismos dos documentos**; continuar resto de 27 hitos, manteniendo PWA, Android y Administrador coordinados.
