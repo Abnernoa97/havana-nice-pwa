@@ -249,8 +249,8 @@ export type ChatMediaSelection={kind:ChatMediaKind;source:ChatMediaSource;
  name:string;mimeType:string;sizeBytes:number;uri:string};
 export const CHAT_MEDIA_UPLOAD_ENABLED=false as const;
 export const CHAT_MEDIA_LIMITS={
- photo:{maxBytes:25*1024*1024,mimes:['image/jpeg','image/png','image/webp','image/heic','image/heif']},
- video:{maxBytes:512*1024*1024,mimes:['video/mp4','video/quicktime']}
+ photo:{maxBytes:100*1024*1024,mimes:['image/jpeg','image/png','image/webp','image/heic','image/heif']},
+ video:{maxBytes:10*1024*1024*1024,mimes:['video/mp4','video/quicktime']}
 } as const;
 export function validateChatMediaSelection(
  item:Pick<ChatMediaSelection,'kind'|'name'|'mimeType'|'sizeBytes'>
