@@ -16,6 +16,7 @@ export function newMediaUploadId(){
 /** Bounded native reads: never load a 10 GiB video into JavaScript memory. */
 export async function uploadNativeOriginal(
  session:ChatSession,selected:ChatMediaSelection,clientId:string,
+ batchId:string,batchIndex:number,
  report:(sent:number,total:number)=>void
 ):Promise<void>{
  const original=new File(selected.uri);
@@ -24,7 +25,7 @@ export async function uploadNativeOriginal(
   if(handle.size!==selected.sizeBytes)throw Error('El archivo seleccionado ya no está disponible');
   const prepare=()=>call(session,'/api/chat/media/start',{
    method:'POST',headers:{'content-type':'application/json'},
-   body:JSON.stringify({clientId,kind:selected.kind,name:selected.name,
+   body:JSON.stringify({clientId,batchId,batchIndex,kind:selected.kind,name:selected.name,
      mimeType:selected.mimeType,sizeBytes:selected.sizeBytes})
   });
   let state=await prepare();
