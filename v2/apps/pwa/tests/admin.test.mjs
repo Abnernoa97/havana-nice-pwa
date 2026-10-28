@@ -273,7 +273,7 @@ test('Administrator Chat uses the existing authenticated session, not a musician
  const viewer=read('../src/AdminChatGeneral.tsx');
  const api=read('../src/admin-api.ts');
  const worker=read('../../../cloudflare/src/index.ts');
- assert.match(access,/section==='chat'.*<AdminChatGeneral/);
+ assert.match(access,/section==='chat'[\s\S]*<AdminCloudConnection[\s\S]*<AdminChatGeneral/);
  assert.match(frame,/tab!=='access'&&tab!=='chat'/);
  assert.match(viewer,/adminChatMessages\(token/);
  assert.match(viewer,/adminDeleteChatMessage\(token,message.seq\)/);
