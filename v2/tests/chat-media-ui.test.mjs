@@ -8,6 +8,7 @@ test('One shared photo/video original quality policy; runtime Worker controls en
  assert.doesNotMatch(src,/CHAT_MEDIA_UPLOAD_ENABLED/);
  assert.match(src,/export type ChatMediaKind='photo'\|'video'/);
  assert.match(src,/export function validateChatMediaSelection/);
+ assert.match(src,/export const CHAT_MEDIA_MAX_PER_SEND=5 as const/);
  assert.match(src,/100\*1024\*1024/);
  assert.match(src,/10\*1024\*1024\*1024/);
  assert.doesNotMatch(src,/audio\/mpeg|mimeTypes:\['audio\//);
@@ -38,7 +39,11 @@ test('PWA attachment menu only offers Fotos and Video, with distinct media filte
   assert.ok(!src.includes(old)&&!css.includes(old),'Obsolete source: '+old);
  }
  assert.match(src,/sendSelectedMedia/);
+ assert.match(src,/multiple onChange=/);
+ assert.match(src,/mediaQueue\.current\.length\+files\.length>CHAT_MEDIA_MAX_PER_SEND/);
+ assert.match(src,/selectedMedia\.map\(item=>/);
  assert.match(read('apps/pwa/src/media-upload.ts'),/file.slice\(offset/);
+ assert.match(read('apps/pwa/src/media-upload.ts'),/batchId,batchIndex/);
 });
 
 test('PWA camera icon requests camera capture directly instead of media gallery',()=>{
@@ -51,7 +56,7 @@ test('PWA camera icon requests camera capture directly instead of media gallery'
  assert.match(src,/chooseMedia\('camera','photo'/);
  assert.doesNotMatch(src,/accept="image\/\*,video\/\*"\s*capture/);
  assert.match(src,/URL.createObjectURL\(file\)/);
- assert.match(src,/URL.revokeObjectURL\(mediaObjectUrl.current\)/);
+ assert.match(src,/URL.revokeObjectURL\(removed.selection.uri\)/);
  assert.match(src,/onSubmit=\{event=>\{event.preventDefault\(\);if\(selectedMedia/);
 });
 
@@ -86,6 +91,9 @@ test('Android native: two gallery filters, camera direct, no legacy extra menu',
   assert.ok(!src.includes(old),'Obsolete Android UI: '+old);
  assert.match(src,/sendSelectedMedia/);
  assert.match(src,/quality:1/);
+ assert.match(src,/allowsMultipleSelection:source==='gallery'/);
+ assert.match(src,/selectionLimit:source==='gallery'\?free:1/);
+ assert.match(src,/selectedMedia\.map\(item=>/);
  assert.equal(manifest.dependencies['expo-file-system'],'~58.0.11');
  assert.match(read('apps/android/media-upload.ts'),/FileMode.ReadOnly/);
 });
