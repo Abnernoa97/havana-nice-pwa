@@ -50,6 +50,15 @@ jobs:
       - name: Typecheck all workspaces
         run: npm run typecheck
 
+      - name: Prepare the real V2 Worker bundle without deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd cloudflare
+          npx wrangler deploy --dry-run --outdir /tmp/havana-v2-worker-preview
+          test -d /tmp/havana-v2-worker-preview
+          echo "SUCCESS: V2 Worker bundled, no production changes"
+
       - name: Verify zero-billing Drive adapter safety
         run: npm run test:media -w @havana/cloudflare
 
