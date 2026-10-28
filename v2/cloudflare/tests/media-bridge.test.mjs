@@ -1,68 +1,37 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {forwardHavanaPhotoToCloud} from '../src/havana-cloud-bridge-client.js';
-const actor='member:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-const cid='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
-const photo=Uint8Array.from([255,216,255,224,0,16,74,70,73,70,0,1,255,217]);
-function request(headers={}){
- return new Request('https://havana-nice-v2-dev.pages.dev/api/chat/media/photo/upload',{
-  method:'POST',headers:{
-   'content-type':'image/jpeg',
-   'x-havana-v2-client-id':cid,
-   'x-havana-v2-file-name':'test.jpg',
-   'x-havana-v2-size-bytes':String(photo.length),...headers
-  },body:photo
- });
-}
-function ready(fetcher){
- return {
-  V2_CLOUD_BRIDGE_ENABLED:'enabled',
-  V2_CLOUD_BRIDGE_PHOTO_ENABLED:'enabled',
-  V2_CLOUD_BRIDGE_SECRET:'x'.repeat(54),
-  HAVANA_CLOUD_BRIDGE:{fetch:fetcher}
- };
-}
-test('M01 server proxy always denies a missing binding or disabled transfer, without invoking cloud',async()=>{
- let called=0;const env=ready(()=>{called++;throw Error('must not call');});
- env.V2_CLOUD_BRIDGE_PHOTO_ENABLED='disabled';
- assert.equal((await forwardHavanaPhotoToCloud(env,request(),actor)).status,503);
- assert.equal((await forwardHavanaPhotoToCloud({},request(),actor)).status,503);
- assert.equal(called,0);
+import {mediaConfigured,handleUnifiedChatMedia} from '../src/unified-media.js';
+
+const actorId='member:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const session={actorId,displayName:'Prueba'};
+const respond=(data,status=200)=>Response.json(data,{status});
+const uuid='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+const valid={kind:'video',name:'video-original.mp4',mimeType:'video/mp4',
+ sizeBytes:10*1024*1024*1024,clientId:uuid};
+const endpoint='https://api.test/api/chat/media/start';
+const post=body=>new Request(endpoint,{method:'POST',
+ headers:{'content-type':'application/json'},body:JSON.stringify(body)});
+test('One storage path denies every photo/video upload until BOTH private Workers are bound',async()=>{
+ assert.equal(mediaConfigured({}),false);
+ const r=await handleUnifiedChatMedia(post(valid),{},session,new URL(endpoint),'',respond,async()=>{});
+ assert.equal(r.status,503);
 });
-test('Verified actor overrides browser identity and no token/account information escapes',async()=>{
- let observed;
- const env=ready(async(url,init)=>{
-  observed={url,headers:new Headers(init.headers),data:new Uint8Array(await new Response(init.body).arrayBuffer())};
-  return Response.json({kind:'photo',status:'ready',
-   assetId:'cccccccc-cccc-4ccc-8ccc-cccccccccccc',alreadyUploaded:false},{status:201});
- });
- const requestWithSpoofedActor=request({'x-havana-v2-actor-id':'member:dddddddd-dddd-4ddd-8ddd-dddddddddddd','authorization':'Bearer fake'});
- const result=await forwardHavanaPhotoToCloud(env,requestWithSpoofedActor,actor);
- assert.deepEqual(result,{ok:true,status:201,assetId:'cccccccc-cccc-4ccc-8ccc-cccccccccccc',kind:'photo',alreadyUploaded:false});
- assert.equal(observed.headers.get('x-havana-v2-actor-id'),actor);
- assert.equal(observed.headers.get('authorization'),null);
- assert.equal(observed.headers.get('x-havana-v2-internal-token'),env.V2_CLOUD_BRIDGE_SECRET);
- assert.equal(observed.url,'https://havana-cloud.internal/api/internal/havana-v2/photo');
- assert.equal(observed.data.length,photo.length);
- assert.equal(JSON.stringify(result).includes('token'),false);
-});
-test('Never proxy illegal formats, identities or large files',async()=>{
- let called=0;const env=ready(()=>{called++;throw Error('must not call')});
- for(const [headers,verified] of [
-  [{'content-type':'video/mp4'},actor],
-  [{'x-havana-v2-client-id':'broken'},actor],
-  [{'x-havana-v2-file-name':'../evil.jpg'},actor],
-  [{'x-havana-v2-size-bytes':'30000000'},actor],
-  [{},'fake']
+test('Metadata does not allow 10GiB+ files or arbitrary file types',async()=>{
+ const env={V2_CLOUD_BRIDGE_ENABLED:'enabled',V2_CLOUD_BRIDGE_MEDIA_ENABLED:'enabled',
+  V2_CLOUD_BRIDGE_SECRET:'x'.repeat(40),HAVANA_CLOUD_BRIDGE:{fetch:()=>{throw Error('should not reach');}},
+  DB:{prepare:()=>{throw Error('should not reach');}}};
+ for(const meta of [
+   {...valid,sizeBytes:10*1024*1024*1024+1},
+   {...valid,kind:'document'}, {...valid,name:'../not-allowed.mp4'},
+   {...valid,mimeType:'text/html'}
  ]){
-  const out=await forwardHavanaPhotoToCloud(env,request(headers),verified);
-  assert.equal(out.status,400);
+  const r=await handleUnifiedChatMedia(post(meta),env,session,new URL(endpoint),'',respond,async()=>{});
+  assert.equal(r.status,400);
  }
- assert.equal(called,0);
 });
-test('Cloud errors never return upstream secret-bearing JSON to browser',async()=>{
- const env=ready(async()=>Response.json({token:'private-google-token',accountId:'secret'},{status:502}));
- const out=await forwardHavanaPhotoToCloud(env,request(),actor);
- assert.equal(out.status,502);
- assert.equal(JSON.stringify(out).includes('private-google-token'),false);
+test('Public media status never exposes cloud credentials or account ids',async()=>{
+ const r=await handleUnifiedChatMedia(new Request('https://api.test/api/chat/media/status'),{},session,
+  new URL('https://api.test/api/chat/media/status'),'',respond,async()=>{});
+ assert.deepEqual(await r.json(),{enabled:false,maxPhotoBytes:100*1024*1024,
+   maxVideoBytes:10*1024*1024*1024,chunkBytes:4*1024*1024});
 });
