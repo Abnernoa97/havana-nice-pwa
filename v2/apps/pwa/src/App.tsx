@@ -3,7 +3,7 @@ import {
   fetchBackendHealth, getChatSnapshot, getOlderChatMessages, searchChatMessages, lastReadByOther, messageDeliveryLabel, newClientMessageId,
   openChatSocket, reconcileChatMessages, startNamedChatSession, restoreNamedChatSession,
   type BackendHealth, type ChatMessage, type ChatServerEvent, type ChatSession,
-  validateChatMediaSelection, HAVANA_V2_DEV_API_BASE_URL, type ChatMediaSelection, type ChatMediaKind, type ChatMediaSource,
+  validateChatMediaSelection, CHAT_MEDIA_MAX_PER_SEND, HAVANA_V2_DEV_API_BASE_URL, type ChatMediaSelection, type ChatMediaKind, type ChatMediaSource,
   reconcileReactions, reconcileUpdatedMessage, reconcileDeletedMessage, reconcileChatSnapshot, type ChatReaction, type ChatEmoji, type ChatReadReceipt,
 } from '@havana/shared';
 import { loadLocalChat, saveLocalChat } from './local';
@@ -11,6 +11,8 @@ import SwipeMessage, {type MessageAnchor} from './SwipeMessage';
 import ComposerIcon from './ChatComposerIcon';
 import ChatMediaView from './ChatMediaView';
 import {uploadOriginalMedia} from './media-upload';
+
+type PwaQueuedMedia={id:string;file:File;selection:ChatMediaSelection;batchIndex?:number};
 
 export default function App() {
   const [health, setHealth] = useState<BackendHealth | null>(null);
@@ -20,11 +22,10 @@ export default function App() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState('');
   const [composerPanel,setComposerPanel]=useState<'attachments'|'emojis'|null>(null);
-  const [selectedMedia,setSelectedMedia]=useState<ChatMediaSelection|null>(null);
+  const [selectedMedia,setSelectedMedia]=useState<PwaQueuedMedia[]>([]);
   const [mediaError,setMediaError]=useState('');
-  const mediaObjectUrl=useRef<string|null>(null);
-  const selectedFile=useRef<File|null>(null);
-  const selectedUploadId=useRef<string|null>(null);
+  const mediaQueue=useRef<PwaQueuedMedia[]>([]);
+  const mediaBatchId=useRef<string|null>(null);
   const [mediaReady,setMediaReady]=useState(false);
   const [mediaUploading,setMediaUploading]=useState(false);
   const [mediaProgress,setMediaProgress]=useState(0);
@@ -59,31 +60,48 @@ export default function App() {
   const bottom = useRef<HTMLDivElement | null>(null);
   const scrollOlderOnce=useRef(false);
   const typingLast = useRef(0);
-  const removeSelectedMedia=()=>{
-    if(mediaObjectUrl.current){URL.revokeObjectURL(mediaObjectUrl.current);mediaObjectUrl.current=null;}
-    selectedFile.current=null;selectedUploadId.current=null;
-    setSelectedMedia(null);setMediaError('');
+  const removeSelectedMedia=(id:string)=>{
+    if(mediaUploading)return;
+    const removed=mediaQueue.current.find(x=>x.id===id);
+    if(removed)URL.revokeObjectURL(removed.selection.uri);
+    mediaQueue.current=mediaQueue.current.filter(x=>x.id!==id);
+    if(!mediaQueue.current.length)mediaBatchId.current=null;
+    setSelectedMedia([...mediaQueue.current]);setMediaError('');
   };
   const openGalleryMedia=(kind:ChatMediaKind)=>{
     setComposerPanel(null);setMediaError('');
+    if(mediaUploading||mediaBatchId.current)return;
+    if(mediaQueue.current.length>=CHAT_MEDIA_MAX_PER_SEND){
+      setMediaError('Máximo 5 archivos por envío, entre fotos y videos.');return;
+    }
     (kind==='photo'?photosPicker:videoPicker).current?.click();
   };
   const openCamera=()=>{
     setComposerPanel(null);setMediaError('');
-    // Android's capture input asks for the device camera, not its media gallery.
+    if(mediaUploading||mediaBatchId.current)return;
+    if(mediaQueue.current.length>=CHAT_MEDIA_MAX_PER_SEND){
+      setMediaError('Máximo 5 archivos por envío, entre fotos y videos.');return;
+    }
     cameraPicker.current?.click();
   };
-  const chooseMedia=(source:ChatMediaSource,kind:ChatMediaKind,file?:File)=>{
-    if(!file)return;
-    const issue=validateChatMediaSelection({kind,name:file.name,
-      mimeType:file.type.toLowerCase(),sizeBytes:file.size});
-    if(issue){setMediaError(issue);return;}
-    if(mediaObjectUrl.current)URL.revokeObjectURL(mediaObjectUrl.current);
-    const uri=URL.createObjectURL(file);
-    mediaObjectUrl.current=uri;
-    selectedFile.current=file;selectedUploadId.current=crypto.randomUUID();
-    setSelectedMedia({kind,source,uri,name:file.name,mimeType:file.type.toLowerCase(),sizeBytes:file.size});
-    setMediaError('');
+  const chooseMedia=(source:ChatMediaSource,kind:ChatMediaKind,files:File[])=>{
+    if(!files.length||mediaUploading||mediaBatchId.current)return;
+    if(mediaQueue.current.length+files.length>CHAT_MEDIA_MAX_PER_SEND){
+      setMediaError('Máximo 5 archivos por envío, entre fotos y videos.');return;
+    }
+    for(const file of files){
+      const issue=validateChatMediaSelection({kind,name:file.name,
+        mimeType:file.type.toLowerCase(),sizeBytes:file.size});
+      if(issue){setMediaError(file.name+': '+issue);return;}
+    }
+    const additions=files.map(file=>{
+      const uri=URL.createObjectURL(file);
+      return {id:crypto.randomUUID(),file,
+        selection:{kind,source,uri,name:file.name,
+          mimeType:file.type.toLowerCase(),sizeBytes:file.size}} as PwaQueuedMedia;
+    });
+    mediaQueue.current=[...mediaQueue.current,...additions];
+    setSelectedMedia([...mediaQueue.current]);setMediaError('');
   };
   useEffect(()=>{
     if(!session){setMediaReady(false);return;}
@@ -96,26 +114,40 @@ export default function App() {
     return()=>{live=false;};
   },[session?.token]);
   async function sendSelectedMedia(){
-    const file=selectedFile.current,entry=selectedMedia;
-    if(!session||!entry||!file||mediaUploading)return;
+    if(!session||!mediaQueue.current.length||mediaUploading)return;
     if(!mediaReady){setMediaError('HAVANA CLOUD todavía no está enlazada.');return;}
+    const batch=mediaBatchId.current||crypto.randomUUID();
+    mediaBatchId.current=batch;
+    const items=mediaQueue.current.map((item,index)=>({
+      ...item,batchIndex:item.batchIndex??index
+    }));
+    mediaQueue.current=items;setSelectedMedia([...items]);
+    const total=items.reduce((n,item)=>n+item.selection.sizeBytes,0);
+    let completed=0;
     setMediaUploading(true);setMediaProgress(0);setMediaError('');
     try{
-      const id=selectedUploadId.current||crypto.randomUUID();
-      selectedUploadId.current=id;
-      await uploadOriginalMedia(session,entry,file,id,({sent,total})=>
-        setMediaProgress(Math.floor(sent/total*100)));
-      removeSelectedMedia();setMediaProgress(0);
-      refreshLatest.current();
-    }catch(reason){setMediaError(reason instanceof Error?reason.message:'No se pudo subir el archivo. Reintenta.');}
-    finally{setMediaUploading(false);}
+      for(const item of items){
+        await uploadOriginalMedia(session,item.selection,item.file,item.id,batch,
+          item.batchIndex!,({sent})=>setMediaProgress(Math.min(100,Math.floor((completed+sent)/total*100))));
+        completed+=item.selection.sizeBytes;
+        URL.revokeObjectURL(item.selection.uri);
+        mediaQueue.current=mediaQueue.current.filter(x=>x.id!==item.id);
+        setSelectedMedia([...mediaQueue.current]);
+        setMediaProgress(Math.floor(completed/total*100));
+        refreshLatest.current();
+      }
+      mediaBatchId.current=null;
+    }catch(reason){
+      setMediaError((reason instanceof Error?reason.message:'No se pudo subir')+
+        '. Los archivos pendientes siguen seleccionados para reintentar.');
+    }finally{setMediaUploading(false);}
   }
   const insertEmoji=(emoji:string)=>{
     if(editing&&savingEdit)return;
     if(draft.length+emoji.length<=2000)typeText(draft+emoji);
     setComposerPanel(null);
   };
-  useEffect(()=>()=>{if(mediaObjectUrl.current)URL.revokeObjectURL(mediaObjectUrl.current);},[]);
+  useEffect(()=>()=>{for(const item of mediaQueue.current)URL.revokeObjectURL(item.selection.uri);},[]);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const storageQueue = useRef<Promise<void>>(Promise.resolve());
   const latestDraft = useRef('');
@@ -770,26 +802,29 @@ export default function App() {
           </div>}
           <input className="chat-media-hidden-input" type="file" ref={photosPicker}
             tabIndex={-1} aria-hidden="true" accept="image/*"
-            onChange={e=>{chooseMedia('gallery','photo',e.currentTarget.files?.[0]);e.currentTarget.value='';}}/>
+            multiple onChange={e=>{chooseMedia('gallery','photo',Array.from(e.currentTarget.files||[]));e.currentTarget.value='';}}/>
           <input className="chat-media-hidden-input" type="file" ref={videoPicker}
             tabIndex={-1} aria-hidden="true" accept="video/*"
-            onChange={e=>{chooseMedia('gallery','video',e.currentTarget.files?.[0]);e.currentTarget.value='';}}/>
+            multiple onChange={e=>{chooseMedia('gallery','video',Array.from(e.currentTarget.files||[]));e.currentTarget.value='';}}/>
           <input className="chat-media-hidden-input" type="file" ref={cameraPicker}
             tabIndex={-1} aria-hidden="true" accept="image/*" capture="environment"
-            onChange={e=>{chooseMedia('camera','photo',e.currentTarget.files?.[0]);e.currentTarget.value='';}}/>
-          {selectedMedia&&<div className="chat-media-preview" aria-label="Vista previa del archivo">
-            {selectedMedia.kind==='photo'
-              ?<img src={selectedMedia.uri} alt="Vista previa de la fotografía seleccionada"/>
-              :<video src={selectedMedia.uri} controls preload="metadata" playsInline aria-label="Vista previa del video"/>}
-            <div className="chat-media-preview-info">
-              <strong>{selectedMedia.name}</strong>
-              <small>{selectedMedia.kind==='photo'?'Fotografía':'Video'} · {(selectedMedia.sizeBytes/1048576).toFixed(1)} MB</small>
-              <small>{mediaUploading?'Subiendo '+mediaProgress+'%':mediaReady?'Original listo para enviar':'La subida a HAVANA CLOUD aún no está habilitada.'}</small>
-            </div>
-            <button type="button" aria-label="Quitar archivo seleccionado" onClick={removeSelectedMedia}>✕</button>
+            onChange={e=>{chooseMedia('camera','photo',Array.from(e.currentTarget.files||[]));e.currentTarget.value='';}}/>
+          {selectedMedia.length>0&&<div aria-label="Archivos para enviar">
+            <small>{selectedMedia.length} de {CHAT_MEDIA_MAX_PER_SEND} archivos · Puedes mezclar Fotos y Video</small>
+            {selectedMedia.map(item=><div key={item.id} className="chat-media-preview">
+              {item.selection.kind==='photo'
+                ?<img src={item.selection.uri} alt={'Vista previa de '+item.selection.name}/>
+                :<video src={item.selection.uri} controls preload="metadata" playsInline aria-label={'Vista previa de '+item.selection.name}/>}
+              <div className="chat-media-preview-info">
+                <strong>{item.selection.name}</strong>
+                <small>{item.selection.kind==='photo'?'Fotografía':'Video'} · {(item.selection.sizeBytes/1048576).toFixed(1)} MB</small>
+              </div>
+              <button type="button" disabled={mediaUploading} aria-label={'Quitar '+item.selection.name} onClick={()=>removeSelectedMedia(item.id)}>✕</button>
+            </div>)}
+            <small>{mediaUploading?'Subiendo '+mediaProgress+'%':mediaReady?'Originales listos para enviar':'La subida a HAVANA CLOUD aún no está habilitada.'}</small>
           </div>}
           {mediaError&&<p className="chat-media-error" role="alert">{mediaError}</p>}
-          <form className="chat-composer" onSubmit={event=>{event.preventDefault();if(selectedMedia&&!editing)void sendSelectedMedia();else send();}}>
+          <form className="chat-composer" onSubmit={event=>{event.preventDefault();if(selectedMedia.length&&!editing)void sendSelectedMedia();else send();}}>
             <div className="chat-input-pill">
               <button type="button" className="chat-icon-button chat-emoji-button"
                 aria-label="Insertar emoji" aria-expanded={composerPanel==='emojis'}
@@ -801,17 +836,17 @@ export default function App() {
                 placeholder={connection==='en vivo'?'Mensaje':'Sin conexión: se enviará después…'}/>
               <button type="button" className="chat-icon-button" aria-label="Adjuntar fotografía o video"
                 aria-expanded={composerPanel==='attachments'}
-                onClick={()=>setComposerPanel(p=>p==='attachments'?null:'attachments')}>
+                disabled={mediaUploading} onClick={()=>setComposerPanel(p=>p==='attachments'?null:'attachments')}>
                 <ComposerIcon name="clip" size={25}/>
               </button>
               <button type="button" className="chat-icon-button" aria-label="Abrir cámara"
-                onClick={openCamera}>
+                disabled={mediaUploading} onClick={openCamera}>
                 <ComposerIcon name="camera" size={25}/>
               </button>
             </div>
-            {draft.trim()||editing||selectedMedia
-              ?<button type="submit" className="chat-action-circle" aria-label={editing?'Guardar mensaje':selectedMedia?'Enviar archivo original':'Enviar mensaje'}
-                  disabled={mediaUploading||savingEdit||(!selectedMedia&&!draft.trim())}>
+            {draft.trim()||editing||selectedMedia.length>0
+              ?<button type="submit" className="chat-action-circle" aria-label={editing?'Guardar mensaje':selectedMedia.length?'Enviar archivos originales':'Enviar mensaje'}
+                  disabled={mediaUploading||savingEdit||(!selectedMedia.length&&!draft.trim())}>
                   <ComposerIcon name="send" size={24}/>
                 </button>
               :<button type="button" className="chat-action-circle" aria-label="Grabar audio (próximamente)"
