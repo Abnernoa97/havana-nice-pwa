@@ -12,6 +12,16 @@
     },
     "extra": {
       "environment": "development"
-    }
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Permitir a HAVANA NICE tomar fotos y videos para el Chat.",
+          "microphonePermission": "Permitir grabar audio al capturar videos en el Chat.",
+          "photosPermission": "Permitir elegir fotos y videos para el Chat."
+        }
+      ]
+    ]
   }
 }

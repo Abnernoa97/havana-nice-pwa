@@ -44,6 +44,11 @@ jobs:
       - name: Prevent V2 technical debt regressions
         run: npm run audit:guard
 
+      - name: Refresh native picker lockfile for integration review
+        run: |
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          git diff --unified=1 -- package-lock.json
+
       - name: Install exact dependencies
         run: npm ci
 
