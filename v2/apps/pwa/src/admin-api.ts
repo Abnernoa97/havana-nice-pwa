@@ -89,6 +89,21 @@ export function adminReleaseInstallation(token:string,actorId:string,confirmName
  return api<{ok:boolean;revokedSessions:number}>('/api/chat/admin/release-installation',
   authenticated(token,{method:'POST',body:JSON.stringify({actorId,confirmName})}));
 }
+// Administrator-only link to EXISTING HAVANA CLOUD, no password/device token
+// is stored by the browser or returned to any musician.
+export type AdminCloudLinkStatus={available:boolean;linked:boolean};
+export function adminCloudLinkStatus(token:string){
+ return api<AdminCloudLinkStatus>('/api/chat/admin/cloud/status',authenticated(token));
+}
+export function adminCloudLinkConnect(token:string,password:string){
+ return api<{ok:boolean;linked:boolean}>('/api/chat/admin/cloud/connect',
+  authenticated(token,{method:'POST',body:JSON.stringify({password})}));
+}
+export function adminCloudLinkDisconnect(token:string){
+ return api<{ok:boolean;linked:boolean}>('/api/chat/admin/cloud/disconnect',
+  authenticated(token,{method:'POST'}));
+}
+
 export type AdminChatMessage={
  seq:number;clientMessageId:string;senderId:string;senderName:string;text:string;
  sentAt:string;replyToSeq:number|null;editedAt:string|null;deletedAt:string|null;
