@@ -1,4 +1,5 @@
 import {useCallback,useEffect,useLayoutEffect,useRef,useState} from 'react';
+import ChatMediaView from './ChatMediaView';
 import {adminChatMessages,adminDeleteChatMessage,isAdminUnauthorized,
  type AdminChatMessage,type AdminChatReaction,type AdminChatStreamEvent} from './admin-api';
 
@@ -178,6 +179,6 @@ export default function AdminChatGeneral({token,connected,liveEvent,onExpired}:P
     })}
   </div>
   {typing&&<p className="a-chat-typing">{typing.name} está escribiendo…</p>}
-  <p className="a-chat-viewer-note">Administrador: solo lectura y eliminación. Los archivos de foto, video y audio aparecerán en esta conversación cuando esos formatos estén habilitados.</p>
+  <p className="a-chat-viewer-note">Administrador: mensajes, fotografías y videos de los músicos. Los originales se guardan en HAVANA CLOUD.</p>
  </section>;
 }
