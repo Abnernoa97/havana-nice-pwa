@@ -38,9 +38,9 @@
 
 ## 3. Último estado REAL auditado (no extrapolar estados antiguos)
 
-- **GitHub V2 HEAD antes de este traspaso:** `5176fd475214372801e8bad8e7ee73193340486f` (solo como referencia: actualizar HEAD al abrir el nuevo chat).
+- **GitHub V2 código fuente:** rama havana-nice-v2-foundation; verificar su HEAD en GitHub al reanudar, sin usar el SHA antiguo de la APK como versión vigente de fuente.
 - **GitHub Actions en el commit de APK** `828e0682815dfc0579e3197ed7a4c582372887ad`: Foundation CI `40613744827` **SUCCESS**; compilación de APK `40613744649` **SUCCESS**; publicador directo `40613744654` **SUCCESS**.
-- **Cloudflare V2 Worker** desplegado: `efbedccb-4d2d-4a3e-a560-8acb91c5a9eb`; **HAVANA CLOUD Worker**: `a5165b9e-b952-42b3-9468-e86da0190a11`. La PWA V2 estaba desplegada correctamente desde HEAD `5176fd475214372801e8bad8e7ee73193340486f`, antes de actualizar este documento.
+- **Cloudflare V2 Worker** desplegado: `efbedccb-4d2d-4a3e-a560-8acb91c5a9eb`; **HAVANA CLOUD Worker**: `a5165b9e-b952-42b3-9468-e86da0190a11`. Esas versiones de Worker son la última auditoría de despliegue y todavía no incluyen el nuevo transporte. No confundir CI de GitHub con despliegue operativo en Cloudflare.
 - **Lectura de D1 al cierre de la conversación:** **3 músicos, 3 sesiones de músicos, 3 instalaciones vinculadas, 44 mensajes (última comprobación 28/10), 11 reacciones (última lectura), 0 registros de multimedia y 0 mensajes marcados eliminados**. Hay un músico adicional respecto a auditorías viejas de 2; **no asumir su nombre** sin consultarlo. No modificar D1 para volver a 2.
 - Todos los seis músicos históricos y `Prueba 2` fueron **retirados del padrón a petición del propietario** el 27/10; el propietario volvió a crear músicos manualmente desde Administrador con la nueva lógica. Se conservaron mensajes/reacciones históricos, sin restaurar credenciales de cuentas eliminadas. No autosembrar el grupo original.
 - **No afirmar pruebas físicas inexistentes.** El borrado físico nuevo sigue pendiente de prueba; la instalación Android 0.0.6 ya fue confirmada por el propietario; la PWA con nuevo compositor y los selectores **sí fue confirmada con fotografías del teléfono**.
