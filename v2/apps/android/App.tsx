@@ -7,12 +7,14 @@ import {
   HAVANA_V2_DEV_API_BASE_URL, fetchBackendHealth, getChatSnapshot, getOlderChatMessages, searchChatMessages, lastReadByOther, messageDeliveryLabel, newClientMessageId,
   reconcileChatMessages, reconcileReactions, reconcileUpdatedMessage, reconcileDeletedMessage, reconcileChatSnapshot, startNamedChatSession, restoreNamedChatSession,
   type ChatMessage, type ChatServerEvent, type ChatSession, type ChatReaction, type ChatEmoji, type ChatReadReceipt,
-  validateChatMediaSelection, CHAT_MEDIA_UPLOAD_ENABLED, type ChatMediaSelection, type ChatMediaKind, type ChatMediaSource,
+  validateChatMediaSelection, type ChatMediaSelection, type ChatMediaKind, type ChatMediaSource,
 } from '@havana/shared';
 import { loadNativeLocalChat, saveNativeLocalChat } from './chatStorage';
 import * as ImagePicker from 'expo-image-picker';
 import SwipeableBubble, {type BubbleAnchor} from './SwipeableBubble';
 import NativeComposerIcon from './ChatComposerIcon';
+import NativeChatMediaView from './NativeChatMediaView';
+import {uploadNativeOriginal,newMediaUploadId} from './media-upload';
 
 export default function App() {
   const {width: viewportWidth, height: viewportHeight} = useWindowDimensions();
@@ -26,6 +28,10 @@ export default function App() {
   const [selectedMedia,setSelectedMedia]=useState<ChatMediaSelection|null>(null);
   const [mediaError,setMediaError]=useState('');
   const [mediaPicking,setMediaPicking]=useState(false);
+  const [mediaUploading,setMediaUploading]=useState(false);
+  const [mediaProgress,setMediaProgress]=useState(0);
+  const [mediaReady,setMediaReady]=useState(false);
+  const mediaClientId=useRef<string|null>(null);
   const [error, setError] = useState('');
   const [connection, setConnection] = useState('desconectado');
   const [joining, setJoining] = useState(false);
@@ -61,7 +67,7 @@ export default function App() {
       const options:ImagePicker.ImagePickerOptions={
         // The clip always filters the gallery; the separate camera icon launches capture.
         mediaTypes:source==='camera'?['images','videos']:kind==='photo'?['images']:['videos'],
-        allowsEditing:false,quality:0.9,selectionLimit:1
+        allowsEditing:false,quality:1,selectionLimit:1
       };
       const result=source==='camera'
         ?await ImagePicker.launchCameraAsync(options)
@@ -75,11 +81,22 @@ export default function App() {
       const sizeBytes=asset.fileSize??0;
       const issue=validateChatMediaSelection({kind:pickedKind,name,mimeType,sizeBytes});
       if(issue){setMediaError(issue);return;}
+      mediaClientId.current=newMediaUploadId();
       setSelectedMedia({kind:pickedKind,source,uri:asset.uri,name,mimeType,sizeBytes});
     }catch{
       setMediaError('No se pudo abrir la cámara o la galería. Inténtalo de nuevo.');
     }finally{setMediaPicking(false);}
   };
+  useEffect(()=>{
+    if(!session){setMediaReady(false);return;}
+    let active=true;
+    void fetch(HAVANA_V2_DEV_API_BASE_URL+'/api/chat/media/status',{
+      headers:{Authorization:'Bearer '+session.token}
+    }).then(async r=>r.json()).then(value=>{
+      if(active)setMediaReady(value.enabled===true);
+    }).catch(()=>{if(active)setMediaReady(false);});
+    return()=>{active=false;};
+  },[session?.token]);
   const autoScroll = useRef(true);
   // Initial load and reopening land at the most recent message, without a long animated scroll.
   const initialHistoryPending = useRef(true);
@@ -638,6 +655,20 @@ export default function App() {
     }
   }
 
+  async function sendSelectedMedia(){
+    if(!selectedMedia||!session||mediaUploading)return;
+    if(!mediaReady){setMediaError('HAVANA CLOUD todavía no está enlazada.');return;}
+    setMediaUploading(true);setMediaError('');setMediaProgress(0);
+    try{
+      const id=mediaClientId.current||newMediaUploadId();
+      mediaClientId.current=id;
+      await uploadNativeOriginal(session,selectedMedia,id,(sent,total)=>
+        setMediaProgress(Math.round(sent/total*100)));
+      mediaClientId.current=null;setSelectedMedia(null);setMediaProgress(0);
+      syncLatest.current();
+    }catch(reason){setMediaError(reason instanceof Error?reason.message:'No se pudo subir. Reintenta.');}
+    finally{setMediaUploading(false);}
+  }
   function send() {
     const text = draft.trim();
     if(editing){
@@ -805,6 +836,7 @@ export default function App() {
                     <Text style={[styles.bubbleText,mine && styles.mineText]}>
                       {message.text}
                     </Text>
+                    {message.media?<NativeChatMediaView media={message.media} session={session}/>:null}
                     {message.seq>0 && !message.deletedAt && reactions.some(r=>r.messageSeq===message.seq) ? (
                       <View style={styles.reactionBadges}>
                         {(['❤️','😂','👍'] as ChatEmoji[]).filter(emoji=>reactions.some(r=>r.messageSeq===message.seq&&r.emoji===emoji)).map(emoji=>(
@@ -895,10 +927,10 @@ export default function App() {
                <View style={styles.mediaInfo}>
                  <Text style={styles.mediaName} numberOfLines={1}>{selectedMedia.name}</Text>
                  <Text style={styles.mediaHint}>{selectedMedia.kind==='photo'?'Fotografía':'Video'} · {(selectedMedia.sizeBytes/1048576).toFixed(1)} MB</Text>
-                 <Text style={styles.mediaHint}>{CHAT_MEDIA_UPLOAD_ENABLED?'Preparado para subir':'La subida a HAVANA CLOUD aún no está habilitada.'}</Text>
+                 <Text style={styles.mediaHint}>{mediaUploading?'Subiendo '+mediaProgress+'%':mediaReady?'Original listo para enviar':'La subida a HAVANA CLOUD aún no está habilitada.'}</Text>
                </View>
                <Pressable accessibilityRole="button" accessibilityLabel="Quitar archivo seleccionado"
-                 onPress={()=>{setSelectedMedia(null);setMediaError('');}}>
+                 onPress={()=>{mediaClientId.current=null;setSelectedMedia(null);setMediaError('');}}>
                  <Text style={styles.mediaClose}>✕</Text>
                </Pressable>
              </View>}
@@ -926,9 +958,9 @@ export default function App() {
                    <NativeComposerIcon name="camera"/>
                  </Pressable>
                </View>
-               {draft.trim()||editing
-                 ?<Pressable accessibilityRole="button" accessibilityLabel={editing?'Guardar mensaje':'Enviar mensaje'}
-                    onPress={send} disabled={!draft.trim()||savingEdit} style={styles.sendCircle}>
+               {draft.trim()||editing||selectedMedia
+                 ?<Pressable accessibilityRole="button" accessibilityLabel={editing?'Guardar mensaje':selectedMedia?'Enviar archivo original':'Enviar mensaje'}
+                    onPress={()=>selectedMedia&&!editing?void sendSelectedMedia():send()} disabled={mediaUploading||savingEdit||(!selectedMedia&&!draft.trim())} style={styles.sendCircle}>
                     <NativeComposerIcon name="send" color="#fff"/>
                   </Pressable>
                  :<Pressable accessibilityRole="button" accessibilityLabel="Grabar audio (próximamente)"
