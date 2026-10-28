@@ -1,5 +1,6 @@
 // @ts-nocheck
 import {handleUnifiedChatMedia,attachChatMedia,mediaConfigured,verifyMediaGrant} from './unified-media.js';
+import {handleCloudLinkAdmin} from './cloud-link.js';
 import { handleAdminSessionApi, verifyAdminSession } from './admin-auth.js';
 import { adminSocketToken, adminTokenRequest, notifyAdminClients } from './admin-realtime.js';
 import {handleAdminMemberManagement,recordMemberEvent,readMemberDevice} from './member-admin.js';
@@ -452,6 +453,9 @@ export default {
         'GROUP BY m.actor_id,m.display_name,m.username,m.active,m.single_device_mode ORDER BY m.display_name'
       ).bind(Date.now()).all();
       return respond({members:members.results||[]},200,origin);
+    }
+    if (url.pathname.startsWith('/api/chat/admin/cloud/')) {
+      return handleCloudLinkAdmin(request,env,url,origin,respond);
     }
     if (url.pathname.startsWith('/api/chat/admin/auth/')) {
       return handleAdminSessionApi(request,env,url,origin,respond);
