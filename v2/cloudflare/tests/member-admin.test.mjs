@@ -15,7 +15,7 @@ class FakeDB{
       if(sql.startsWith('SELECT actor_id,display_name FROM chat_members'))return this.members.get(args[0])||null;
       if(sql.startsWith('SELECT actor_id FROM chat_members'))return this.members.get(args[0])||null;
       if(sql.startsWith('SELECT COUNT(*) AS entries'))return {entries:2};
-      if(sql.includes('AS mediaAssets') && sql.includes('FROM v2_media_assets')){
+      if(sql.includes('AS mediaAssets') && sql.includes('FROM chat_media_assets')){
         return {sessions:2,messages:3,reactions:1,receipts:1,historyEvents:4,mediaAssets:this.mediaAssets};
       }
       throw Error('Unexpected first: '+sql);
