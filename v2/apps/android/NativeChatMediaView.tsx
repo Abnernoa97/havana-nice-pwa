@@ -9,7 +9,7 @@ type Media=NonNullable<ChatMessage['media']>;
 const MAX_ORIGINAL_IMAGE_BYTES=100*1024*1024;
 const pendingPhotos=new Map<string,Promise<string>>();
 const identifier=(value:string)=>value.replace(/[^0-9a-f-]/gi,'').slice(0,36);
-const photoPath=(media:Media)=>new File(Paths.cache,'hn-v2-chat-photo-'+identifier(media.assetId)+'-'+media.sizeBytes+'.img');
+const photoPath=(media:Media)=>{const ext=media.mimeType==='image/png'?'png':media.mimeType==='image/webp'?'webp':media.mimeType==='image/heic'||media.mimeType==='image/heif'?'heic':'jpg';return new File(Paths.cache,'hn-v2-chat-photo-'+identifier(media.assetId)+'-'+media.sizeBytes+'.'+ext);};
 
 // The private app cache is best effort: no Google credentials, device tokens or
 // private signed URLs are persisted. Complete originals are atomic on disk.
@@ -68,6 +68,15 @@ export default function NativeChatMediaView({
   const abort=new AbortController();
   setSigned('');setPhoto('');setRatio(1);setError('');setEnlarged(false);
   void (async()=>{
+   // Reuse a verified original directly from private app cache, including
+   // offline views. No new signed grant or network download is needed.
+   if(media.kind==='photo'){
+    const cached=photoPath(media);
+    if(cached.exists&&cached.size===media.sizeBytes){
+     Image.getSize(cached.uri,(w,h)=>{if(active){setRatio(w>0&&h>0?w/h:1);setPhoto(cached.uri);}},()=>{});
+     return;
+    }
+   }
    // Refresh signed URLs only for network reads, never persist them.
    const result=await fetch(API+'/api/chat/media/'+media.assetId+'/grant',{
     headers:{Authorization:'Bearer '+session.token},signal:abort.signal
