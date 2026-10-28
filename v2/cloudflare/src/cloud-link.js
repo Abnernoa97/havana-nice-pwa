@@ -7,7 +7,7 @@ import {verifyAdminSession,adminLoginConfigured} from './admin-auth.js';
 const BASE='https://havana-nice-cloud.soloaplicaciones97.workers.dev';
 const TE=new TextEncoder(),TD=new TextDecoder();
 const DEVICE=/^d1\.([0-9]{10,12})\.[0-9a-f-]{36}\.[A-Za-z0-9_-]{43}$/i;
-const VALID_CLOUD_PATHS=new Set(['/api/auth/device','/api/google/upload/session','/api/google/upload/chunk']);
+const VALID_CLOUD_PATHS=new Set(['/api/auth/login','/api/auth/device','/api/google/upload/session','/api/google/upload/chunk']);
 const RUNTIME_FLAG='enabled';
 
 const encode=bytes=>btoa(String.fromCharCode(...bytes)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
@@ -118,8 +118,10 @@ export async function requestExistingCloud(env,path,options={}){
  const issued=auth.headers.get('set-cookie')||'';
  const cookie=/^hn_cloud_session=([^;\s]+)/.exec(issued)?.[0];
  if(!cookie||!DEVICE.test(authBody?.deviceToken||''))throw Error('cloud_link_expired');
- // Cloud returns a refreshed, signed device token that remains server-only.
- await writeToken(env,authBody.deviceToken);
+ // A normal request must not write D1 for every 4 MiB fragment. Refresh
+ // the long-lived device grant only when expiration is close.
+ if(Number(row.expires_at)<Date.now()+7*24*3600_000)
+  await writeToken(env,authBody.deviceToken);
  const headers=new Headers(options.headers||{});
  headers.set('cookie',cookie);
  headers.delete('authorization');
