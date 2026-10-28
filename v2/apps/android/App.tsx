@@ -685,6 +685,7 @@ export default function App() {
       const worker=async()=>{
         while(next<items.length){
           const item=items[next++];
+          if(!item)break;
           try{
             await uploadNativeOriginal(session,item,item.id,batch,item.batchIndex!, (sent)=>{
               confirmed.set(item.id,sent);report();
