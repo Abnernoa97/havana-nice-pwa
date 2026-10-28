@@ -2,6 +2,7 @@ import React,{useEffect,useMemo,useState} from 'react';
 import {ActivityIndicator,Image,Modal,Pressable,Text,View,useWindowDimensions} from 'react-native';
 import {File,Paths} from 'expo-file-system';
 import {VideoView,useVideoPlayer} from 'expo-video';
+import {useEvent} from 'expo';
 import {HAVANA_V2_DEV_API_BASE_URL as API} from '@havana/shared';
 import type {ChatMessage,ChatSession} from '@havana/shared';
 
@@ -43,11 +44,18 @@ async function cacheWholePhoto(media:Media,remoteUrl:string){
  finally{if(pendingPhotos.get(key)===work)pendingPhotos.delete(key);}
 }
 
-function InlineNativeVideo({url,width}:{url:string;width:number}){
+function InlineNativeVideo({url,width,onRetry}:{url:string;width:number;onRetry:()=>void}){
  const player=useVideoPlayer({uri:url},value=>{value.loop=false;});
- return <View style={{width,overflow:'hidden',borderRadius:12,backgroundColor:'#171717'}}>
+ const {status}=useEvent(player,'statusChange',{status:player.status});
+ return <View style={{width,borderRadius:12,backgroundColor:'#171717'}}>
+  {/* Prefer Android's supported primary video surface. TextureView has been
+      showing native controls but an entirely black video frame on-device. */}
   <VideoView player={player} nativeControls contentFit="contain"
-   surfaceType="textureView" style={{width,height:Math.round(width*1.16)}}/>
+   surfaceType="surfaceView" style={{width,height:Math.round(width*1.16),borderRadius:12}}/>
+  {status==='error'?<Pressable accessibilityRole="button" accessibilityLabel="Reintentar video"
+    onPress={onRetry} style={{padding:14,alignItems:'center'}}>
+    <Text style={{color:'#fff'}}>No se pudo reproducir. Reintentar</Text>
+   </Pressable>:null}
  </View>;
 }
 
@@ -55,6 +63,7 @@ export default function NativeChatMediaView({
  media,session
 }:{media:Media;session:ChatSession}){
  const [signed,setSigned]=useState('');
+ const [videoAttempt,setVideoAttempt]=useState(0);
  const [photo,setPhoto]=useState('');
  const [ratio,setRatio]=useState(1);
  const [enlarged,setEnlarged]=useState(false);
@@ -95,7 +104,7 @@ export default function NativeChatMediaView({
    },()=>{if(active)setError('No se pudo visualizar la fotografía');});
   })().catch(()=>{if(active)setError('Archivo no disponible');});
   return()=>{active=false;abort.abort();};
- },[media.assetId,media.kind,media.sizeBytes,session.token]);
+ },[media.assetId,media.kind,media.sizeBytes,session.token,videoAttempt]);
 
  return <View style={{marginVertical:3,alignSelf:'flex-start',maxWidth:'100%'}}>
   {media.kind==='photo'?
@@ -109,7 +118,8 @@ export default function NativeChatMediaView({
        <View style={{width,height:92,alignItems:'center',justifyContent:'center'}}>
         <ActivityIndicator color="#77736d"/>
        </View>
-    :signed?<InlineNativeVideo url={signed} width={width}/>:
+    :signed?<InlineNativeVideo key={signed} url={signed} width={width}
+       onRetry={()=>setVideoAttempt(count=>count+1)}/>:
       error?<Text style={{color:'#7c4141'}}>{error}</Text>:
        <View style={{width,height:92,alignItems:'center',justifyContent:'center'}}>
         <ActivityIndicator color="#77736d"/>
