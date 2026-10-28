@@ -160,7 +160,7 @@ export default function AdminChatGeneral({token,connected,liveEvent,onExpired}:P
       <article className="a-chat-bubble">
        {!adjacent&&<strong className="a-chat-author">{m.senderName}</strong>}
        {m.replyToSeq!==null&&<small className="a-chat-reply">Responde al mensaje #{m.replyToSeq}</small>}
-       <p>{m.text}</p>
+       {!m.media&&<p>{m.text}</p>}
        {m.media&&<ChatMediaView media={m.media} token={token}/>}
        <div className="a-chat-message-footer">
         <time dateTime={m.sentAt}>{dateTime(m.sentAt)}</time>
