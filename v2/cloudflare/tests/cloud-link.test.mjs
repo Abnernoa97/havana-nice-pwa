@@ -112,3 +112,40 @@ test('Failed owner login does not write a credential or return a cookie',async()
  assert.equal(r.status,401);assert.equal(getRow(),null);
  assert.equal(JSON.stringify(await r.json()).includes('deviceToken'),false);
 });
+
+test('Fast upload: one server-only Cloud device authorization serves multiple sequential chunks',async()=>{
+ const {env,upstreamCalls}=setup();
+ const connect=await handleCloudLinkAdmin(req('connect','POST',{password:'owner-password'}),
+   env,new URL(api+'connect'),'',respond);
+ assert.equal(connect.status,200);
+ for(let i=0;i<5;i++){
+  const result=await requestExistingCloud(env,'/api/google/upload/session',{
+   method:'POST',headers:{'content-type':'application/json'},
+   body:JSON.stringify({name:'original-'+i+'.jpg'})
+  });
+  assert.equal(result.status,200);
+ }
+ assert.equal(upstreamCalls.filter(x=>x.path==='/api/auth/device').length,1,
+  'Five short consecutive requests must not pay for five device authorizations');
+ assert.equal(upstreamCalls.filter(x=>x.path==='/api/google/upload/session').length,5);
+ const before=upstreamCalls.length;
+ await handleCloudLinkAdmin(req('disconnect','POST'),env,new URL(api+'disconnect'),'',respond);
+ await assert.rejects(requestExistingCloud(env,'/api/google/upload/session'),/cloud_not_linked/);
+ assert.equal(upstreamCalls.length,before,'Disconnected V2 must not contact personal Cloud again');
+});
+test('Fast upload: concurrent requests coalesce device login; cookie never appears in results',async()=>{
+ const {env,upstreamCalls}=setup();
+ const connected=await handleCloudLinkAdmin(req('connect','POST',{password:'owner-password'}),
+   env,new URL(api+'connect'),'',respond);
+ assert.equal(connected.status,200);
+ const replies=await Promise.all(Array.from({length:3},(_,i)=>requestExistingCloud(
+  env,'/api/google/upload/session',{
+   method:'POST',headers:{'content-type':'application/json'},
+   body:JSON.stringify({name:'batch-'+i+'.jpg'})
+  })));
+ for(const response of replies){
+  assert.equal(response.status,200);
+  assert.equal(JSON.stringify(await response.json()).includes('hn_cloud_session'),false);
+ }
+ assert.equal(upstreamCalls.filter(x=>x.path==='/api/auth/device').length,1);
+});
