@@ -1031,7 +1031,7 @@ const styles = StyleSheet.create({
     paddingHorizontal:4,paddingVertical:7,fontSize:16},
   sendCircle:{width:51,height:51,borderRadius:26,backgroundColor:'#242522',
     alignItems:'center',justifyContent:'center'},
-  composerPanelDismiss:{...StyleSheet.absoluteFillObject,zIndex:20,backgroundColor:'transparent'},
+  composerPanelDismiss:{position:'absolute',top:0,right:0,bottom:0,left:0,zIndex:20,backgroundColor:'transparent'},
   attachmentsPopover:{position:'absolute',bottom:75,left:14,width:285,maxWidth:'90%',zIndex:22,
     backgroundColor:'#fff',borderRadius:19,borderWidth:1,borderColor:'#e9e3da',padding:9,
     elevation:9,shadowColor:'#000',shadowOpacity:.14,shadowRadius:13},
