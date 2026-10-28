@@ -95,7 +95,11 @@ test('Android native: two gallery filters, camera direct, no legacy extra menu',
  assert.match(src,/selectionLimit:source==='gallery'\?free:1/);
  assert.match(src,/selectedMedia\.map\(item=>/);
  assert.equal(manifest.dependencies['expo-file-system'],'~58.0.11');
- assert.match(read('apps/android/media-upload.ts'),/FileMode.ReadOnly/);
+ const nativeUpload=read('apps/android/media-upload.ts');
+ assert.match(nativeUpload,/import \{fetch as expoFetch\} from 'expo\/fetch'/);
+ assert.match(nativeUpload,/original\.slice\(offset/);
+ assert.match(nativeUpload,/body:piece/);
+ assert.doesNotMatch(nativeUpload,/new Blob\(\[piece\]\)|FileMode\.ReadOnly/);
 });
 
 test('Emoji stays enabled; microphone is informative until M03',()=>{
@@ -159,6 +163,10 @@ test('Native photo uses a fully verified local cache and modal without a browser
  assert.equal(packageManifest.dependencies['expo-video'],'58.0.12');
  assert.match(native,/useVideoPlayer/);
  assert.match(native,/<VideoView player=\{player\} nativeControls/);
+ assert.match(native,/surfaceType="surfaceView"/);
+ assert.doesNotMatch(native,/surfaceType="textureView"/);
+ assert.match(native,/useEvent\(player,'statusChange'/);
+ assert.match(native,/onRetry=\{\(\)=>setVideoAttempt/);
  assert.match(native,/File\.downloadFileAsync/);
  assert.match(native,/finished\.size!==media\.sizeBytes/);
  assert.match(native,/cached\.exists&&cached\.size===media\.sizeBytes/);
