@@ -244,6 +244,8 @@ export function reconcileChatMessages(
 
 // M01/M02: one selection policy shared by the PWA and native Chat.
 // Photos and videos share one original-file contract; runtime Worker gates enforce rollout.
+// One send may contain at most five ORIGINAL files in any photo/video mix.
+export const CHAT_MEDIA_MAX_PER_SEND=5 as const;
 export type ChatMediaKind='photo'|'video';
 export type ChatMediaSource='gallery'|'camera';
 export type ChatMediaSelection={kind:ChatMediaKind;source:ChatMediaSource;
