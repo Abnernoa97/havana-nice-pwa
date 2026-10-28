@@ -32,7 +32,7 @@ function createEnvironment(){
     }
     if(sql.startsWith('UPDATE chat_cloud_uploads')){
      if(!up)return{meta:{changes:0}};
-     if(sql.includes("stage='starting',owner_nonce=?")){
+     if(sql.includes("WHERE asset_id=? AND stage='failed'")){
       if(up.stage!=='failed')return{meta:{changes:0}};
       Object.assign(up,{owner_nonce:args[0],stage:'starting'});return{meta:{changes:1}};
      }
