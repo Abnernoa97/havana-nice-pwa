@@ -1,4 +1,6 @@
 // HAVANA NICE V2 / one media API. D1 owns only metadata and message relations.
+import {cloudLinkConfigured,cloudLinkStatus} from './cloud-link.js';
+import {cloudStart,cloudChunk,cloudRead} from './cloud-media-adapter.js';
 // HAVANA CLOUD owns original bytes; the private service binding never exposes Google IDs.
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const TYPES={photo:{max:100*1048576,mimes:['image/jpeg','image/png','image/webp','image/heic','image/heif']},
@@ -7,7 +9,7 @@ const CHUNK_BYTES=4*1048576;
 const MAX_BATCH_FILES=5;
 const enc=new TextEncoder();
 async function signGrant(env,assetId,expires){
- const key=await crypto.subtle.importKey('raw',enc.encode(env.V2_CLOUD_BRIDGE_SECRET),
+ const key=await crypto.subtle.importKey('raw',enc.encode(env.V2_ADMIN_LOGIN_SECRET),
    {name:'HMAC',hash:'SHA-256'},false,['sign']);
  const bytes=new Uint8Array(await crypto.subtle.sign('HMAC',key,enc.encode(assetId+':'+expires)));
  return btoa(String.fromCharCode(...bytes)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
@@ -25,16 +27,8 @@ export async function verifyMediaGrant(env,url){
  let difference=0;for(let i=0;i<sig.length;i++)difference|=sig.charCodeAt(i)^expected.charCodeAt(i);
  return difference===0;
 }
-export const mediaConfigured=env=>env?.V2_CLOUD_BRIDGE_ENABLED==='enabled'&&
- env?.V2_CLOUD_BRIDGE_MEDIA_ENABLED==='enabled'&&
- typeof env?.V2_CLOUD_BRIDGE_SECRET==='string'&&env.V2_CLOUD_BRIDGE_SECRET.length>=40&&
- typeof env?.HAVANA_CLOUD_BRIDGE?.fetch==='function';
-function privateRequest(env,path,options={}){
- const headers=new Headers(options.headers||{});
- headers.set('x-havana-v2-internal-token',env.V2_CLOUD_BRIDGE_SECRET);
- return env.HAVANA_CLOUD_BRIDGE.fetch('https://havana-cloud.internal'+path,
-   {...options,headers});
-}
+export const mediaConfigured=env=>cloudLinkConfigured(env)&&
+ env?.V2_CLOUD_MEDIA_ENABLED==='enabled';
 function validMetadata(m){
  const rule=TYPES[m?.kind];
  return rule&&UUID.test(m.clientId||'')&&UUID.test(m.batchId||'')&&
@@ -86,9 +80,11 @@ export async function handleUnifiedChatMedia(request,env,session,url,origin,resp
  const reply=(obj,status=200)=>respond(obj,status,origin);
  const path=url.pathname;
  if(!session)return reply({error:'No autorizado'},401);
- if(path==='/api/chat/media/status'&&request.method==='GET')
-   return reply({enabled:mediaConfigured(env),maxPhotoBytes:TYPES.photo.max,
+ if(path==='/api/chat/media/status'&&request.method==='GET'){
+   const linked=mediaConfigured(env)&&((await cloudLinkStatus(env)).linked===true);
+   return reply({enabled:linked,maxPhotoBytes:TYPES.photo.max,
      maxVideoBytes:TYPES.video.max,chunkBytes:CHUNK_BYTES,maxFilesPerSend:MAX_BATCH_FILES});
+ }
  if(!mediaConfigured(env))return reply({error:'HAVANA CLOUD todavía no está enlazada'},503);
  if(path==='/api/chat/media/start'&&request.method==='POST'){
    let m;try{m=await request.json()}catch{return reply({error:'Archivo inválido'},400);}
@@ -110,21 +106,25 @@ export async function handleUnifiedChatMedia(request,env,session,url,origin,resp
      return reply({assetId,complete:true,nextOffset:m.sizeBytes,chunkBytes:CHUNK_BYTES});
    let remote;
    try{
-     const r=await privateRequest(env,'/api/internal/havana-v2/media/start',{
-       method:'POST',headers:{'content-type':'application/json'},
-       body:JSON.stringify({assetId,actorId:session.actorId,clientId:m.clientId,
-         kind:m.kind,fileName:m.name,mimeType:m.mimeType,sizeBytes:m.sizeBytes})
+     remote=await cloudStart(env,old||{
+       asset_id:assetId,bytes:m.sizeBytes,mime:m.mimeType,
+       original_name:m.name,sender_id:session.actorId,client_id:m.clientId,kind:m.kind
      });
-     if(!r.ok)return reply({error:'No hay almacenamiento disponible'},r.status===507?507:502);
-     remote=await r.json();
-   }catch{return reply({error:'No se pudo conectar con HAVANA CLOUD'},502);}
-   if(remote.state==='ready'){
+   }catch(error){
+     const reason=error instanceof Error?error.message:'cloud_session_failed';
+     return reply({error:reason==='cloud_not_linked'?'Autoriza HAVANA CLOUD desde el Administrador':
+       reason==='cloud_no_space'?'No queda espacio de Google Drive':
+       reason==='cloud_session_preparing'?'Archivo en preparación; vuelve a intentar':
+       'No se pudo preparar la transferencia con HAVANA CLOUD'},
+       reason==='cloud_no_space'?507:reason==='cloud_session_preparing'?409:503);
+   }
+   if(remote.complete){
      try{await finalizeConfirmedMedia(env,old||{
        asset_id:assetId,client_id:m.clientId,kind:m.kind,sender_id:session.actorId
      },session,notify);}
      catch{return reply({error:'Archivo guardado; mensaje pendiente de confirmación'},503);}
    }
-   return reply({assetId,complete:remote.state==='ready',
+   return reply({assetId,complete:remote.complete===true,
      nextOffset:remote.nextOffset,chunkBytes:CHUNK_BYTES});
  }
  const grant=/^\/api\/chat\/media\/([0-9a-f-]{36})\/grant$/.exec(path);
@@ -150,17 +150,17 @@ export async function handleUnifiedChatMedia(request,env,session,url,origin,resp
       Number(request.headers.get('content-length')||0)>CHUNK_BYTES)
      return reply({error:'Fragmento inválido'},400);
    if(!request.body)return reply({error:'Fragmento vacío'},400);
-   let upstream;
-   try{
-     upstream=await privateRequest(env,'/api/internal/havana-v2/media/'+assetId+'/chunk',{
-       method:'POST',headers:{
-         'x-havana-v2-actor-id':session.actorId,'x-havana-v2-offset':String(offset),
-         'content-type':'application/octet-stream'},
-       body:request.body
-     });
-   }catch{return reply({error:'Error temporal de conexión'},502);}
-   if(!upstream.ok)return reply({error:'Transferencia pendiente de reconciliar'},upstream.status===409?409:502);
-   const received=await upstream.json();
+   const data=await request.arrayBuffer();
+   if(!data.byteLength||data.byteLength>CHUNK_BYTES)return reply({error:'Fragmento inválido'},400);
+   let received;
+   try{received=await cloudChunk(env,record,offset,data);}
+   catch(error){
+     const reason=error instanceof Error?error.message:'cloud_chunk_failed';
+     return reply({error:reason==='cloud_offset_conflict'?'Fragmento fuera de orden':
+       reason==='cloud_session_preparing'?'Fragmento en preparación; reintenta':
+       'Transferencia pendiente de confirmación'},
+       reason==='cloud_offset_conflict'||reason==='cloud_session_preparing'?409:502);
+   }
    if(received.complete){
      try{await finalizeConfirmedMedia(env,record,session,notify);}
      catch{return reply({error:'Archivo guardado; mensaje pendiente de confirmación'},503);}
@@ -172,7 +172,7 @@ export async function handleUnifiedChatMedia(request,env,session,url,origin,resp
    const headers=new Headers();
    if(request.headers.has('range'))headers.set('range',request.headers.get('range'));
    try{
-     const result=await privateRequest(env,'/api/internal/havana-v2/media/'+assetId+'/file',{headers});
+     const result=await cloudRead(env,assetId,headers.get('range'));
      if(!result.ok)return reply({error:'Archivo temporalmente no disponible'},result.status===404?404:502);
      const output=new Headers(result.headers);
      output.set('access-control-allow-origin',origin||'https://havana-nice-v2-dev.pages.dev');
