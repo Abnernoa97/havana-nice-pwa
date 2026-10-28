@@ -1,5 +1,6 @@
 import {useCallback,useEffect,useState,type FormEvent} from 'react';
 import AdminChatGeneral from './AdminChatGeneral';
+import AdminCloudConnection from './AdminCloudConnection';
 import {adminAvailability,adminLogin,adminLogout,adminVerify,adminOtherSessions,adminRevokeOtherSessions,adminMembers,adminCreateMember,adminMemberHistory,adminDeletionPreview,adminRemoveMember,adminDuplicateLogins,adminReviewDuplicateLogin,adminReleaseInstallation,openAdminRealtime,
  type AdminSession,type AdminMember,type AdminMemberHistory,type AdminDeletionPreview,type AdminDuplicateLoginAlert,type AdminChatStreamEvent,isAdminUnauthorized} from './admin-api';
 
@@ -333,7 +334,10 @@ export default function AdminChatAccess({section}:{section:Section}){
    </form>
    {error&&<p role="alert" className="a-admin-error">{error}</p>}
  </section>;
- if(section==='chat')return <AdminChatGeneral token={session.token} connected={realtime==='connected'} liveEvent={chatEvent} onExpired={onChatExpired}/>;
+ if(section==='chat')return <>
+  <AdminCloudConnection token={session.token} onExpired={onChatExpired}/>
+  <AdminChatGeneral token={session.token} connected={realtime==='connected'} liveEvent={chatEvent} onExpired={onChatExpired}/>
+ </>;
  return <div className="a-access-workspace">
    <section className="a-panel a-admin-private">
      <div className="a-admin-toolbar">
