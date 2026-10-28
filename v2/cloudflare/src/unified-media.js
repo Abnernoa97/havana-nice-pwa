@@ -4,6 +4,26 @@ const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]
 const TYPES={photo:{max:100*1048576,mimes:['image/jpeg','image/png','image/webp','image/heic','image/heif']},
  video:{max:10*1024*1024*1024,mimes:['video/mp4','video/quicktime']}};
 const CHUNK_BYTES=4*1048576;
+const enc=new TextEncoder();
+async function signGrant(env,assetId,expires){
+ const key=await crypto.subtle.importKey('raw',enc.encode(env.V2_CLOUD_BRIDGE_SECRET),
+   {name:'HMAC',hash:'SHA-256'},false,['sign']);
+ const bytes=new Uint8Array(await crypto.subtle.sign('HMAC',key,enc.encode(assetId+':'+expires)));
+ return btoa(String.fromCharCode(...bytes)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+export async function verifyMediaGrant(env,url){
+ if(!mediaConfigured(env))return false;
+ const match=/^\/api\/chat\/media\/([0-9a-f-]{36})\/file$/.exec(url.pathname);
+ if(!match||!UUID.test(match[1]))return false;
+ const expires=Number(url.searchParams.get('exp'));
+ const sig=url.searchParams.get('sig')||'';
+ if(!Number.isSafeInteger(expires)||expires<Date.now()||expires>Date.now()+3600_000||
+    !/^[A-Za-z0-9_-]{40,60}$/.test(sig))return false;
+ const expected=await signGrant(env,match[1],expires);
+ if(sig.length!==expected.length)return false;
+ let difference=0;for(let i=0;i<sig.length;i++)difference|=sig.charCodeAt(i)^expected.charCodeAt(i);
+ return difference===0;
+}
 export const mediaConfigured=env=>env?.V2_CLOUD_BRIDGE_ENABLED==='enabled'&&
  env?.V2_CLOUD_BRIDGE_MEDIA_ENABLED==='enabled'&&
  typeof env?.V2_CLOUD_BRIDGE_SECRET==='string'&&env.V2_CLOUD_BRIDGE_SECRET.length>=40&&
@@ -76,6 +96,16 @@ export async function handleUnifiedChatMedia(request,env,session,url,origin,resp
    }catch{return reply({error:'No se pudo conectar con HAVANA CLOUD'},502);}
    return reply({assetId,complete:remote.state==='ready',
      nextOffset:remote.nextOffset,chunkBytes:CHUNK_BYTES});
+ }
+ const grant=/^\/api\/chat\/media\/([0-9a-f-]{36})\/grant$/.exec(path);
+ if(grant&&request.method==='GET'&&UUID.test(grant[1])){
+   const row=await env.DB.prepare("SELECT asset_id FROM chat_media_assets WHERE asset_id=? AND status='ready' AND message_seq IS NOT NULL")
+     .bind(grant[1]).first();
+   if(!row)return reply({error:'Archivo no encontrado'},404);
+   const expires=Date.now()+45*60*1000;
+   const sig=await signGrant(env,grant[1],expires);
+   return reply({url:url.origin+'/api/chat/media/'+grant[1]+'/file?exp='+expires+'&sig='+sig,
+     expiresAt:new Date(expires).toISOString()});
  }
  const found=/^\/api\/chat\/media\/([0-9a-f-]{36})\/(chunk|file)$/.exec(path);
  if(!found||!UUID.test(found[1]))return reply({error:'Archivo no encontrado'},404);
