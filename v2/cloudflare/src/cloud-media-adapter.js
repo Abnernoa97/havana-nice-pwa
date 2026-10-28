@@ -113,9 +113,11 @@ export async function cloudDelete(env,assetId){
  if(!row?.cloud_media_key)throw Error('cloud_file_unavailable');
  const call=(path)=>requestExistingCloud(env,path,{method:'POST',
   headers:{'content-type':'application/json'},body:JSON.stringify({keys:[row.cloud_media_key]})});
- const trash=await call('/api/media/delete'),moved=await bytesJson(trash);
- if(!trash.ok||!moved.trashedKeys?.includes(row.cloud_media_key))
-  throw Error('cloud_delete_unconfirmed');
+ // A previous attempt can have moved the original to Cloud's bin before
+ // losing its response. Retry the existing permanent-delete endpoint even if
+ // the item is already there. Never claim success without a deletedKeys ack.
+ const trash=await call('/api/media/delete');
+ if(!trash.ok)throw Error('cloud_delete_unconfirmed');
  const deleteResult=await call('/api/trash/delete'),confirmed=await bytesJson(deleteResult);
  if(!deleteResult.ok||!confirmed.deletedKeys?.includes(row.cloud_media_key))
   throw Error('cloud_delete_unconfirmed');
