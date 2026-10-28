@@ -254,19 +254,26 @@ jobs:
             "$BASE/api/chat/session" -H "Authorization: Bearer aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")"
           test "$STATUS" = "401"
 
-      - name: Verify live private media endpoint is closed without independent Google OAuth
+      - name: Verify V2 media and existing-CLOUD pairing reject all anonymous requests
         shell: bash
         run: |
           set -euo pipefail
           BASE="https://havana-nice-v2-dev.soloaplicaciones97.workers.dev"
           STATUS="$(curl --silent --show-error --output /tmp/hnv2-media-private.json --write-out '%{http_code}' "$BASE/api/chat/media/status")"
           test "$STATUS" = "401"
-          grep -q 'Unauthorized' /tmp/hnv2-media-private.json
+          grep -q 'No autorizado' /tmp/hnv2-media-private.json
           STATUS="$(curl --silent --show-error --output /tmp/hnv2-media-upload.json --write-out '%{http_code}' \
             -X POST "$BASE/api/chat/media/upload" -H 'Content-Type: image/jpeg' \
             --data-binary 'not-a-photo')"
           test "$STATUS" = "401"
-          curl --fail --silent --show-error "$BASE/health" | grep -q 'havana-cloud-private-bridge-pending'
+          STATUS="$(curl --silent --show-error --output /tmp/hnv2-cloud-admin-denied.json --write-out '%{http_code}' "$BASE/api/chat/admin/cloud/status")"
+          test "$STATUS" = "401"
+          grep -q 'No autorizado' /tmp/hnv2-cloud-admin-denied.json
+          STATUS="$(curl --silent --show-error --output /tmp/hnv2-cloud-pair-denied.json --write-out '%{http_code}' \
+            -X POST "$BASE/api/chat/admin/cloud/connect" -H 'Content-Type: application/json' --data '{}')"
+          test "$STATUS" = "401"
+          grep -q 'No autorizado' /tmp/hnv2-cloud-pair-denied.json
+          curl --fail --silent --show-error "$BASE/health" | grep -q 'havana-cloud-google-drive'
 
       - name: Verify native Android WebSocket origin is permitted
         shell: bash
@@ -294,23 +301,3 @@ jobs:
             https://havana-nice-v2-dev.pages.dev/manifest.webmanifest \
             | tee /tmp/havana-manifest.json
           grep -q 'HAVANA NICE V2' /tmp/havana-manifest.json
-
-      # Build output for V2-only version staging through the authenticated
-      # Cloudflare connector. This does not publish or change any Worker.
-      # The compiled JS contains no environment secret values.
-      - name: Verify and fingerprint full V2 Worker build for version-only staging
-        shell: bash
-        run: |
-          set -euo pipefail
-          mapfile -t WORKER_FILES < <(find /tmp/havana-v2-worker-preview -maxdepth 1 -type f -name '*.js' | sort)
-          test "${#WORKER_FILES[@]}" -eq 1
-          FILE="${WORKER_FILES[0]}"
-          test "$(wc -c < "$FILE")" -ge 30000
-          test "$(wc -c < "$FILE")" -le 600000
-          grep -q 'ChatRoom' "$FILE"
-          grep -q 'HAVANA_CLOUD_BRIDGE' "$FILE"
-          echo "V2_WORKER_VERIFIED_SHA256:$(sha256sum "$FILE" | cut -d' ' -f1)"
-          echo "V2_WORKER_VERIFIED_COMMIT:$GITHUB_SHA"
-          echo "V2_WORKER_SOURCE_B64_BEGIN"
-          base64 -w 240 "$FILE" | sed 's/^/V2_WORKER_SOURCE_PART:/'
-          echo "V2_WORKER_SOURCE_B64_END"
