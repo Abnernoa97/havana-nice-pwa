@@ -5,7 +5,8 @@
   "compatibility_date": "2026-10-23",
   "vars": {
     "HAVANA_ENV": "development",
-    "V2_CLOUD_LINK_ENABLED": "disabled"
+    "V2_CLOUD_LINK_ENABLED": "disabled",
+    "V2_CLOUD_MEDIA_ENABLED": "disabled"
   },
   "d1_databases": [
     {
