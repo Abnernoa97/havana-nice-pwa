@@ -395,7 +395,7 @@ export default {
     }
     // One authenticated photo/video gateway; a private Worker binding is required.
     if(url.pathname.startsWith('/api/chat/media/')){
-      const token=(request.headers.get('authorization')||'').replace(/^Bearer\\s+/i,'');
+      const token=(request.headers.get('authorization')||'').replace(/^Bearer\s+/i,'');
       const session=await verifySession(env,token);
       // Administrator can view confirmed media, but cannot impersonate musicians
       // or create uploads.
