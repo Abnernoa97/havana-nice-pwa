@@ -671,21 +671,36 @@ export default function App() {
     const items=selectedMedia.map((item,index)=>({...item,batchIndex:item.batchIndex??index}));
     setSelectedMedia(items);
     const total=items.reduce((n,item)=>n+item.sizeBytes,0);
-    let completed=0,remaining=items;
+    const confirmed=new Map<string,number>();
+    let next=0;
+    const failures:string[]=[];
+    const report=()=>{
+      const sent=items.reduce((n,item)=>n+(confirmed.get(item.id)||0),0);
+      setMediaProgress(Math.min(100,Math.floor(sent/total*100)));
+    };
     setMediaUploading(true);setMediaError('');setMediaProgress(0);
     try{
-      for(const item of items){
-        await uploadNativeOriginal(session,item,item.id,batch,item.batchIndex!, (sent)=>
-          setMediaProgress(Math.floor((completed+sent)/total*100)));
-        completed+=item.sizeBytes;
-        remaining=remaining.filter(x=>x.id!==item.id);
-        setSelectedMedia([...remaining]);
-        setMediaProgress(Math.floor(completed/total*100));
-        syncLatest.current();
-      }
-      mediaBatchId.current=null;
-    }catch(reason){
-      setMediaError((reason instanceof Error?reason.message:'No se pudo subir')+
+      // Bounded parallel originals; each original continues sequentially
+      // through its own protected Google Drive resumable session.
+      const worker=async()=>{
+        while(next<items.length){
+          const item=items[next++];
+          try{
+            await uploadNativeOriginal(session,item,item.id,batch,item.batchIndex!, (sent)=>{
+              confirmed.set(item.id,sent);report();
+            });
+            confirmed.set(item.id,item.sizeBytes);report();
+            setSelectedMedia(current=>current.filter(x=>x.id!==item.id));
+            syncLatest.current();
+          }catch(reason){
+            failures.push(reason instanceof Error?reason.message:'No se pudo subir');
+          }
+        }
+      };
+      await Promise.all(Array.from({length:Math.min(2,items.length)},()=>worker()));
+      // Preserve failed file IDs and their original batch for recovery.
+      if(!failures.length)mediaBatchId.current=null;
+      else setMediaError(failures[0]+
         '. Los archivos pendientes siguen disponibles para reintentar.');
     }finally{setMediaUploading(false);}
   }
