@@ -12,6 +12,7 @@ import {
 import { loadNativeLocalChat, saveNativeLocalChat } from './chatStorage';
 import * as ImagePicker from 'expo-image-picker';
 import SwipeableBubble, {type BubbleAnchor} from './SwipeableBubble';
+import NativeComposerIcon from './ChatComposerIcon';
 
 export default function App() {
   const {width: viewportWidth, height: viewportHeight} = useWindowDimensions();
@@ -21,7 +22,7 @@ export default function App() {
   const [restoringAccess,setRestoringAccess] = useState(true);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState('');
-  const [mediaMenuOpen,setMediaMenuOpen]=useState(false);
+  const [composerPanel,setComposerPanel]=useState<'attachments'|'emojis'|null>(null);
   const [selectedMedia,setSelectedMedia]=useState<ChatMediaSelection|null>(null);
   const [mediaError,setMediaError]=useState('');
   const [mediaPicking,setMediaPicking]=useState(false);
@@ -45,8 +46,8 @@ export default function App() {
   const [menuAnchor,setMenuAnchor] = useState<BubbleAnchor | null>(null);
   const socket = useRef<WebSocket | null>(null);
   const scroll = useRef<React.ElementRef<typeof ScrollView> | null>(null);
-  const chooseNativeMedia=async(source:ChatMediaSource,kind:ChatMediaKind)=>{
-    setMediaMenuOpen(false);setMediaError('');Keyboard.dismiss();
+  const chooseNativeMedia=async(source:ChatMediaSource)=>{
+    setComposerPanel(null);setMediaError('');Keyboard.dismiss();
     if(mediaPicking)return;
     setMediaPicking(true);
     try{
@@ -58,8 +59,8 @@ export default function App() {
         }
       }
       const options:ImagePicker.ImagePickerOptions={
-        mediaTypes:kind==='photo'?['images']:['videos'],allowsEditing:false,
-        quality:kind==='photo'?0.9:1,selectionLimit:1
+        mediaTypes:['images','videos'],allowsEditing:false,
+        quality:0.9,selectionLimit:1
       };
       const result=source==='camera'
         ?await ImagePicker.launchCameraAsync(options)
@@ -67,6 +68,7 @@ export default function App() {
       if(result.canceled||!result.assets?.length)return;
       const asset=result.assets[0];
       if(!asset)return;
+      const kind:ChatMediaKind=asset.type==='video'||asset.mimeType?.startsWith('video/')?'video':'photo';
       const mimeType=(asset.mimeType||(kind==='photo'?'image/jpeg':'video/mp4')).toLowerCase();
       const name=asset.fileName||('havana-'+Date.now()+(kind==='photo'?'.jpg':'.mp4'));
       const sizeBytes=asset.fileSize??0;
@@ -885,16 +887,6 @@ export default function App() {
             {typing ? <View style={styles.typingIndicator} accessibilityLiveRegion="polite">
                <Text style={styles.typingIndicatorText}>{typing}</Text>
              </View> : null}
-             {mediaMenuOpen&&<View style={styles.mediaMenu}>
-               {([
-                 ['gallery','photo','Galería · Foto'],['gallery','video','Galería · Video'],
-                 ['camera','photo','Cámara · Foto'],['camera','video','Cámara · Video']
-               ] as const).map(([source,kind,label])=>
-                 <Pressable key={source+kind} accessibilityRole="button" accessibilityLabel={label}
-                   style={styles.mediaMenuButton} onPress={()=>void chooseNativeMedia(source,kind)}>
-                   <Text style={styles.mediaMenuText}>{label}</Text>
-                 </Pressable>)}
-             </View>}
              {selectedMedia&&<View style={styles.mediaPreview} accessibilityLabel="Archivo seleccionado">
                {selectedMedia.kind==='photo'
                  ?<Image source={{uri:selectedMedia.uri}} style={styles.mediaThumb}/>
@@ -911,22 +903,75 @@ export default function App() {
              </View>}
              {!!mediaError&&<Text style={styles.mediaError}>{mediaError}</Text>}
              <View style={styles.composer}>
-              <Pressable accessibilityRole="button" accessibilityLabel="Adjuntar fotografía o video"
-                accessibilityState={{expanded:mediaMenuOpen}} disabled={mediaPicking}
-                style={styles.mediaPlus} onPress={()=>setMediaMenuOpen(v=>!v)}>
-                <Text style={styles.mediaPlusText}>+</Text>
-              </Pressable>
-              <TextInput
-                accessibilityLabel="Escribir mensaje" style={styles.draft} value={draft}
-                onChangeText={typeText} editable={!savingEdit} maxLength={2000} multiline
-                placeholder={connection === 'en vivo' ? 'Escribe un mensaje…' : 'Sin conexión: se enviará después…'} placeholderTextColor="#888"
-              />
-              <Pressable onPress={send} disabled={!draft.trim()||savingEdit} style={styles.sendButton}>
-                <Text style={styles.sendText}>{savingEdit?'Guardando…':editing?'Guardar':'Enviar'}</Text>
-              </Pressable>
-            </View>
+               <View style={styles.inputPill}>
+                 <Pressable accessibilityRole="button" accessibilityLabel="Insertar emoji"
+                   accessibilityState={{expanded:composerPanel==='emojis'}}
+                   style={styles.composerIcon} onPress={()=>{Keyboard.dismiss();setComposerPanel(v=>v==='emojis'?null:'emojis');}}>
+                   <NativeComposerIcon name="emoji"/>
+                 </Pressable>
+                 <TextInput accessibilityLabel="Escribir mensaje" style={styles.draft} value={draft}
+                   onChangeText={value=>{typeText(value);setComposerPanel(null);}}
+                   editable={!savingEdit} maxLength={2000} multiline
+                   placeholder={connection==='en vivo'?'Mensaje':'Sin conexión: se enviará después…'}
+                   placeholderTextColor="#85898a"/>
+                 <Pressable accessibilityRole="button" accessibilityLabel="Adjuntar fotografía o video"
+                   accessibilityState={{expanded:composerPanel==='attachments'}} style={styles.composerIcon}
+                   onPress={()=>{Keyboard.dismiss();setComposerPanel(v=>v==='attachments'?null:'attachments');}}>
+                   <NativeComposerIcon name="clip"/>
+                 </Pressable>
+                 <Pressable accessibilityRole="button" accessibilityLabel="Abrir cámara"
+                   disabled={mediaPicking} style={styles.composerIcon}
+                   onPress={()=>void chooseNativeMedia('camera')}>
+                   <NativeComposerIcon name="camera"/>
+                 </Pressable>
+               </View>
+               {draft.trim()||editing
+                 ?<Pressable accessibilityRole="button" accessibilityLabel={editing?'Guardar mensaje':'Enviar mensaje'}
+                    onPress={send} disabled={!draft.trim()||savingEdit} style={styles.sendCircle}>
+                    <NativeComposerIcon name="send" color="#fff"/>
+                  </Pressable>
+                 :<Pressable accessibilityRole="button" accessibilityLabel="Grabar audio (próximamente)"
+                    style={styles.sendCircle}
+                    onPress={()=>Alert.alert('Mensajes de voz','Los audios estarán disponibles después de las fotografías y los videos.')}>
+                    <NativeComposerIcon name="mic" color="#fff"/>
+                  </Pressable>}
+             </View>
           </>
         )}
+        {session&&composerPanel&&<Pressable style={styles.composerPanelDismiss}
+          onPress={()=>setComposerPanel(null)} accessibilityLabel="Cerrar menú"/>}
+        {session&&composerPanel==='attachments'&&<View style={styles.attachmentsPopover}
+          accessibilityLabel="Adjuntar al chat">
+          <Pressable style={styles.attachmentItem} accessibilityRole="button" accessibilityLabel="Galería: fotos y videos"
+            onPress={()=>void chooseNativeMedia('gallery')}>
+            <View style={[styles.attachmentSymbol,styles.gallerySymbol]}>
+              <NativeComposerIcon name="photo" color="#776c98"/>
+            </View>
+            <View>
+              <Text style={styles.attachmentTitle}>Galería</Text>
+              <Text style={styles.attachmentDescription}>Fotos y videos</Text>
+            </View>
+          </Pressable>
+          <Pressable style={styles.attachmentItem} accessibilityRole="button" accessibilityLabel="Cámara: foto o video"
+            onPress={()=>void chooseNativeMedia('camera')}>
+            <View style={[styles.attachmentSymbol,styles.cameraSymbol]}>
+              <NativeComposerIcon name="camera" color="#946b67"/>
+            </View>
+            <View>
+              <Text style={styles.attachmentTitle}>Cámara</Text>
+              <Text style={styles.attachmentDescription}>Foto o video</Text>
+            </View>
+          </Pressable>
+        </View>}
+        {session&&composerPanel==='emojis'&&<View style={styles.emojisPopover}
+          accessibilityLabel="Elegir emoji">
+          {['😀','😂','❤️','👍','🥰','🎉','👏','😍'].map(emoji=>
+            <Pressable key={emoji} accessibilityRole="button" accessibilityLabel={'Insertar '+emoji}
+              style={styles.emojiOption} onPress={()=>{
+                if(!savingEdit&&draft.length+emoji.length<=2000)typeText(draft+emoji);
+                setComposerPanel(null);
+              }}><Text style={styles.emojiOptionText}>{emoji}</Text></Pressable>)}
+        </View>}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -976,14 +1021,32 @@ const styles = StyleSheet.create({
   mineText: { color: '#fff' },
   messageTime: { color: '#8a857b', fontSize: 10, textAlign: 'right', marginTop: 5 },
   mineMeta: { color: '#c1c1bd' },
-  composer: { flexDirection: 'row', alignItems: 'flex-end', padding: 12, borderTopColor: '#d6cab9', borderTopWidth: 1, gap: 8 },
-  mediaPlus:{width:44,height:44,borderRadius:22,backgroundColor:'#e0d6c8',alignItems:'center',justifyContent:'center'},
-  mediaPlusText:{fontSize:30,lineHeight:38,fontWeight:'400',color:'#242720'},
-  mediaMenu:{flexDirection:'row',flexWrap:'wrap',gap:8,paddingHorizontal:12,paddingVertical:12,
-    backgroundColor:'#f3eddf',borderTopWidth:1,borderTopColor:'#ded3c4'},
-  mediaMenuButton:{width:'48%',backgroundColor:'#fffaf4',borderRadius:13,borderWidth:1,
-    borderColor:'#d8c9ba',paddingHorizontal:8,minHeight:46,alignItems:'center',justifyContent:'center'},
-  mediaMenuText:{color:'#292b27',fontSize:13,fontWeight:'600'},
+  // Single compact messaging row, matching the PWA without an extra icon package.
+  composer:{flexDirection:'row',alignItems:'center',gap:8,paddingHorizontal:9,
+    paddingVertical:8,backgroundColor:'#F3EDDF',borderTopWidth:1,borderTopColor:'#e4dcd1'},
+  inputPill:{flex:1,minWidth:0,height:50,borderRadius:25,backgroundColor:'#fff',
+    borderWidth:1,borderColor:'#e7e1d9',flexDirection:'row',alignItems:'center',paddingHorizontal:3},
+  composerIcon:{height:44,width:38,alignItems:'center',justifyContent:'center'},
+  draft:{flex:1,minWidth:0,minHeight:42,maxHeight:98,color:'#1d2222',
+    paddingHorizontal:4,paddingVertical:7,fontSize:16},
+  sendCircle:{width:51,height:51,borderRadius:26,backgroundColor:'#242522',
+    alignItems:'center',justifyContent:'center'},
+  composerPanelDismiss:{...StyleSheet.absoluteFillObject,zIndex:20,backgroundColor:'transparent'},
+  attachmentsPopover:{position:'absolute',bottom:75,left:14,width:285,maxWidth:'90%',zIndex:22,
+    backgroundColor:'#fff',borderRadius:19,borderWidth:1,borderColor:'#e9e3da',padding:9,
+    elevation:9,shadowColor:'#000',shadowOpacity:.14,shadowRadius:13},
+  attachmentItem:{minHeight:61,flexDirection:'row',alignItems:'center',gap:13,
+    borderRadius:12,paddingHorizontal:12,paddingVertical:7},
+  attachmentSymbol:{height:42,width:42,borderRadius:14,alignItems:'center',justifyContent:'center'},
+  gallerySymbol:{backgroundColor:'#f0edfb'},
+  cameraSymbol:{backgroundColor:'#fbefec'},
+  attachmentTitle:{fontSize:15,fontWeight:'600',color:'#272c29'},
+  attachmentDescription:{fontSize:11,color:'#7b817c',marginTop:3},
+  emojisPopover:{position:'absolute',bottom:75,left:14,width:285,maxWidth:'90%',zIndex:22,
+    backgroundColor:'#fff',borderRadius:19,borderWidth:1,borderColor:'#e9e3da',padding:10,
+    flexDirection:'row',flexWrap:'wrap',elevation:9},
+  emojiOption:{width:'25%',height:49,alignItems:'center',justifyContent:'center'},
+  emojiOptionText:{fontSize:26},
   mediaPreview:{flexDirection:'row',alignItems:'center',gap:11,paddingHorizontal:13,paddingVertical:9,
     borderTopWidth:1,borderColor:'#ded3c4',backgroundColor:'#faf5ed'},
   mediaThumb:{width:70,height:70,borderRadius:10,backgroundColor:'#e5dfd7'},
@@ -994,9 +1057,6 @@ const styles = StyleSheet.create({
   mediaHint:{fontSize:10,color:'#736b61'},
   mediaClose:{fontSize:22,color:'#6e5f53',paddingHorizontal:5},
   mediaError:{fontSize:12,color:'#b23d2e',backgroundColor:'#fff4ee',paddingHorizontal:16,paddingVertical:8},
-  draft: { flex: 1, maxHeight: 95, minHeight: 45, backgroundColor: '#fffaf4', borderRadius: 23, borderWidth: 1, borderColor: '#ded4c7', paddingHorizontal: 14, paddingVertical: 11, color: '#171713', fontSize: 16 },
-  sendButton: { backgroundColor: '#252621', borderRadius: 22, paddingHorizontal: 15, height: 45, justifyContent: 'center' },
-  sendText: { color: '#fff', fontWeight: '700', fontSize: 14 },
   reconnect: { padding: 11, alignItems: 'center', borderTopWidth: 1, borderColor: '#d6cab9' },
   reconnectText: { fontWeight: '700', color: '#8a5a3c' },
   errorBanner: { color: '#a8322f', fontSize: 12, paddingHorizontal: 20, paddingVertical: 4 },
