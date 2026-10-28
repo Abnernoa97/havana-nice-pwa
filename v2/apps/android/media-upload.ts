@@ -1,9 +1,10 @@
-import {File,FileMode} from 'expo-file-system';
+import {File} from 'expo-file-system';
+import {fetch as expoFetch} from 'expo/fetch';
 import {HAVANA_V2_DEV_API_BASE_URL as API} from '@havana/shared';
 import type {ChatMediaSelection,ChatSession} from '@havana/shared';
 type Reply={assetId?:string;nextOffset?:number;chunkBytes?:number;complete?:boolean;error?:string};
 async function call(session:ChatSession,path:string,options:RequestInit={}):Promise<Reply>{
- const result=await fetch(API+path,{...options,headers:{Authorization:'Bearer '+session.token,...options.headers}});
+ const result=await expoFetch(API+path,{...options,headers:{Authorization:'Bearer '+session.token,...options.headers}});
  const body=await result.json() as Reply;
  if(!result.ok)throw Error(body.error||'No se pudo guardar el archivo');
  return body;
@@ -20,9 +21,8 @@ export async function uploadNativeOriginal(
  report:(sent:number,total:number)=>void
 ):Promise<void>{
  const original=new File(selected.uri);
- const handle=original.open(FileMode.ReadOnly);
- try{
-  if(handle.size!==selected.sizeBytes)throw Error('El archivo seleccionado ya no está disponible');
+ if(!original.exists||original.size!==selected.sizeBytes)throw Error('El archivo seleccionado ya no está disponible');
+ {
   const prepare=()=>call(session,'/api/chat/media/start',{
    method:'POST',headers:{'content-type':'application/json'},
    body:JSON.stringify({clientId,batchId,batchIndex,kind:selected.kind,name:selected.name,
@@ -35,16 +35,19 @@ export async function uploadNativeOriginal(
   const pieceSize=Math.min(state.chunkBytes||4*1048576,4*1048576);
   if(state.complete)return;
   while(offset<selected.sizeBytes){
-   handle.offset=offset;
-   const piece=await handle.readBytes(Math.min(pieceSize,selected.sizeBytes-offset));
-   if(!piece.length)throw Error('No se pudo leer el archivo original');
+   // Expo's file-backed Blob slices can be sent with expo/fetch directly.
+   // Never build a React Native Blob from Uint8Array/ArrayBuffer: that throws
+   // "Creating blobs from 'ArrayBuffer' and 'ArrayBufferView' are not supported".
+   const piece=original.slice(offset,Math.min(offset+pieceSize,selected.sizeBytes),
+     'application/octet-stream');
+   if(!piece.size||piece.size>pieceSize)throw Error('No se pudo leer el archivo original');
    let answer:Reply|undefined;let error:unknown;
    for(let attempt=0;attempt<3;attempt++){
     try{
      answer=await call(session,'/api/chat/media/'+state.assetId+'/chunk',{
        method:'POST',headers:{'content-type':'application/octet-stream',
          'x-havana-v2-offset':String(offset)},
-       body:new Blob([piece])
+       body:piece
      });break;
     }catch(reason){
      error=reason;
@@ -68,5 +71,5 @@ export async function uploadNativeOriginal(
    if(answer.complete)return;
   }
   throw Error('La transferencia terminó sin confirmación de almacenamiento');
- }finally{handle.close();}
+ }
 }
