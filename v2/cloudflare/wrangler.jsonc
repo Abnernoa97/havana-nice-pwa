@@ -13,12 +13,6 @@
       "database_id": "6a4abd3a-c01b-4d4f-b0ed-49f7eaca0cc5"
     }
   ],
-  "services": [
-    {
-      "binding": "HAVANA_CLOUD_BRIDGE",
-      "service": "havana-nice-cloud"
-    }
-  ],
   "durable_objects": {
     "bindings": [
       {
