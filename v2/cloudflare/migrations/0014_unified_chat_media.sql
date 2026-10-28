@@ -3,6 +3,10 @@
 -- The old standalone OAuth path was removed from the application source.
 -- Abort safely instead of deleting any legacy record if a different environment
 -- unexpectedly contains pre-existing media.
+-- Installations created after the obsolete bootstrap was physically deleted
+-- have no old tables. Create inert placeholders only for guarded cleanup.
+CREATE TABLE IF NOT EXISTS v2_media_assets(asset_id TEXT PRIMARY KEY);
+CREATE TABLE IF NOT EXISTS v2_media_quota(id INTEGER PRIMARY KEY,bytes_used INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS _v2_legacy_cleanup_guard (
   empty_only INTEGER NOT NULL CHECK(empty_only = 0)
 );
