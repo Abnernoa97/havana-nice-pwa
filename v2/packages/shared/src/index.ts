@@ -243,12 +243,11 @@ export function reconcileChatMessages(
 }
 
 // M01/M02: one selection policy shared by the PWA and native Chat.
-// Actual media uploads remain disabled until HAVANA CLOUD's private bridge is ready.
+// Photos and videos share one original-file contract; runtime Worker gates enforce rollout.
 export type ChatMediaKind='photo'|'video';
 export type ChatMediaSource='gallery'|'camera';
 export type ChatMediaSelection={kind:ChatMediaKind;source:ChatMediaSource;
  name:string;mimeType:string;sizeBytes:number;uri:string};
-export const CHAT_MEDIA_UPLOAD_ENABLED=false as const;
 export const CHAT_MEDIA_LIMITS={
  photo:{maxBytes:100*1024*1024,mimes:['image/jpeg','image/png','image/webp','image/heic','image/heif']},
  video:{maxBytes:10*1024*1024*1024,mimes:['video/mp4','video/quicktime']}
