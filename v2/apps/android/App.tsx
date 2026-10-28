@@ -1060,7 +1060,6 @@ const styles = StyleSheet.create({
   reconnect: { padding: 11, alignItems: 'center', borderTopWidth: 1, borderColor: '#d6cab9' },
   reconnectText: { fontWeight: '700', color: '#8a5a3c' },
   errorBanner: { color: '#a8322f', fontSize: 12, paddingHorizontal: 20, paddingVertical: 4 },
-  deletedText:{fontStyle:'italic',opacity:.72},
   reactionBadges:{flexDirection:'row',gap:4,alignSelf:'flex-end',marginTop:5},
   reactionBadge:{fontSize:11,color:'#403c34',backgroundColor:'#e8e5dc',paddingHorizontal:5,paddingVertical:1,borderRadius:9,overflow:'hidden'},
   whatsappBackdrop:{flex:1,backgroundColor:'rgba(20,19,16,.16)'},
