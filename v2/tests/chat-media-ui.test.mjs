@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync} from 'node:fs';
+import {readFileSync,existsSync} from 'node:fs';
 const read=name=>readFileSync(new URL('../'+name,import.meta.url),'utf8');
 
 test('One shared photo/video original quality policy; runtime Worker controls enablement',()=>{
@@ -107,4 +107,14 @@ test('Emoji stays enabled; microphone is informative until M03',()=>{
  assert.match(native,/Los audios estarán disponibles después de las fotografías y los videos/);
  assert.doesNotMatch(native,/requestMicrophonePermissionsAsync|startRecording\(/);
  assert.doesNotMatch(pwa,/getUserMedia|MediaRecorder/);
+});
+
+test('Cloud is an untouched existing product: no proposed service binding or unused lab bridge',()=>{
+ const config=JSON.parse(read('cloudflare/wrangler.jsonc'));
+ assert.equal(config.name,'havana-nice-v2-dev');
+ assert.deepEqual(config.services||[],[],'Do not bind or modify HAVANA CLOUD Worker to develop V2 Chat');
+ assert.equal(existsSync(new URL('../cloudflare/src/havana-cloud-bridge-client.js',import.meta.url)),false,
+   'Obsolete unused Cloud-private bridge module must remain deleted');
+ const contract=read('cloudflare/src/unified-media.js');
+ assert.match(contract,/maxFilesPerSend:MAX_BATCH_FILES/,'Retain the accepted five-file media policy');
 });
