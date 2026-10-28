@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { handleChatMedia, mediaReadiness } from './drive-media.js';
+import {forwardHavanaPhotoToCloud} from './havana-cloud-bridge-client.js';
 import { handleAdminSessionApi, verifyAdminSession } from './admin-auth.js';
 import { adminSocketToken, adminTokenRequest, notifyAdminClients } from './admin-realtime.js';
 import {handleAdminMemberManagement,recordMemberEvent,readMemberDevice} from './member-admin.js';
@@ -374,13 +375,22 @@ export default {
     if (request.headers.has('origin') && !origin) return respond({ error: 'Origin not allowed' }, 403);
     if (request.method === 'OPTIONS') return new Response(null, {
       status: 204, headers: { 'access-control-allow-origin': origin || 'https://havana-nice-v2-dev.pages.dev',
-        'access-control-allow-methods': 'GET, POST, DELETE, OPTIONS', 'access-control-allow-headers': 'Authorization, Content-Type, X-Havana-Client-Asset-Id',
+        'access-control-allow-methods': 'GET, POST, DELETE, OPTIONS', 'access-control-allow-headers': 'Authorization, Content-Type, X-Havana-Client-Asset-Id, X-Havana-V2-Client-Id, X-Havana-V2-File-Name, X-Havana-V2-Size-Bytes',
         'access-control-max-age': '3600', 'vary': 'Origin' },
     });
     if (url.pathname === '/health') {
       let row = null, database = 'error';
       try { row = await env.DB.prepare('SELECT value FROM system_meta WHERE key = ?').bind('schema_version').first(); database = 'ok'; } catch {}
       return respond({ ok: database === 'ok', app: 'havana-nice-v2', environment: env.HAVANA_ENV || 'development', database, schemaVersion: row?.value ?? null, realtime: 'configured', media: mediaReadiness(env).enabled ? 'google-drive-v2' : 'havana-cloud-private-bridge-pending', chat: 'authorized-members-persistent-device-sessions-realtime' }, database === 'ok' ? 200 : 503, origin);
+    }
+    // M01 staging only: the proxy is disabled until D1 can commit an
+    // attachment + message after HAVANA CLOUD confirms the actual photo.
+    if (url.pathname === '/api/chat/media/photo/upload' && request.method === 'POST') {
+      const session = await verifySession(env,
+        (request.headers.get('authorization') || '').replace(/^Bearer\\s+/i,''));
+      if (!session) return respond({error:'Unauthorized'},401,origin);
+      const result=await forwardHavanaPhotoToCloud(env,request,session.actorId);
+      return respond(result,result.status||503,origin);
     }
     if (url.pathname.startsWith('/api/chat/media/')) {
       const session = await verifySession(env, (request.headers.get('authorization') || '').replace(/^Bearer\s+/i, ''));
