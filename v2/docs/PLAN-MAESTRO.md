@@ -18,7 +18,7 @@
 6. **Acceso simplificado ya cerrado:** músico únicamente por **nombre autorizado manualmente en Admin**, primera instalación queda vinculada, segundo dispositivo con el mismo nombre bloqueado y alerta de duplicado. No contraseñas de músico, aprobaciones de teléfonos, seguridad bancaria, huellas inventadas ni migración de cuentas antiguas. El Admin se autentica por separado.
 7. **Administrador → Chat general**: muestra todas las burbujas con autor y reacciones, tiempo real, sin escribir. Puede borrar de forma definitiva el mensaje. **No** conservar burbujas «Mensaje eliminado» ni borrado lógico; mantener el servicio canónico `message-removal.js`.
 8. **Media actual: solo Fotos y Video.** HAVANA CLOUD gestiona la infraestructura Drive existente; V2 solo se integra con nuestra nube mediante puente privado. No añadir Google OAuth para músicos, Drive directo desde clientes, R2, almacenamiento alternativo ni audios/documentos en esta fase. Nunca fingir subida: `CHAT_MEDIA_UPLOAD_ENABLED=false` hasta el circuito real.
-9. **Interfaz WhatsApp aprobada**: en una misma barra emoji funcional, campo Mensaje, clip, icono cámara y círculo de micrófono informativo/enviar. El clip abre **solamente dos filas verticales «Fotos» y «Video»**, nunca «Galería»/«Cámara» ni una cuadrícula de cuatro botones. «Fotos» filtra fotos, «Video» videos; cámara separada abre cámara real. Vista previa local con quitar, sin enviar aún. La PWA fue aprobada físicamente. Android ya tiene el código y **la APK 0.0.6 ya se publicó**, pendiente prueba en dispositivo.
+9. **Interfaz WhatsApp aprobada**: en una misma barra emoji funcional, campo Mensaje, clip, icono cámara y círculo de micrófono informativo/enviar. El clip abre **solamente dos filas verticales «Fotos» y «Video»**, nunca «Galería»/«Cámara» ni una cuadrícula de cuatro botones. «Fotos» filtra fotos, «Video» videos; cámara separada abre cámara real. Vista previa local con quitar, sin enviar aún. La PWA fue aprobada físicamente. Android ya tiene el código y **la APK 0.0.6 fue instalada y validada físicamente por el propietario el 27/10/2026**. No reconstruir la APK por cambios del bridge.
 10. No cobrar, adquirir servicios, tocar cuentas Google ni elevar permisos sin autorización. Ejecutar auditoría, tests y despliegues verificables; no afirmar algo probado en teléfono sin captura/confirmación del propietario.
 
 ## 2. Tablero original — 27 hitos
@@ -37,7 +37,7 @@
 
 ### Android, acceso y seguridad
 
-- [x] **H01 · Preservar Android nativo.** Paquete/firma constante y actualización física anteriormente validada; APK 0.0.6 nueva compilada y publicada con comparación criptográfica correcta, pendiente prueba física de instalación.
+- [x] **H01 · Preservar Android nativo.** Paquete/firma constante y actualización física anteriormente validada; APK 0.0.6 publicada con comparación criptográfica correcta y validada físicamente por el propietario; conservó las funciones existentes.
 - [ ] **H02 · Módulos no-Chat mediante PWA.** Home, Calendario y Repertorio visuales en Android; Chat continúa nativo.
 - [ ] **H03 · Navegación y sesión coordinadas.** Identidad compartida, Atrás, recuperación segura de borradores/reintentos y sesión intermodular.
 - [ ] **H04 · PWA visual actualizable sin APK.** Verificación física de actualización de módulos no-Chat.
@@ -46,7 +46,7 @@
 
 ### Multimedia (prioridad actual: fotos y videos)
 
-- [ ] **M01 · Fotos privadas reales.** **Interfaz + menú Fotos/cámara aprobados en PWA y codificados en Android; APK 0.0.6 publicada.** Falta transferencia a HAVANA CLOUD, miniatura, progreso, lectura desde Chat PWA/nativo/Admin y borrado físico del archivo. **Siguiente hito activo.**
+- [ ] **M01 · Fotos privadas reales.** **Interfaz + menú Fotos/cámara aprobados en PWA y Android; APK 0.0.6 validada físicamente.** Falta transferencia a HAVANA CLOUD, miniatura, progreso, lectura desde Chat PWA/nativo/Admin y borrado físico del archivo. **Siguiente hito activo.**
 - [ ] **M02 · Videos reales.** **Menú Video y selector de videos listos**, sin envío aún. Falta carga por fragmentos/reanudación, poster, duración, reproducción en clientes/Admin y borrado remoto.
 - [ ] **M03 · Audios.** APLAZADO: HAVANA CLOUD no tiene todavía infraestructura aprobada para ellos. El micrófono del compositor no graba y solo informa; no iniciar M03.
 - [ ] **M04 · Visor multimedia.** Pantalla completa, zoom, gestos, videos y regreso a Chat sin perder lugar.
@@ -83,7 +83,7 @@
 https://raw.githubusercontent.com/Abnernoa97/havana-nice-pwa/havana-nice-v2-apk-downloads/HAVANA-NICE-V2-ANDROID-828e0682815d.apk
 
 - Fuente exacta APK: `828e0682815dfc0579e3197ed7a4c582372887ad`; CI base `40613744827`, build `40613744649`, distribución `40613744654`: **SUCCESS**.
-- Certificado igual al APK anterior, comparado con `v2/scripts/apk-signature-gate.py`. SHA-256 APK `6f66111fa3f935c61788718fb4c220211f725f05f66e19ad603896d18f24e50e`. **No se ha confirmado instalación en teléfono del propietario**.
+- Certificado igual al APK anterior, comparado con `v2/scripts/apk-signature-gate.py`. SHA-256 APK `6f66111fa3f935c61788718fb4c220211f725f05f66e19ad603896d18f24e50e`. **Instalación y funcionamiento confirmados por el propietario el 27/10/2026 («Quedó perfecto»).**
 - Última comprobación Cloudflare: Worker V2 `efbedccb-4d2d-4a3e-a560-8acb91c5a9eb`; Worker HAVANA CLOUD `a5165b9e-b952-42b3-9468-e86da0190a11`.
 - Lectura D1 al redactar: **3 músicos, 3 sesiones, 3 dispositivos vinculados, 43 mensajes, 11 reacciones, 0 multimedia y 0 marcadores de eliminado**. Estos conteos pueden variar por uso normal; nunca ejecutar borrados para volver a una cifra antigua.
 - Las cuentas originales y el músico temporal de QA fueron retirados por indicación del propietario; nuevos nombres se crean exclusivamente en Admin y el historial anterior se preserva sin autorías falsas.
@@ -94,11 +94,13 @@ https://raw.githubusercontent.com/Abnernoa97/havana-nice-pwa/havana-nice-v2-apk-
 
 **Auditoría técnica verificada (27/10/2026, solo lectura):** los dos Workers siguen desplegados en sus versiones ya documentadas, pero el Worker V2 **no** tiene configurado el Service Binding `HAVANA_CLOUD_BRIDGE` ni las variables habilitadoras del puente. D1 mantiene 3 músicos, 3 sesiones, 3 dispositivos, 43 mensajes, 11 reacciones y 0 medios. Su tabla anterior `v2_media_assets` impone 640 KiB, permite solo tres MIME de imagen y procede de un proveedor OAuth aislado obsoleto: **no reutilizar esa ruta para la integración HAVANA CLOUD de 25 MiB/512 MiB**; el nuevo contrato debe versionar su propio modelo D1 de referencias y vincularlo con los mensajes. La rama LAB existente de CLOUD corrigió el límite anunciado de 640 KiB para que derive del contrato único de 25 MiB, y la reserva de cuota: commits `d680ebe6182b` y `b4d445f4a9b5`, CI `40618122367` SUCCESS. **Solamente LAB; sin despliegue, sin subidas y sin cambios en datos o nube personal.** La vigencia efectiva de tokens Drive y la disponibilidad por cuenta no se han verificado.
 
+**M01 — implementación LAB tras confirmación APK 0.0.6:** se añadieron a la rama experimental de HAVANA CLOUD `worker/havana-v2-photo-transfer.ts` (foto privada, cabecera/tamaño/MIME y firma de contenido, idempotencia y bloqueo de duplicados ante confirmaciones ambiguas), `worker/havana-v2-photo-google.ts` (subida real a Google Drive mediante OAuth que ya gestiona CLOUD, `appProperties` y espacio separados), y métodos transaccionales de Durable Object. El puente interno requiere autenticación entre Workers más la bandera independiente `HAVANA_V2_PHOTO_UPLOAD_ENABLED`; **desactivada actualmente**. Se agregaron suites de pruebas contra Google simulado y CI experimental; `main` de CLOUD no fue modificado. En V2 se creó un proxy autenticado que sustituye cualquier identidad de actor suministrada por el navegador por la identidad verificada en D1, requiere flags `V2_CLOUD_BRIDGE_ENABLED` y `V2_CLOUD_BRIDGE_PHOTO_ENABLED` y permanece **desactivado** sin binding. Esto **no** equivale aún a enviar fotografías: falta vínculo transaccional con mensaje D1, lectura privada, moderación y QA cruzada.
+
 **Pendiente:** enlace de transferencia privada Service Binding validado, autorización única, idempotencia, espacio por cuenta, fotos reales, comprobación de cuota, miniaturas, sesión/autor, lecturas autorizadas, reintentos, borrado remoto confiable, presencia en Admin y video por fragmentos. No añadir un segundo storage ni subir imágenes a D1. Primero cerrar M01 con prueba real en PWA/nativo/Admin y luego reutilizar mismo circuito para M02. Mantener aislamiento total de galería personal y seguridad sin ingeniería exagerada.
 
 ## 5. Secuencia inmediatamente siguiente
 
-1. **Continuidad y pruebas físicas:** entregar al propietario la APK 0.0.6 ya publicada y verificar que se instale **encima**, sin borrar datos; probar selector Fotos, Video, cámara nativa, emoji y texto. PWA con esas funciones ya aprobada físicamente.
+1. **Continuidad y pruebas físicas (HECHO):** propietario confirmó que la APK 0.0.6 quedó perfecta sobre la app existente. Se preservan el paquete, firma y sesión; ningún nuevo APK es necesario para preparar M01.
 2. **Auditoría privada antes de activar:** verificar Worker, Service Binding de HAVANA CLOUD, validez efectiva de cuentas/espacio Drive, namespace `havana-app:v1:media:` y modelo D1. No mutar usuarios ni archivos personales.
 3. **M01 fotografía real:** completar un solo protocolo de subida segura, creación de mensaje en D1, consulta en Chat PWA/nativo y lectura/moderación desde Chat general Admin; pruebas físicas. Borrado debe ser definitivo en ambos sistemas con reconciliación si falla una parte.
 4. **M02 video real:** mismos endpoints de referencia/autorización, subida controlada y progresiva, reproducción, eliminación. No agregar audios.
