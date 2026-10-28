@@ -23,7 +23,7 @@ export async function uploadOriginalMedia(
  });
  if(!meta.assetId||!Number.isSafeInteger(meta.nextOffset))throw Error('No se confirmó la sesión de almacenamiento');
  if(meta.complete)return;
- let offset=meta.nextOffset;
+ let offset=meta.nextOffset as number;
  const chunkBytes=Math.min(4*1048576,meta.chunkBytes||4*1048576);
  while(offset<file.size){
   const chunk=file.slice(offset,Math.min(offset+chunkBytes,file.size));
@@ -43,7 +43,7 @@ export async function uploadOriginalMedia(
    }
   }
   if(!result)throw failed||Error('La subida fue interrumpida');
-  if(!Number.isSafeInteger(result.nextOffset)||result.nextOffset<=offset||
+  if(typeof result.nextOffset!=='number'||!Number.isSafeInteger(result.nextOffset)||result.nextOffset<=offset||
       result.nextOffset>file.size)throw Error('No se pudo confirmar el avance del archivo');
   offset=result.nextOffset;
   onProgress({sent:offset,total:file.size});
