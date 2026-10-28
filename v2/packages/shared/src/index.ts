@@ -240,3 +240,28 @@ export function reconcileChatMessages(
     return a.sentAt.localeCompare(b.sentAt);
   });
 }
+
+// M01/M02: one selection policy shared by the PWA and native Chat.
+// Actual media uploads remain disabled until HAVANA CLOUD's private bridge is ready.
+export type ChatMediaKind='photo'|'video';
+export type ChatMediaSource='gallery'|'camera';
+export type ChatMediaSelection={kind:ChatMediaKind;source:ChatMediaSource;
+ name:string;mimeType:string;sizeBytes:number;uri:string};
+export const CHAT_MEDIA_UPLOAD_ENABLED=false as const;
+export const CHAT_MEDIA_LIMITS={
+ photo:{maxBytes:25*1024*1024,mimes:['image/jpeg','image/png','image/webp','image/heic','image/heif']},
+ video:{maxBytes:512*1024*1024,mimes:['video/mp4','video/quicktime']}
+} as const;
+export function validateChatMediaSelection(
+ item:Pick<ChatMediaSelection,'kind'|'name'|'mimeType'|'sizeBytes'>
+):string|null{
+ const rule=CHAT_MEDIA_LIMITS[item.kind];
+ if(!rule)return 'Solo se admiten fotografías y videos.';
+ if(typeof item.name!=='string'||!item.name.trim()||item.name.length>180||
+    /[\\/\x00-\x1f\x7f]/.test(item.name))return 'Nombre de archivo no válido.';
+ if(typeof item.mimeType!=='string'||!(rule.mimes as readonly string[]).includes(item.mimeType.toLowerCase()))
+  return 'Formato no admitido por HAVANA CLOUD.';
+ if(!Number.isSafeInteger(item.sizeBytes)||item.sizeBytes<=0||item.sizeBytes>rule.maxBytes)
+  return 'El archivo está vacío o supera el límite permitido.';
+ return null;
+}
