@@ -13,12 +13,13 @@ async function request(session:ChatSession,path:string,options:RequestInit={}){
 // Identical bytes from the gallery; no canvas, compression or base64.
 export async function uploadOriginalMedia(
  session:ChatSession,selection:ChatMediaSelection,file:File,clientId:string,
+ batchId:string,batchIndex:number,
  onProgress:(progress:UploadProgress)=>void
 ):Promise<void>{
  if(file.size!==selection.sizeBytes)throw Error('La fotografía o video seleccionado cambió');
  const meta=await request(session,'/api/chat/media/start',{
   method:'POST',headers:{'content-type':'application/json'},
-  body:JSON.stringify({clientId,kind:selection.kind,name:selection.name,
+  body:JSON.stringify({clientId,batchId,batchIndex,kind:selection.kind,name:selection.name,
    mimeType:selection.mimeType,sizeBytes:selection.sizeBytes})
  });
  if(!meta.assetId||!Number.isSafeInteger(meta.nextOffset))throw Error('No se confirmó la sesión de almacenamiento');
