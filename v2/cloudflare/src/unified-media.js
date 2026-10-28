@@ -34,7 +34,6 @@ function privateRequest(env,path,options={}){
  return env.HAVANA_CLOUD_BRIDGE.fetch('https://havana-cloud.internal'+path,
    {...options,headers});
 }
-const bad=(respond,origin,error,status)=>respond({error},status,origin);
 function validMetadata(m){
  const rule=TYPES[m?.kind];
  return rule&&UUID.test(m.clientId||'')&&
@@ -58,6 +57,28 @@ export async function attachChatMedia(env,messages){
  }]));
  return messages.map(m=>({...m,media:map.get(m.seq)||null}));
  }catch{return messages;}
+}
+// Persist the original's Chat bubble atomically, only AFTER Drive confirmation.
+// Repeating start after a lost response repairs the same message without duplicates.
+export async function finalizeConfirmedMedia(env,record,session,notify){
+ const now=new Date().toISOString();
+ await env.DB.batch([
+  env.DB.prepare(
+   'INSERT OR IGNORE INTO chat_messages(client_message_id,sender_id,sender_name,body,created_at) VALUES(?,?,?,?,?)'
+  ).bind(record.client_id,record.sender_id,session.displayName,
+    record.kind==='photo'?'📷 Foto':'🎬 Video',now),
+  env.DB.prepare(
+   "UPDATE chat_media_assets SET status='ready',completed_at=COALESCE(completed_at,?),"+
+   ' message_seq=(SELECT seq FROM chat_messages WHERE sender_id=? AND client_message_id=?) '+
+   'WHERE asset_id=? AND sender_id=?'
+  ).bind(now,record.sender_id,record.client_id,record.asset_id,record.sender_id)
+ ]);
+ const linked=await env.DB.prepare('SELECT message_seq FROM chat_media_assets WHERE asset_id=? AND status=?')
+   .bind(record.asset_id,'ready').first();
+ if(!Number.isSafeInteger(linked?.message_seq)||linked.message_seq<1)
+   throw Error('media_chat_link_not_confirmed');
+ await notify(linked.message_seq).catch(()=>{});
+ return linked.message_seq;
 }
 export async function handleUnifiedChatMedia(request,env,session,url,origin,respond,notify){
  const reply=(obj,status=200)=>respond(obj,status,origin);
@@ -94,6 +115,12 @@ export async function handleUnifiedChatMedia(request,env,session,url,origin,resp
      if(!r.ok)return reply({error:'No hay almacenamiento disponible'},r.status===507?507:502);
      remote=await r.json();
    }catch{return reply({error:'No se pudo conectar con HAVANA CLOUD'},502);}
+   if(remote.state==='ready'){
+     try{await finalizeConfirmedMedia(env,old||{
+       asset_id:assetId,client_id:m.clientId,kind:m.kind,sender_id:session.actorId
+     },session,notify);}
+     catch{return reply({error:'Archivo guardado; mensaje pendiente de confirmación'},503);}
+   }
    return reply({assetId,complete:remote.state==='ready',
      nextOffset:remote.nextOffset,chunkBytes:CHUNK_BYTES});
  }
@@ -132,23 +159,8 @@ export async function handleUnifiedChatMedia(request,env,session,url,origin,resp
    if(!upstream.ok)return reply({error:'Transferencia pendiente de reconciliar'},upstream.status===409?409:502);
    const received=await upstream.json();
    if(received.complete){
-     if(record.status!=='ready'||!record.message_seq){
-       const [marker]=await env.DB.batch([
-         env.DB.prepare("UPDATE chat_media_assets SET status='ready',completed_at=? WHERE asset_id=?")
-           .bind(new Date().toISOString(),assetId)
-       ]);
-       const text=record.kind==='photo'?'📷 Foto':'🎬 Video';
-       await env.DB.prepare(
-         'INSERT OR IGNORE INTO chat_messages(client_message_id,sender_id,sender_name,body,created_at) VALUES(?,?,?,?,?)'
-       ).bind(record.client_id,session.actorId,session.displayName,text,new Date().toISOString()).run();
-       const message=await env.DB.prepare(
-         'SELECT seq FROM chat_messages WHERE sender_id=? AND client_message_id=?'
-       ).bind(session.actorId,record.client_id).first();
-       if(!message)return reply({error:'Archivo guardado, mensaje pendiente'},503);
-       await env.DB.prepare('UPDATE chat_media_assets SET message_seq=? WHERE asset_id=? AND message_seq IS NULL')
-         .bind(message.seq,assetId).run();
-       await notify(message.seq).catch(()=>{});
-     }
+     try{await finalizeConfirmedMedia(env,record,session,notify);}
+     catch{return reply({error:'Archivo guardado; mensaje pendiente de confirmación'},503);}
    }
    return reply({assetId,complete:received.complete,nextOffset:received.nextOffset});
  }
