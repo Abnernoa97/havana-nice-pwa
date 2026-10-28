@@ -7,7 +7,8 @@ import {verifyAdminSession,adminLoginConfigured} from './admin-auth.js';
 const BASE='https://havana-nice-cloud.soloaplicaciones97.workers.dev';
 const TE=new TextEncoder(),TD=new TextDecoder();
 const DEVICE=/^d1\.([0-9]{10,12})\.[0-9a-f-]{36}\.[A-Za-z0-9_-]{43}$/i;
-const VALID_CLOUD_PATHS=new Set(['/api/auth/login','/api/auth/device','/api/google/upload/session','/api/google/upload/chunk']);
+const VALID_CLOUD_PATHS=new Set(['/api/auth/login','/api/auth/device','/api/google/upload/session','/api/google/upload/chunk','/api/media/delete','/api/trash/delete']);
+const CLOUD_READ=/^\/api\/media\/[0-9a-f-]{36}\/content$/i;
 const RUNTIME_FLAG='enabled';
 
 const encode=bytes=>btoa(String.fromCharCode(...bytes)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
@@ -54,7 +55,7 @@ async function writeToken(env,token){
  ).bind(sealed.encrypted_token,sealed.iv,Number(parsed[1])*1000,Date.now()).run();
 }
 async function fetchCloud(env,path,options){
- if(!path.startsWith('/api/')||path.includes('//')||!VALID_CLOUD_PATHS.has(path))
+ if(!path.startsWith('/api/')||path.includes('//')||(!VALID_CLOUD_PATHS.has(path)&&!CLOUD_READ.test(path)))
   throw Error('cloud_path_not_allowed');
  return env.HAVANA_CLOUD_BRIDGE.fetch(BASE+path,options);
 }
