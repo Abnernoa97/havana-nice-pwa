@@ -86,6 +86,11 @@ export async function handleUnifiedChatMedia(request,env,session,url,origin,resp
      maxVideoBytes:TYPES.video.max,chunkBytes:CHUNK_BYTES,maxFilesPerSend:MAX_BATCH_FILES});
  }
  if(!mediaConfigured(env))return reply({error:'HAVANA CLOUD todavía no está enlazada'},503);
+ // Never create a Chat media record or a Drive session before the owner has
+ // explicitly authorized this backend. Unpaired musician attempts are read-only.
+ if(path==='/api/chat/media/start'&&request.method==='POST'&&
+    !(await cloudLinkStatus(env)).linked)
+   return reply({error:'Vincula HAVANA CLOUD desde el Administrador'},503);
  if(path==='/api/chat/media/start'&&request.method==='POST'){
    let m;try{m=await request.json()}catch{return reply({error:'Archivo inválido'},400);}
    if(!validMetadata(m))return reply({error:'Archivo no admitido'},400);
