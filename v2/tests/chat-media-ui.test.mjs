@@ -122,3 +122,22 @@ test('Cloud is an untouched existing product: no proposed service binding or unu
  const contract=read('cloudflare/src/unified-media.js');
  assert.match(contract,/maxFilesPerSend:MAX_BATCH_FILES/,'Retain the accepted five-file media policy');
 });
+
+test('Faster batches are strictly bounded: two original files concurrently, ordered resumable chunks per file',()=>{
+ const pwa=read('apps/pwa/src/App.tsx');
+ const android=read('apps/android/App.tsx');
+ for(const source of [pwa,android]){
+  const start=source.indexOf('async function sendSelectedMedia(){');
+  const end=source.indexOf('function send()',start);
+  const body=source.slice(start,end);
+  assert.ok(start>=0&&end>start);
+  assert.match(body,/Promise\.all\(Array\.from\(\{length:Math\.min\(2,items\.length\)\}/);
+  assert.match(body,/const confirmed=new Map<string,number>\(\)/);
+  assert.match(body,/const failures:string\[\]=\[\]/);
+  assert.match(body,/while\(next<items\.length\)/);
+  assert.match(body,/batchIndex:item\.batchIndex\?\?index/);
+ }
+ // A single file is still uploaded in strict offset order, never parallel chunks.
+ assert.match(read('apps/android/media-upload.ts'),/while\(offset<selected\.sizeBytes\)/);
+ assert.match(read('apps/pwa/src/media-upload.ts'),/while\(offset<file\.size\)/);
+});
