@@ -101,14 +101,12 @@ h1 span { font-weight:400; }
   box-shadow:0 8px 28px #0002}
 .chat-attachments-popover{width:min(310px,calc(100% - 30px));display:grid;gap:2px;padding:9px}
 .chat-attachments-popover button{border:0;background:transparent;color:#272c29;
-  display:flex;align-items:center;gap:13px;text-align:left;min-height:61px;
+  display:flex;align-items:center;gap:13px;text-align:left;min-height:58px;
   border-radius:12px;padding:9px 11px;font-size:15px;font-weight:600}
 .chat-attachments-popover button:active,.chat-attachments-popover button:focus-visible{background:#f3f2f0}
 .chat-attachments-symbol{width:40px;height:40px;display:grid;place-items:center;
   color:#77739b;background:#f0edfb;border-radius:14px}
-.chat-attachments-popover button:nth-child(2) .chat-attachments-symbol{color:#976b67;background:#fbefec}
-.chat-attachments-popover button span:nth-child(2){display:flex;flex-direction:column;gap:2px}
-.chat-attachments-popover button small{color:#7b817c;font-size:11px;font-weight:400}
+.chat-attachments-popover button:nth-child(2) .chat-attachments-symbol{color:#5f8b9b;background:#eaf3f7}
 .chat-emojis-popover{width:min(310px,calc(100% - 30px));display:grid;
   grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;padding:12px}
 .chat-emojis-popover button{font-size:27px;border:0;background:transparent;

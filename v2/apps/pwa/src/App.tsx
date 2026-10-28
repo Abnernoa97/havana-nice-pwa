@@ -21,7 +21,8 @@ export default function App() {
   const [selectedMedia,setSelectedMedia]=useState<ChatMediaSelection|null>(null);
   const [mediaError,setMediaError]=useState('');
   const mediaObjectUrl=useRef<string|null>(null);
-  const galleryPicker=useRef<HTMLInputElement|null>(null);
+  const photosPicker=useRef<HTMLInputElement|null>(null);
+  const videoPicker=useRef<HTMLInputElement|null>(null);
   const cameraPicker=useRef<HTMLInputElement|null>(null);
   const [connection, setConnection] = useState('desconectado');
   const [error, setError] = useState('');
@@ -55,14 +56,17 @@ export default function App() {
     if(mediaObjectUrl.current){URL.revokeObjectURL(mediaObjectUrl.current);mediaObjectUrl.current=null;}
     setSelectedMedia(null);setMediaError('');
   };
-  const openMediaPicker=(source:ChatMediaSource)=>{
+  const openGalleryMedia=(kind:ChatMediaKind)=>{
     setComposerPanel(null);setMediaError('');
-    // The browser opens its own image/video chooser or camera, with no upload.
-    (source==='gallery'?galleryPicker:cameraPicker).current?.click();
+    (kind==='photo'?photosPicker:videoPicker).current?.click();
   };
-  const chooseMedia=(source:ChatMediaSource,file?:File)=>{
+  const openCamera=()=>{
+    setComposerPanel(null);setMediaError('');
+    // Android's capture input asks for the device camera, not its media gallery.
+    cameraPicker.current?.click();
+  };
+  const chooseMedia=(source:ChatMediaSource,kind:ChatMediaKind,file?:File)=>{
     if(!file)return;
-    const kind:ChatMediaKind=file.type.startsWith('image/')?'photo':'video';
     const issue=validateChatMediaSelection({kind,name:file.name,
       mimeType:file.type.toLowerCase(),sizeBytes:file.size});
     if(issue){setMediaError(issue);return;}
@@ -714,13 +718,13 @@ export default function App() {
             onClick={()=>setComposerPanel(null)}/>}
           {composerPanel==='attachments'&&<div className="chat-attachments-popover"
             role="group" aria-label="Adjuntar al chat">
-            <button type="button" onClick={()=>openMediaPicker('gallery')}>
+            <button type="button" aria-label="Fotos" onClick={()=>openGalleryMedia('photo')}>
               <span className="chat-attachments-symbol"><ComposerIcon name="photo" size={23}/></span>
-              <span>Galería<small>Fotos y videos</small></span>
+              <span>Fotos</span>
             </button>
-            <button type="button" onClick={()=>openMediaPicker('camera')}>
-              <span className="chat-attachments-symbol"><ComposerIcon name="camera" size={23}/></span>
-              <span>Cámara<small>Foto o video</small></span>
+            <button type="button" aria-label="Video" onClick={()=>openGalleryMedia('video')}>
+              <span className="chat-attachments-symbol"><ComposerIcon name="video" size={23}/></span>
+              <span>Video</span>
             </button>
           </div>}
           {composerPanel==='emojis'&&<div className="chat-emojis-popover"
@@ -729,13 +733,15 @@ export default function App() {
               <button type="button" key={emoji} onClick={()=>insertEmoji(emoji)}
                 aria-label={'Insertar '+emoji}>{emoji}</button>)}
           </div>}
-          <input className="chat-media-hidden-input" type="file" ref={galleryPicker}
-            tabIndex={-1} aria-hidden="true" accept="image/*,video/*"
-            onChange={e=>{chooseMedia('gallery',e.currentTarget.files?.[0]);e.currentTarget.value='';}}/>
+          <input className="chat-media-hidden-input" type="file" ref={photosPicker}
+            tabIndex={-1} aria-hidden="true" accept="image/*"
+            onChange={e=>{chooseMedia('gallery','photo',e.currentTarget.files?.[0]);e.currentTarget.value='';}}/>
+          <input className="chat-media-hidden-input" type="file" ref={videoPicker}
+            tabIndex={-1} aria-hidden="true" accept="video/*"
+            onChange={e=>{chooseMedia('gallery','video',e.currentTarget.files?.[0]);e.currentTarget.value='';}}/>
           <input className="chat-media-hidden-input" type="file" ref={cameraPicker}
-            tabIndex={-1} aria-hidden="true" accept="image/*,video/*"
-            capture="environment"
-            onChange={e=>{chooseMedia('camera',e.currentTarget.files?.[0]);e.currentTarget.value='';}}/>
+            tabIndex={-1} aria-hidden="true" accept="image/*" capture="environment"
+            onChange={e=>{chooseMedia('camera','photo',e.currentTarget.files?.[0]);e.currentTarget.value='';}}/>
           {selectedMedia&&<div className="chat-media-preview" aria-label="Vista previa del archivo">
             {selectedMedia.kind==='photo'
               ?<img src={selectedMedia.uri} alt="Vista previa de la fotografía seleccionada"/>
@@ -764,7 +770,7 @@ export default function App() {
                 <ComposerIcon name="clip" size={25}/>
               </button>
               <button type="button" className="chat-icon-button" aria-label="Abrir cámara"
-                onClick={()=>openMediaPicker('camera')}>
+                onClick={openCamera}>
                 <ComposerIcon name="camera" size={25}/>
               </button>
             </div>
