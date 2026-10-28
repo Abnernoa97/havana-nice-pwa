@@ -112,7 +112,8 @@ test('Emoji stays enabled; microphone is informative until M03',()=>{
 test('Cloud is an untouched existing product: no proposed service binding or unused lab bridge',()=>{
  const config=JSON.parse(read('cloudflare/wrangler.jsonc'));
  assert.equal(config.name,'havana-nice-v2-dev');
- assert.equal(config.vars?.V2_CLOUD_LINK_ENABLED,'disabled','No upload credentials or requests enabled by default');
+ assert.equal(config.vars?.V2_CLOUD_LINK_ENABLED,'enabled','One-time storage pairing is administered solely within V2');
+ assert.equal(config.vars?.V2_CLOUD_MEDIA_ENABLED,'disabled','Real photo/video transfers remain disabled until owner pairs Cloud and confirms QA');
  assert.deepEqual(config.services||[],[{
   binding:'HAVANA_CLOUD_BRIDGE',service:'havana-nice-cloud'
  }],'Caller-only V2 service binding may invoke the published Cloud endpoints without changing Cloud');
