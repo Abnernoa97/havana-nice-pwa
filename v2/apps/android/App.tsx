@@ -1,14 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Alert, AppState, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, SafeAreaView, ScrollView,
-  StatusBar, StyleSheet, Text, TextInput, View, useWindowDimensions,
+  StatusBar, StyleSheet, Text, TextInput, View, Image, useWindowDimensions,
 } from 'react-native';
 import {
   HAVANA_V2_DEV_API_BASE_URL, fetchBackendHealth, getChatSnapshot, getOlderChatMessages, searchChatMessages, lastReadByOther, messageDeliveryLabel, newClientMessageId,
   reconcileChatMessages, reconcileReactions, reconcileUpdatedMessage, reconcileDeletedMessage, reconcileChatSnapshot, startNamedChatSession, restoreNamedChatSession,
   type ChatMessage, type ChatServerEvent, type ChatSession, type ChatReaction, type ChatEmoji, type ChatReadReceipt,
+  validateChatMediaSelection, CHAT_MEDIA_UPLOAD_ENABLED, type ChatMediaSelection, type ChatMediaKind, type ChatMediaSource,
 } from '@havana/shared';
 import { loadNativeLocalChat, saveNativeLocalChat } from './chatStorage';
+import * as ImagePicker from 'expo-image-picker';
 import SwipeableBubble, {type BubbleAnchor} from './SwipeableBubble';
 
 export default function App() {
@@ -19,6 +21,10 @@ export default function App() {
   const [restoringAccess,setRestoringAccess] = useState(true);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState('');
+  const [mediaMenuOpen,setMediaMenuOpen]=useState(false);
+  const [selectedMedia,setSelectedMedia]=useState<ChatMediaSelection|null>(null);
+  const [mediaError,setMediaError]=useState('');
+  const [mediaPicking,setMediaPicking]=useState(false);
   const [error, setError] = useState('');
   const [connection, setConnection] = useState('desconectado');
   const [joining, setJoining] = useState(false);
@@ -39,6 +45,38 @@ export default function App() {
   const [menuAnchor,setMenuAnchor] = useState<BubbleAnchor | null>(null);
   const socket = useRef<WebSocket | null>(null);
   const scroll = useRef<React.ElementRef<typeof ScrollView> | null>(null);
+  const chooseNativeMedia=async(source:ChatMediaSource,kind:ChatMediaKind)=>{
+    setMediaMenuOpen(false);setMediaError('');Keyboard.dismiss();
+    if(mediaPicking)return;
+    setMediaPicking(true);
+    try{
+      if(source==='camera'){
+        const permission=await ImagePicker.requestCameraPermissionsAsync();
+        if(!permission.granted){
+          Alert.alert('Permiso de cámara','Permite el acceso a la cámara para tomar fotos o videos.');
+          return;
+        }
+      }
+      const options:ImagePicker.ImagePickerOptions={
+        mediaTypes:kind==='photo'?['images']:['videos'],allowsEditing:false,
+        quality:kind==='photo'?0.9:1,selectionLimit:1
+      };
+      const result=source==='camera'
+        ?await ImagePicker.launchCameraAsync(options)
+        :await ImagePicker.launchImageLibraryAsync(options);
+      if(result.canceled||!result.assets?.length)return;
+      const asset=result.assets[0];
+      if(!asset)return;
+      const mimeType=(asset.mimeType||(kind==='photo'?'image/jpeg':'video/mp4')).toLowerCase();
+      const name=asset.fileName||('havana-'+Date.now()+(kind==='photo'?'.jpg':'.mp4'));
+      const sizeBytes=asset.fileSize??0;
+      const issue=validateChatMediaSelection({kind,name,mimeType,sizeBytes});
+      if(issue){setMediaError(issue);return;}
+      setSelectedMedia({kind,source,uri:asset.uri,name,mimeType,sizeBytes});
+    }catch{
+      setMediaError('No se pudo abrir la cámara o la galería. Inténtalo de nuevo.');
+    }finally{setMediaPicking(false);}
+  };
   const autoScroll = useRef(true);
   // Initial load and reopening land at the most recent message, without a long animated scroll.
   const initialHistoryPending = useRef(true);
@@ -847,7 +885,37 @@ export default function App() {
             {typing ? <View style={styles.typingIndicator} accessibilityLiveRegion="polite">
                <Text style={styles.typingIndicatorText}>{typing}</Text>
              </View> : null}
+             {mediaMenuOpen&&<View style={styles.mediaMenu}>
+               {([
+                 ['gallery','photo','Galería · Foto'],['gallery','video','Galería · Video'],
+                 ['camera','photo','Cámara · Foto'],['camera','video','Cámara · Video']
+               ] as const).map(([source,kind,label])=>
+                 <Pressable key={source+kind} accessibilityRole="button" accessibilityLabel={label}
+                   style={styles.mediaMenuButton} onPress={()=>void chooseNativeMedia(source,kind)}>
+                   <Text style={styles.mediaMenuText}>{label}</Text>
+                 </Pressable>)}
+             </View>}
+             {selectedMedia&&<View style={styles.mediaPreview} accessibilityLabel="Archivo seleccionado">
+               {selectedMedia.kind==='photo'
+                 ?<Image source={{uri:selectedMedia.uri}} style={styles.mediaThumb}/>
+                 :<View style={[styles.mediaThumb,styles.videoThumb]}><Text style={styles.videoThumbText}>▶</Text></View>}
+               <View style={styles.mediaInfo}>
+                 <Text style={styles.mediaName} numberOfLines={1}>{selectedMedia.name}</Text>
+                 <Text style={styles.mediaHint}>{selectedMedia.kind==='photo'?'Fotografía':'Video'} · {(selectedMedia.sizeBytes/1048576).toFixed(1)} MB</Text>
+                 <Text style={styles.mediaHint}>{CHAT_MEDIA_UPLOAD_ENABLED?'Preparado para subir':'La subida a HAVANA CLOUD aún no está habilitada.'}</Text>
+               </View>
+               <Pressable accessibilityRole="button" accessibilityLabel="Quitar archivo seleccionado"
+                 onPress={()=>{setSelectedMedia(null);setMediaError('');}}>
+                 <Text style={styles.mediaClose}>✕</Text>
+               </Pressable>
+             </View>}
+             {!!mediaError&&<Text style={styles.mediaError}>{mediaError}</Text>}
              <View style={styles.composer}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Adjuntar fotografía o video"
+                accessibilityState={{expanded:mediaMenuOpen}} disabled={mediaPicking}
+                style={styles.mediaPlus} onPress={()=>setMediaMenuOpen(v=>!v)}>
+                <Text style={styles.mediaPlusText}>+</Text>
+              </Pressable>
               <TextInput
                 accessibilityLabel="Escribir mensaje" style={styles.draft} value={draft}
                 onChangeText={typeText} editable={!savingEdit} maxLength={2000} multiline
@@ -909,6 +977,23 @@ const styles = StyleSheet.create({
   messageTime: { color: '#8a857b', fontSize: 10, textAlign: 'right', marginTop: 5 },
   mineMeta: { color: '#c1c1bd' },
   composer: { flexDirection: 'row', alignItems: 'flex-end', padding: 12, borderTopColor: '#d6cab9', borderTopWidth: 1, gap: 8 },
+  mediaPlus:{width:44,height:44,borderRadius:22,backgroundColor:'#e0d6c8',alignItems:'center',justifyContent:'center'},
+  mediaPlusText:{fontSize:30,lineHeight:38,fontWeight:'400',color:'#242720'},
+  mediaMenu:{flexDirection:'row',flexWrap:'wrap',gap:8,paddingHorizontal:12,paddingVertical:12,
+    backgroundColor:'#f3eddf',borderTopWidth:1,borderTopColor:'#ded3c4'},
+  mediaMenuButton:{width:'48%',backgroundColor:'#fffaf4',borderRadius:13,borderWidth:1,
+    borderColor:'#d8c9ba',paddingHorizontal:8,minHeight:46,alignItems:'center',justifyContent:'center'},
+  mediaMenuText:{color:'#292b27',fontSize:13,fontWeight:'600'},
+  mediaPreview:{flexDirection:'row',alignItems:'center',gap:11,paddingHorizontal:13,paddingVertical:9,
+    borderTopWidth:1,borderColor:'#ded3c4',backgroundColor:'#faf5ed'},
+  mediaThumb:{width:70,height:70,borderRadius:10,backgroundColor:'#e5dfd7'},
+  videoThumb:{alignItems:'center',justifyContent:'center'},
+  videoThumbText:{fontSize:26,color:'#443e38'},
+  mediaInfo:{flex:1,minWidth:0,gap:4},
+  mediaName:{fontSize:12,fontWeight:'700',color:'#282b28'},
+  mediaHint:{fontSize:10,color:'#736b61'},
+  mediaClose:{fontSize:22,color:'#6e5f53',paddingHorizontal:5},
+  mediaError:{fontSize:12,color:'#b23d2e',backgroundColor:'#fff4ee',paddingHorizontal:16,paddingVertical:8},
   draft: { flex: 1, maxHeight: 95, minHeight: 45, backgroundColor: '#fffaf4', borderRadius: 23, borderWidth: 1, borderColor: '#ded4c7', paddingHorizontal: 14, paddingVertical: 11, color: '#171713', fontSize: 16 },
   sendButton: { backgroundColor: '#252621', borderRadius: 22, paddingHorizontal: 15, height: 45, justifyContent: 'center' },
   sendText: { color: '#fff', fontWeight: '700', fontSize: 14 },
