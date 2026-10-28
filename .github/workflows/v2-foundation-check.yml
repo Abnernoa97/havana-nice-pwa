@@ -44,11 +44,6 @@ jobs:
       - name: Prevent V2 technical debt regressions
         run: npm run audit:guard
 
-      - name: Refresh native picker lockfile for integration review
-        run: |
-          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
-          git diff --unified=1 -- package-lock.json
-
       - name: Install exact dependencies
         run: npm ci
 
@@ -72,6 +67,9 @@ jobs:
 
       - name: Check isolated Administrator PWA security
         run: npm run test:admin -w @havana/pwa
+
+      - name: Prevent accidental photo/video uploads before HAVANA CLOUD bridge
+        run: node --test tests/chat-media-ui.test.mjs
 
       - name: Build iPhone PWA
         run: npm run build:pwa
