@@ -1,5 +1,5 @@
 // @ts-nocheck
-import {handleUnifiedChatMedia,attachChatMedia,mediaConfigured} from './unified-media.js';
+import {handleUnifiedChatMedia,attachChatMedia,mediaConfigured,verifyMediaGrant} from './unified-media.js';
 import { handleAdminSessionApi, verifyAdminSession } from './admin-auth.js';
 import { adminSocketToken, adminTokenRequest, notifyAdminClients } from './admin-realtime.js';
 import {handleAdminMemberManagement,recordMemberEvent,readMemberDevice} from './member-admin.js';
@@ -399,8 +399,11 @@ export default {
       const session=await verifySession(env,token);
       // Administrator can view confirmed media, but cannot impersonate musicians
       // or create uploads.
-      if(!session && !(request.method==='GET'&&/\/file$/.test(url.pathname)&&
-         await verifyAdminSession(request,env)))
+      const delegated=request.method==='GET'&&/\/file$/.test(url.pathname)&&
+        await verifyMediaGrant(env,url);
+      const viewing=request.method==='GET'&&
+        (/\/(file|grant)$/.test(url.pathname))&&await verifyAdminSession(request,env);
+      if(!session&&!delegated&&!viewing)
         return respond({error:'No autorizado'},401,origin);
       const caller=session||{actorId:'admin',displayName:'Administrador'};
       return handleUnifiedChatMedia(request,env,caller,url,origin,respond,
