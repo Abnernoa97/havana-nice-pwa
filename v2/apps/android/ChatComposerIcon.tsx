@@ -1,7 +1,7 @@
 import React from 'react';
 import {StyleSheet,Text,View} from 'react-native';
 // Dependency-free native shapes match the PWA's monochrome composer icon set.
-export type NativeComposerIconName='emoji'|'clip'|'camera'|'mic'|'send'|'photo';
+export type NativeComposerIconName='emoji'|'clip'|'camera'|'mic'|'send'|'photo'|'video';
 export default function NativeComposerIcon({name,color='#697378'}:{
  name:NativeComposerIconName;color?:string
 }){
@@ -25,6 +25,9 @@ export default function NativeComposerIcon({name,color='#697378'}:{
  if(name==='photo')return <View style={[x.photoFrame,{borderColor:color}]}>
    <View style={[x.photoSun,{backgroundColor:color}]}/>
    <View style={[x.photoMountain,{borderColor:color}]}/>
+ </View>;
+ if(name==='video')return <View style={[x.videoFrame,{borderColor:color}]}>
+   <Text style={[x.videoPlay,{color}]}>▶</Text>
  </View>;
  return <Text style={[x.sendArrow,{color}]}>➤</Text>;
 }
@@ -53,5 +56,7 @@ const x=StyleSheet.create({
  photoSun:{position:'absolute',top:5,left:5,width:5,height:5,borderRadius:3},
  photoMountain:{position:'absolute',bottom:2,left:7,width:12,height:9,
   borderLeftWidth:2,borderTopWidth:2,transform:[{rotate:'45deg'}]},
+ videoFrame:{width:26,height:24,borderWidth:2,borderRadius:4,alignItems:'center',justifyContent:'center'},
+ videoPlay:{fontSize:13,lineHeight:18,marginLeft:2},
  sendArrow:{fontSize:24,fontWeight:'700',marginLeft:2},
 });

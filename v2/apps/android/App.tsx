@@ -46,7 +46,7 @@ export default function App() {
   const [menuAnchor,setMenuAnchor] = useState<BubbleAnchor | null>(null);
   const socket = useRef<WebSocket | null>(null);
   const scroll = useRef<React.ElementRef<typeof ScrollView> | null>(null);
-  const chooseNativeMedia=async(source:ChatMediaSource)=>{
+  const chooseNativeMedia=async(source:ChatMediaSource,kind?:ChatMediaKind)=>{
     setComposerPanel(null);setMediaError('');Keyboard.dismiss();
     if(mediaPicking)return;
     setMediaPicking(true);
@@ -59,8 +59,9 @@ export default function App() {
         }
       }
       const options:ImagePicker.ImagePickerOptions={
-        mediaTypes:['images','videos'],allowsEditing:false,
-        quality:0.9,selectionLimit:1
+        // The clip always filters the gallery; the separate camera icon launches capture.
+        mediaTypes:source==='camera'?['images','videos']:kind==='photo'?['images']:['videos'],
+        allowsEditing:false,quality:0.9,selectionLimit:1
       };
       const result=source==='camera'
         ?await ImagePicker.launchCameraAsync(options)
@@ -942,25 +943,19 @@ export default function App() {
           onPress={()=>setComposerPanel(null)} accessibilityLabel="Cerrar menú"/>}
         {session&&composerPanel==='attachments'&&<View style={styles.attachmentsPopover}
           accessibilityLabel="Adjuntar al chat">
-          <Pressable style={styles.attachmentItem} accessibilityRole="button" accessibilityLabel="Galería: fotos y videos"
-            onPress={()=>void chooseNativeMedia('gallery')}>
+          <Pressable style={styles.attachmentItem} accessibilityRole="button"
+            accessibilityLabel="Fotos" onPress={()=>void chooseNativeMedia('gallery','photo')}>
             <View style={[styles.attachmentSymbol,styles.gallerySymbol]}>
               <NativeComposerIcon name="photo" color="#776c98"/>
             </View>
-            <View>
-              <Text style={styles.attachmentTitle}>Galería</Text>
-              <Text style={styles.attachmentDescription}>Fotos y videos</Text>
-            </View>
+            <Text style={styles.attachmentTitle}>Fotos</Text>
           </Pressable>
-          <Pressable style={styles.attachmentItem} accessibilityRole="button" accessibilityLabel="Cámara: foto o video"
-            onPress={()=>void chooseNativeMedia('camera')}>
-            <View style={[styles.attachmentSymbol,styles.cameraSymbol]}>
-              <NativeComposerIcon name="camera" color="#946b67"/>
+          <Pressable style={styles.attachmentItem} accessibilityRole="button"
+            accessibilityLabel="Video" onPress={()=>void chooseNativeMedia('gallery','video')}>
+            <View style={[styles.attachmentSymbol,styles.videoSymbol]}>
+              <NativeComposerIcon name="video" color="#5f8b9b"/>
             </View>
-            <View>
-              <Text style={styles.attachmentTitle}>Cámara</Text>
-              <Text style={styles.attachmentDescription}>Foto o video</Text>
-            </View>
+            <Text style={styles.attachmentTitle}>Video</Text>
           </Pressable>
         </View>}
         {session&&composerPanel==='emojis'&&<View style={styles.emojisPopover}
@@ -1035,13 +1030,12 @@ const styles = StyleSheet.create({
   attachmentsPopover:{position:'absolute',bottom:75,left:14,width:285,maxWidth:'90%',zIndex:22,
     backgroundColor:'#fff',borderRadius:19,borderWidth:1,borderColor:'#e9e3da',padding:9,
     elevation:9,shadowColor:'#000',shadowOpacity:.14,shadowRadius:13},
-  attachmentItem:{minHeight:61,flexDirection:'row',alignItems:'center',gap:13,
+  attachmentItem:{minHeight:58,flexDirection:'row',alignItems:'center',gap:13,
     borderRadius:12,paddingHorizontal:12,paddingVertical:7},
   attachmentSymbol:{height:42,width:42,borderRadius:14,alignItems:'center',justifyContent:'center'},
   gallerySymbol:{backgroundColor:'#f0edfb'},
-  cameraSymbol:{backgroundColor:'#fbefec'},
+  videoSymbol:{backgroundColor:'#eaf3f7'},
   attachmentTitle:{fontSize:15,fontWeight:'600',color:'#272c29'},
-  attachmentDescription:{fontSize:11,color:'#7b817c',marginTop:3},
   emojisPopover:{position:'absolute',bottom:75,left:14,width:285,maxWidth:'90%',zIndex:22,
     backgroundColor:'#fff',borderRadius:19,borderWidth:1,borderColor:'#e9e3da',padding:10,
     flexDirection:'row',flexWrap:'wrap',elevation:9},
