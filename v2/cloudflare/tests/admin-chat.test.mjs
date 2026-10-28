@@ -17,6 +17,7 @@ async function fixture(){
    async first(){
     if(sql.includes('FROM chat_admin_sessions'))return args[0]===digest?{expires_at:Date.now()+90_000,revoked_at:null}:null;
     if(sql==='SELECT seq FROM chat_messages WHERE seq=?')return rows.find(m=>m.seq===args[0])??null;
+    if(sql==='SELECT asset_id FROM chat_media_assets WHERE message_seq=?')return null;
     throw Error('Unexpected first: '+sql);
    },
    async all(){
