@@ -743,7 +743,7 @@ export default function App() {
                 {message.replyToSeq&&<div className="reply-original">
                   ↪ {messages.find(m=>m.seq===message.replyToSeq)?.text.slice(0,70)||'Mensaje anterior'}
                 </div>}
-                <div>{message.text}</div>
+                {!message.media&&<div>{message.text}</div>}
                  {message.media&&<ChatMediaView media={message.media} token={session.token}/>}
                 {message.seq>0&&!message.deletedAt&&reactions.some(r=>r.messageSeq===message.seq)&&
                   <div className="reaction-counts">
