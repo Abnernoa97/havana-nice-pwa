@@ -4,6 +4,7 @@ const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]
 const TYPES={photo:{max:100*1048576,mimes:['image/jpeg','image/png','image/webp','image/heic','image/heif']},
  video:{max:10*1024*1024*1024,mimes:['video/mp4','video/quicktime']}};
 const CHUNK_BYTES=4*1048576;
+const MAX_BATCH_FILES=5;
 const enc=new TextEncoder();
 async function signGrant(env,assetId,expires){
  const key=await crypto.subtle.importKey('raw',enc.encode(env.V2_CLOUD_BRIDGE_SECRET),
@@ -36,7 +37,8 @@ function privateRequest(env,path,options={}){
 }
 function validMetadata(m){
  const rule=TYPES[m?.kind];
- return rule&&UUID.test(m.clientId||'')&&
+ return rule&&UUID.test(m.clientId||'')&&UUID.test(m.batchId||'')&&
+   Number.isInteger(m.batchIndex)&&m.batchIndex>=0&&m.batchIndex<MAX_BATCH_FILES&&
    typeof m.name==='string'&&m.name.length>0&&m.name.length<=180&&
    !/[\\/\x00-\x1f\x7f]/.test(m.name)&&
    rule.mimes.includes(m.mimeType)&&
@@ -93,14 +95,15 @@ export async function handleUnifiedChatMedia(request,env,session,url,origin,resp
    if(!validMetadata(m))return reply({error:'Archivo no admitido'},400);
    const old=await env.DB.prepare('SELECT * FROM chat_media_assets WHERE sender_id=? AND client_id=?')
      .bind(session.actorId,m.clientId).first();
-   if(old&&(old.kind!==m.kind||old.mime!==m.mimeType||
+   if(old&&(old.batch_id!==m.batchId||old.batch_index!==m.batchIndex||
+      old.kind!==m.kind||old.mime!==m.mimeType||
       old.bytes!==m.sizeBytes||old.original_name!==m.name))
      return reply({error:'El identificador ya corresponde a otro archivo'},409);
    const assetId=old?.asset_id||crypto.randomUUID();
    if(!old){
      const ins=await env.DB.prepare(
-       "INSERT OR IGNORE INTO chat_media_assets(asset_id,sender_id,client_id,kind,mime,bytes,original_name,status,created_at) VALUES(?,?,?,?,?,?,?,'uploading',?)"
-     ).bind(assetId,session.actorId,m.clientId,m.kind,m.mimeType,m.sizeBytes,m.name,new Date().toISOString()).run();
+       "INSERT OR IGNORE INTO chat_media_assets(asset_id,sender_id,client_id,batch_id,batch_index,kind,mime,bytes,original_name,status,created_at) VALUES(?,?,?,?,?,?,?,?,?,'uploading',?)"
+     ).bind(assetId,session.actorId,m.clientId,m.batchId,m.batchIndex,m.kind,m.mimeType,m.sizeBytes,m.name,new Date().toISOString()).run();
      if(ins.meta?.changes!==1)return reply({error:'Vuelve a intentar preparar el archivo'},409);
    }
    if(old?.status==='ready'&&old.message_seq)
