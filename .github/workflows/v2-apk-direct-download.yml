@@ -3,6 +3,10 @@ name: HAVANA NICE V2 direct Android APK distribution
 # Only distribute a new APK when explicitly requested, never while pruning
 # rejected legacy login paths or changing the shared authentication contract.
 on:
+  push:
+    branches: [havana-nice-v2-foundation]
+    paths:
+      - 'v2/apps/android/app.json'
   workflow_dispatch:
 
 permissions:
