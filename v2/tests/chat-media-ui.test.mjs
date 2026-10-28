@@ -63,7 +63,7 @@ test('Android native has ONE compact dock, system camera/gallery and overlay pan
 test('Microphone is informative but recording is NOT activated ahead of M03',()=>{
  const pwa=read('apps/pwa/src/App.tsx');
  const native=read('apps/android/App.tsx');
- assert.match(pwa,/Mensajes de voz se habilitarán después de fotos y videos/);
+ assert.match(pwa,/Los mensajes de voz se habilitarán después de fotos y videos/);
  assert.match(native,/Los audios estarán disponibles después de las fotografías y los videos/);
  assert.doesNotMatch(native,/requestMicrophonePermissionsAsync|startRecording\(/);
  assert.doesNotMatch(pwa,/getUserMedia|MediaRecorder/);
