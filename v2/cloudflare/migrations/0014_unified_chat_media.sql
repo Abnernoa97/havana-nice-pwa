@@ -1,24 +1,9 @@
--- One storage contract: HAVANA NICE V2 owns chat metadata and permissions;
--- HAVANA CLOUD owns original photo/video bytes in existing connected Google Drive.
--- The old standalone OAuth path was removed from the application source.
--- Abort safely instead of deleting any legacy record if a different environment
--- unexpectedly contains pre-existing media.
--- Installations created after the obsolete bootstrap was physically deleted
--- have no old tables. Create inert placeholders only for guarded cleanup.
-CREATE TABLE IF NOT EXISTS v2_media_assets(asset_id TEXT PRIMARY KEY);
-CREATE TABLE IF NOT EXISTS v2_media_quota(id INTEGER PRIMARY KEY,bytes_used INTEGER NOT NULL DEFAULT 0);
-CREATE TABLE IF NOT EXISTS _v2_legacy_cleanup_guard (
-  empty_only INTEGER NOT NULL CHECK(empty_only = 0)
-);
-INSERT INTO _v2_legacy_cleanup_guard(empty_only)
- SELECT 1 WHERE EXISTS (SELECT 1 FROM v2_media_assets);
-INSERT INTO _v2_legacy_cleanup_guard(empty_only)
- SELECT 1 WHERE EXISTS (SELECT 1 FROM v2_media_quota WHERE bytes_used > 0);
-DROP TABLE IF EXISTS v2_media_assets;
-DROP TABLE IF EXISTS v2_media_quota;
-DROP TABLE IF EXISTS _v2_legacy_cleanup_guard;
+-- Additive, reversible staging: HAVANA NICE V2 chat metadata for original media.
+-- The live old Worker still references v2_media_assets. DO NOT DROP old tables
+-- before the replacement Worker is deployed and Chat/Admin are regression-tested.
+-- Old routes/source were already physically removed in the foundation branch.
+-- HAVANA CLOUD alone stores photo/video bytes and its Profile shows usage only.
 
--- New ledger stores metadata ONLY, never actual file bytes or OAuth secrets.
 CREATE TABLE IF NOT EXISTS chat_media_assets (
  asset_id TEXT PRIMARY KEY NOT NULL,
  sender_id TEXT NOT NULL REFERENCES chat_members(actor_id),
