@@ -123,22 +123,39 @@ export default function App() {
     }));
     mediaQueue.current=items;setSelectedMedia([...items]);
     const total=items.reduce((n,item)=>n+item.selection.sizeBytes,0);
-    let completed=0;
+    const confirmed=new Map<string,number>();
+    let next=0;
+    const failures:string[]=[];
+    const report=()=>{
+      const sent=items.reduce((n,item)=>n+(confirmed.get(item.id)||0),0);
+      setMediaProgress(Math.min(100,Math.floor(sent/total*100)));
+    };
     setMediaUploading(true);setMediaProgress(0);setMediaError('');
+    // Two independent originals at once, while each file keeps its own ordered
+    // 4 MiB resumable chunks. Never overlap chunks from the SAME Drive session.
     try{
-      for(const item of items){
-        await uploadOriginalMedia(session,item.selection,item.file,item.id,batch,
-          item.batchIndex!,({sent})=>setMediaProgress(Math.min(100,Math.floor((completed+sent)/total*100))));
-        completed+=item.selection.sizeBytes;
-        URL.revokeObjectURL(item.selection.uri);
-        mediaQueue.current=mediaQueue.current.filter(x=>x.id!==item.id);
-        setSelectedMedia([...mediaQueue.current]);
-        setMediaProgress(Math.floor(completed/total*100));
-        refreshLatest.current();
-      }
-      mediaBatchId.current=null;
-    }catch(reason){
-      setMediaError((reason instanceof Error?reason.message:'No se pudo subir')+
+      const worker=async()=>{
+        while(next<items.length){
+          const item=items[next++];
+          try{
+            await uploadOriginalMedia(session,item.selection,item.file,item.id,batch,
+              item.batchIndex!,({sent})=>{
+                confirmed.set(item.id,sent);report();
+              });
+            confirmed.set(item.id,item.selection.sizeBytes);report();
+            URL.revokeObjectURL(item.selection.uri);
+            mediaQueue.current=mediaQueue.current.filter(x=>x.id!==item.id);
+            setSelectedMedia([...mediaQueue.current]);
+            refreshLatest.current();
+          }catch(reason){
+            failures.push(reason instanceof Error?reason.message:'No se pudo subir');
+            // Keep this item and its stable id for an exact resumable retry.
+          }
+        }
+      };
+      await Promise.all(Array.from({length:Math.min(2,items.length)},()=>worker()));
+      if(!mediaQueue.current.length)mediaBatchId.current=null;
+      if(failures.length)setMediaError(failures[0]+
         '. Los archivos pendientes siguen seleccionados para reintentar.');
     }finally{setMediaUploading(false);}
   }
