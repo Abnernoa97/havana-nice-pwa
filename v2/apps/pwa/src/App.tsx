@@ -137,6 +137,7 @@ export default function App() {
       const worker=async()=>{
         while(next<items.length){
           const item=items[next++];
+          if(!item)break;
           try{
             await uploadOriginalMedia(session,item.selection,item.file,item.id,batch,
               item.batchIndex!,({sent})=>{
