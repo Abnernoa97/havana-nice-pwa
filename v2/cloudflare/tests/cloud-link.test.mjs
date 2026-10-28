@@ -22,6 +22,10 @@ function setup({bound=true,flag='enabled',passwordOk=true}={}){
     if(sql.includes('FROM chat_cloud_link'))return rows?{...rows}:null;
     throw Error('Unexpected direct SELECT '+sql);
    },
+   async run(){
+    if(sql.startsWith('DELETE FROM chat_cloud_link')){rows=null;return{meta:{changes:1}};}
+    throw Error('Unexpected direct run '+sql);
+   },
    bind(...args){return {
    async first(){
     if(sql.includes('FROM chat_admin_sessions')){adminSessions++;return{expires_at:Date.now()+200000,revoked_at:null};}
