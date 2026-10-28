@@ -32,13 +32,14 @@ export default function AdminCloudConnection({token,onExpired}:{token:string;onE
   catch(e){if(isAdminUnauthorized(e))onExpired();else setError('No se pudo desvincular.');}
   finally{setBusy(false);}
  }
- if(status===null)return null;
+ // Do not clutter the live Admin Chat with unfinished setup when the V2 link is disabled.
+ if(status===null||!status.available)return null;
  return <section className="a-panel" aria-label="Almacenamiento del Chat">
   <h2>Almacenamiento del Chat</h2>
   {!status.available?
    <p className="a-detail">Conexión segura en preparación. HAVANA CLOUD funciona independientemente y no se ha modificado.</p>:
    status.linked?
-   <div><p className="a-detail">HAVANA CLOUD vinculada desde el servidor V2. Los músicos no reciben acceso a tu nube.</p>
+   <div><p className="a-detail">Acceso a HAVANA CLOUD autorizado para el servidor V2. Los músicos no reciben acceso a tu nube. La subida de archivos seguirá deshabilitada hasta completar M01/M02.</p>
     <button type="button" disabled={busy} onClick={()=>void disconnect()}>{busy?'Procesando…':'Desvincular'}</button></div>:
    <form onSubmit={connect} className="a-admin-login">
     <p className="a-detail">Autoriza una vez el almacenamiento existente. La contraseña no se guarda; solo el servidor V2 conserva un acceso cifrado.</p>
