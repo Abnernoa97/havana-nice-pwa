@@ -6,7 +6,7 @@
   "vars": {
     "HAVANA_ENV": "development",
     "V2_CLOUD_LINK_ENABLED": "enabled",
-    "V2_CLOUD_MEDIA_ENABLED": "disabled"
+    "V2_CLOUD_MEDIA_ENABLED": "enabled"
   },
   "d1_databases": [
     {
