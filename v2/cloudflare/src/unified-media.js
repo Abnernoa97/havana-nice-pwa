@@ -86,14 +86,12 @@ export async function handleUnifiedChatMedia(request,env,session,url,origin,resp
      maxVideoBytes:TYPES.video.max,chunkBytes:CHUNK_BYTES,maxFilesPerSend:MAX_BATCH_FILES});
  }
  if(!mediaConfigured(env))return reply({error:'HAVANA CLOUD todavía no está enlazada'},503);
- // Never create a Chat media record or a Drive session before the owner has
- // explicitly authorized this backend. Unpaired musician attempts are read-only.
- if(path==='/api/chat/media/start'&&request.method==='POST'&&
-    !(await cloudLinkStatus(env)).linked)
-   return reply({error:'Vincula HAVANA CLOUD desde el Administrador'},503);
  if(path==='/api/chat/media/start'&&request.method==='POST'){
    let m;try{m=await request.json()}catch{return reply({error:'Archivo inválido'},400);}
    if(!validMetadata(m))return reply({error:'Archivo no admitido'},400);
+   // Do not create a D1 asset or remote upload before owner pairing.
+   if(!(await cloudLinkStatus(env)).linked)
+     return reply({error:'Vincula HAVANA CLOUD desde el Administrador'},503);
    const old=await env.DB.prepare('SELECT * FROM chat_media_assets WHERE sender_id=? AND client_id=?')
      .bind(session.actorId,m.clientId).first();
    if(old&&(old.batch_id!==m.batchId||old.batch_index!==m.batchIndex||
