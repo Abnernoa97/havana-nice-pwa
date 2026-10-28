@@ -3,6 +3,7 @@ import {
   fetchBackendHealth, getChatSnapshot, getOlderChatMessages, searchChatMessages, lastReadByOther, messageDeliveryLabel, newClientMessageId,
   openChatSocket, reconcileChatMessages, startNamedChatSession, restoreNamedChatSession,
   type BackendHealth, type ChatMessage, type ChatServerEvent, type ChatSession,
+  validateChatMediaSelection, CHAT_MEDIA_UPLOAD_ENABLED, type ChatMediaSelection, type ChatMediaKind, type ChatMediaSource,
   reconcileReactions, reconcileUpdatedMessage, reconcileDeletedMessage, reconcileChatSnapshot, type ChatReaction, type ChatEmoji, type ChatReadReceipt,
 } from '@havana/shared';
 import { loadLocalChat, saveLocalChat } from './local';
@@ -15,6 +16,11 @@ export default function App() {
   const [restoringAccess,setRestoringAccess] = useState(true);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState('');
+  const [mediaMenuOpen,setMediaMenuOpen]=useState(false);
+  const [selectedMedia,setSelectedMedia]=useState<ChatMediaSelection|null>(null);
+  const [mediaError,setMediaError]=useState('');
+  const mediaObjectUrl=useRef<string|null>(null);
+  const mediaInputs=useRef<Record<string,HTMLInputElement|null>>({});
   const [connection, setConnection] = useState('desconectado');
   const [error, setError] = useState('');
   const [joining, setJoining] = useState(false);
@@ -43,6 +49,26 @@ export default function App() {
   const bottom = useRef<HTMLDivElement | null>(null);
   const scrollOlderOnce=useRef(false);
   const typingLast = useRef(0);
+  const removeSelectedMedia=()=>{
+    if(mediaObjectUrl.current){URL.revokeObjectURL(mediaObjectUrl.current);mediaObjectUrl.current=null;}
+    setSelectedMedia(null);setMediaError('');
+  };
+  const openMediaPicker=(source:ChatMediaSource,kind:ChatMediaKind)=>{
+    setMediaMenuOpen(false);setMediaError('');
+    mediaInputs.current[source+':'+kind]?.click();
+  };
+  const chooseMedia=(source:ChatMediaSource,kind:ChatMediaKind,file?:File)=>{
+    if(!file)return;
+    const issue=validateChatMediaSelection({kind,name:file.name,
+      mimeType:file.type.toLowerCase(),sizeBytes:file.size});
+    if(issue){setMediaError(issue);return;}
+    if(mediaObjectUrl.current)URL.revokeObjectURL(mediaObjectUrl.current);
+    const uri=URL.createObjectURL(file);
+    mediaObjectUrl.current=uri;
+    setSelectedMedia({kind,source,uri,name:file.name,mimeType:file.type.toLowerCase(),sizeBytes:file.size});
+    setMediaError('');
+  };
+  useEffect(()=>()=>{if(mediaObjectUrl.current)URL.revokeObjectURL(mediaObjectUrl.current);},[]);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const storageQueue = useRef<Promise<void>>(Promise.resolve());
   const latestDraft = useRef('');
@@ -675,9 +701,45 @@ export default function App() {
           {editing && <div className="reply-preview">Editando mensaje <button type="button" onClick={finishEditing} disabled={savingEdit}>Cancelar</button></div>}
           {replyTo && !editing && <div className="reply-preview">Respondiendo a: {replyTo.text.slice(0,65)} <button type="button" onClick={() => setReplyTo(null)}>Cancelar</button></div>}
           {typing && <div className="chat-typing-indicator" role="status" aria-live="polite">{typing}</div>}
+          {mediaMenuOpen&&<div className="chat-media-menu" role="group" aria-label="Adjuntar foto o video">
+            <button type="button" onClick={()=>openMediaPicker('gallery','photo')}>Galería · Foto</button>
+            <button type="button" onClick={()=>openMediaPicker('gallery','video')}>Galería · Video</button>
+            <button type="button" onClick={()=>openMediaPicker('camera','photo')}>Cámara · Foto</button>
+            <button type="button" onClick={()=>openMediaPicker('camera','video')}>Cámara · Video</button>
+          </div>}
+          {(['gallery','camera'] as ChatMediaSource[]).flatMap(source=>
+            (['photo','video'] as ChatMediaKind[]).map(kind=>
+              <input key={source+kind} className="chat-media-hidden-input" type="file"
+                ref={node=>{mediaInputs.current[source+':'+kind]=node;}}
+                tabIndex={-1} aria-hidden="true" accept={kind==='photo'?'image/*':'video/*'}
+                {...(source==='camera'?{capture:'environment' as const}:{})}
+                onChange={event=>{
+                  chooseMedia(source,kind,event.currentTarget.files?.[0]);
+                  event.currentTarget.value='';
+                }}/>)
+          )}
+          {selectedMedia&&<div className="chat-media-preview" aria-label="Vista previa del archivo">
+            {selectedMedia.kind==='photo'
+              ?<img src={selectedMedia.uri} alt="Vista previa de la fotografía seleccionada"/>
+              :<video src={selectedMedia.uri} controls preload="metadata" playsInline aria-label="Vista previa del video"/>}
+            <div className="chat-media-preview-info">
+              <strong>{selectedMedia.name}</strong>
+              <small>{selectedMedia.kind==='photo'?'Fotografía':'Video'} · {(selectedMedia.sizeBytes/1048576).toFixed(1)} MB</small>
+              <small>{CHAT_MEDIA_UPLOAD_ENABLED?'Preparado para subir':'La subida a HAVANA CLOUD aún no está habilitada.'}</small>
+            </div>
+            <button type="button" aria-label="Quitar archivo seleccionado" onClick={removeSelectedMedia}>✕</button>
+          </div>}
+          {mediaError&&<p className="chat-media-error" role="alert">{mediaError}</p>}
           <form className="chat-composer" onSubmit={event => { event.preventDefault(); send(); }}>
-            <input aria-label="Escribir mensaje" disabled={savingEdit} value={draft} maxLength={2000} onChange={event => typeText(event.target.value)} placeholder={connection === 'en vivo' ? 'Escribe un mensaje…' : 'Sin conexión: se enviará después…'} />
-            <button aria-label="Enviar" disabled={!draft.trim()||savingEdit} type="submit">{savingEdit?'Guardando…':editing?'Guardar':'Enviar'}</button>
+            <button type="button" className="chat-attach-button"
+              aria-label="Adjuntar fotografía o video" aria-expanded={mediaMenuOpen}
+              onClick={()=>setMediaMenuOpen(v=>!v)}>+</button>
+            <input aria-label="Escribir mensaje" disabled={savingEdit} value={draft} maxLength={2000}
+              onChange={event=>typeText(event.target.value)}
+              placeholder={connection==='en vivo'?'Escribe un mensaje…':'Sin conexión: se enviará después…'}/>
+            <button aria-label="Enviar" disabled={!draft.trim()||savingEdit} type="submit">
+              {savingEdit?'Guardando…':editing?'Guardar':'Enviar'}
+            </button>
           </form>
         </>
       )}
