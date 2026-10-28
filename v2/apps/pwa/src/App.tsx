@@ -3,12 +3,14 @@ import {
   fetchBackendHealth, getChatSnapshot, getOlderChatMessages, searchChatMessages, lastReadByOther, messageDeliveryLabel, newClientMessageId,
   openChatSocket, reconcileChatMessages, startNamedChatSession, restoreNamedChatSession,
   type BackendHealth, type ChatMessage, type ChatServerEvent, type ChatSession,
-  validateChatMediaSelection, CHAT_MEDIA_UPLOAD_ENABLED, type ChatMediaSelection, type ChatMediaKind, type ChatMediaSource,
+  validateChatMediaSelection, HAVANA_V2_DEV_API_BASE_URL, type ChatMediaSelection, type ChatMediaKind, type ChatMediaSource,
   reconcileReactions, reconcileUpdatedMessage, reconcileDeletedMessage, reconcileChatSnapshot, type ChatReaction, type ChatEmoji, type ChatReadReceipt,
 } from '@havana/shared';
 import { loadLocalChat, saveLocalChat } from './local';
 import SwipeMessage, {type MessageAnchor} from './SwipeMessage';
 import ComposerIcon from './ChatComposerIcon';
+import ChatMediaView from './ChatMediaView';
+import {uploadOriginalMedia} from './media-upload';
 
 export default function App() {
   const [health, setHealth] = useState<BackendHealth | null>(null);
@@ -21,6 +23,11 @@ export default function App() {
   const [selectedMedia,setSelectedMedia]=useState<ChatMediaSelection|null>(null);
   const [mediaError,setMediaError]=useState('');
   const mediaObjectUrl=useRef<string|null>(null);
+  const selectedFile=useRef<File|null>(null);
+  const selectedUploadId=useRef<string|null>(null);
+  const [mediaReady,setMediaReady]=useState(false);
+  const [mediaUploading,setMediaUploading]=useState(false);
+  const [mediaProgress,setMediaProgress]=useState(0);
   const photosPicker=useRef<HTMLInputElement|null>(null);
   const videoPicker=useRef<HTMLInputElement|null>(null);
   const cameraPicker=useRef<HTMLInputElement|null>(null);
@@ -54,6 +61,7 @@ export default function App() {
   const typingLast = useRef(0);
   const removeSelectedMedia=()=>{
     if(mediaObjectUrl.current){URL.revokeObjectURL(mediaObjectUrl.current);mediaObjectUrl.current=null;}
+    selectedFile.current=null;selectedUploadId.current=null;
     setSelectedMedia(null);setMediaError('');
   };
   const openGalleryMedia=(kind:ChatMediaKind)=>{
@@ -73,9 +81,35 @@ export default function App() {
     if(mediaObjectUrl.current)URL.revokeObjectURL(mediaObjectUrl.current);
     const uri=URL.createObjectURL(file);
     mediaObjectUrl.current=uri;
+    selectedFile.current=file;selectedUploadId.current=crypto.randomUUID();
     setSelectedMedia({kind,source,uri,name:file.name,mimeType:file.type.toLowerCase(),sizeBytes:file.size});
     setMediaError('');
   };
+  useEffect(()=>{
+    if(!session){setMediaReady(false);return;}
+    let live=true;
+    void fetch(HAVANA_V2_DEV_API_BASE_URL+'/api/chat/media/status',{
+      cache:'no-store',headers:{Authorization:'Bearer '+session.token}
+    }).then(async r=>r.json()).then(status=>{
+      if(live)setMediaReady(status.enabled===true);
+    }).catch(()=>{if(live)setMediaReady(false);});
+    return()=>{live=false;};
+  },[session?.token]);
+  async function sendSelectedMedia(){
+    const file=selectedFile.current,entry=selectedMedia;
+    if(!session||!entry||!file||mediaUploading)return;
+    if(!mediaReady){setMediaError('HAVANA CLOUD todavía no está enlazada.');return;}
+    setMediaUploading(true);setMediaProgress(0);setMediaError('');
+    try{
+      const id=selectedUploadId.current||crypto.randomUUID();
+      selectedUploadId.current=id;
+      await uploadOriginalMedia(session,entry,file,id,({sent,total})=>
+        setMediaProgress(Math.floor(sent/total*100)));
+      removeSelectedMedia();setMediaProgress(0);
+      refreshLatest.current();
+    }catch(reason){setMediaError(reason instanceof Error?reason.message:'No se pudo subir el archivo. Reintenta.');}
+    finally{setMediaUploading(false);}
+  }
   const insertEmoji=(emoji:string)=>{
     if(editing&&savingEdit)return;
     if(draft.length+emoji.length<=2000)typeText(draft+emoji);
@@ -660,6 +694,7 @@ export default function App() {
                   ↪ {messages.find(m=>m.seq===message.replyToSeq)?.text.slice(0,70)||'Mensaje anterior'}
                 </div>}
                 <div>{message.text}</div>
+                 {message.media&&<ChatMediaView media={message.media} token={session.token}/>}
                 {message.seq>0&&!message.deletedAt&&reactions.some(r=>r.messageSeq===message.seq)&&
                   <div className="reaction-counts">
                     {(['❤️','😂','👍'] as ChatEmoji[])
@@ -749,12 +784,12 @@ export default function App() {
             <div className="chat-media-preview-info">
               <strong>{selectedMedia.name}</strong>
               <small>{selectedMedia.kind==='photo'?'Fotografía':'Video'} · {(selectedMedia.sizeBytes/1048576).toFixed(1)} MB</small>
-              <small>{CHAT_MEDIA_UPLOAD_ENABLED?'Preparado para subir':'La subida a HAVANA CLOUD aún no está habilitada.'}</small>
+              <small>{mediaUploading?'Subiendo '+mediaProgress+'%':mediaReady?'Original listo para enviar':'La subida a HAVANA CLOUD aún no está habilitada.'}</small>
             </div>
             <button type="button" aria-label="Quitar archivo seleccionado" onClick={removeSelectedMedia}>✕</button>
           </div>}
           {mediaError&&<p className="chat-media-error" role="alert">{mediaError}</p>}
-          <form className="chat-composer" onSubmit={event=>{event.preventDefault();send();}}>
+          <form className="chat-composer" onSubmit={event=>{event.preventDefault();if(selectedMedia&&!editing)void sendSelectedMedia();else send();}}>
             <div className="chat-input-pill">
               <button type="button" className="chat-icon-button chat-emoji-button"
                 aria-label="Insertar emoji" aria-expanded={composerPanel==='emojis'}
@@ -774,9 +809,9 @@ export default function App() {
                 <ComposerIcon name="camera" size={25}/>
               </button>
             </div>
-            {draft.trim()||editing
-              ?<button type="submit" className="chat-action-circle" aria-label={editing?'Guardar mensaje':'Enviar mensaje'}
-                  disabled={!draft.trim()||savingEdit}>
+            {draft.trim()||editing||selectedMedia
+              ?<button type="submit" className="chat-action-circle" aria-label={editing?'Guardar mensaje':selectedMedia?'Enviar archivo original':'Enviar mensaje'}
+                  disabled={mediaUploading||savingEdit||(!selectedMedia&&!draft.trim())}>
                   <ComposerIcon name="send" size={24}/>
                 </button>
               :<button type="button" className="chat-action-circle" aria-label="Grabar audio (próximamente)"
