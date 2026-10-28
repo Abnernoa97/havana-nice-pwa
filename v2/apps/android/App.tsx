@@ -69,13 +69,13 @@ export default function App() {
       if(result.canceled||!result.assets?.length)return;
       const asset=result.assets[0];
       if(!asset)return;
-      const kind:ChatMediaKind=asset.type==='video'||asset.mimeType?.startsWith('video/')?'video':'photo';
-      const mimeType=(asset.mimeType||(kind==='photo'?'image/jpeg':'video/mp4')).toLowerCase();
-      const name=asset.fileName||('havana-'+Date.now()+(kind==='photo'?'.jpg':'.mp4'));
+      const pickedKind:ChatMediaKind=asset.type==='video'||asset.mimeType?.startsWith('video/')?'video':'photo';
+      const mimeType=(asset.mimeType||(pickedKind==='photo'?'image/jpeg':'video/mp4')).toLowerCase();
+      const name=asset.fileName||('havana-'+Date.now()+(pickedKind==='photo'?'.jpg':'.mp4'));
       const sizeBytes=asset.fileSize??0;
-      const issue=validateChatMediaSelection({kind,name,mimeType,sizeBytes});
+      const issue=validateChatMediaSelection({kind:pickedKind,name,mimeType,sizeBytes});
       if(issue){setMediaError(issue);return;}
-      setSelectedMedia({kind,source,uri:asset.uri,name,mimeType,sizeBytes});
+      setSelectedMedia({kind:pickedKind,source,uri:asset.uri,name,mimeType,sizeBytes});
     }catch{
       setMediaError('No se pudo abrir la cámara o la galería. Inténtalo de nuevo.');
     }finally{setMediaPicking(false);}
