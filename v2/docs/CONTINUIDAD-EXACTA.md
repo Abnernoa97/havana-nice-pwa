@@ -68,7 +68,7 @@
 - `v2/apps/android/App.tsx`, `v2/apps/pwa/src/App.tsx` y `v2/apps/pwa/src/AdminChatGeneral.tsx` ya no muestran «Foto»/«Video» como texto de burbuja multimedia. El visor nativo dejó de mostrar nombre y MB. Autor, hora, respuestas, reacciones y moderación siguen vigentes.
 - `v2/tests/chat-media-ui.test.mjs` protege media-only bubbles, caché original completa, video nativo, Modal y ausencia de `Linking.openURL`. `expo-video` 58.0.12 está en dependencia y lock; no añadir otro reproductor ni otra estrategia.
 
-**Comprobaciones de código:** [Foundation CI 40725322822 SUCCESS](https://github.com/Abnernoa97/havana-nice-pwa/actions/runs/40725322822) y [Foundation CI del release 0.0.8 40725644879 SUCCESS](https://github.com/Abnernoa97/havana-nice-pwa/actions/runs/40725644879), cubriendo TypeScript, PWA, export Android y guardas. **NO equivalen a prueba física del visor en Android.**
+**Comprobaciones de código:** [Foundation CI 40725322822 SUCCESS](https://github.com/Abnernoa97/havana-nice-pwa/actions/runs/40725322822) y [Foundation CI del release 0.0.9 40730744345 SUCCESS](https://github.com/Abnernoa97/havana-nice-pwa/actions/runs/40730744345), cubriendo TypeScript, PWA, export Android y guardas. **NO equivalen a prueba física del visor en Android.**
 
 **QA físico ya recibido (Android 0.0.8):** fotos proporcionales y completas aceptadas; videos negros pese a controles; error de subida Blob desde ArrayBuffer. **QA pendiente (0.0.9):** video con fotogramas/sonido/pausa/búsqueda dentro del Chat, enviar una foto y video reales, retorno a la conversación y persistencia de caché. No asegurar que la corrección funciona físicamente por pasar CI.
 
@@ -115,4 +115,4 @@
 - PWA no es Android nativo; UI actualizada en Cloudflare Pages no sustituye una APK.
 - No decir «mientras» o dejar otro documento de traspaso: la continuidad está **aquí**, completa, coherente y única.
 
-**FIN DE LA CONTINUIDAD VIGENTE. INICIAR EL PRÓXIMO CHAT DESDE M04 CON APK ANDROID 0.0.8 PUBLICADA, SIN TOCAR HAVANA CLOUD.**
+**FIN DE LA CONTINUIDAD VIGENTE. SIGUIENTE ACCIÓN: QA FÍSICO DE LA APK ANDROID 0.0.9 FIRMADA Y PUBLICADA, CORREGIR SOLO V2 SI FALLA, SIN TOCAR HAVANA CLOUD.**
