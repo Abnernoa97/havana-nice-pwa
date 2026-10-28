@@ -53,7 +53,7 @@ async function memberDeletionImpact(env,actorId){
   '(SELECT COUNT(*) FROM chat_reactions WHERE actor_id=? OR message_seq IN (SELECT seq FROM chat_messages WHERE sender_id=?)) AS reactions,'+
   '(SELECT COUNT(*) FROM chat_read_receipts WHERE actor_id=?) AS receipts,'+
   '(SELECT COUNT(*) FROM chat_access_events WHERE actor_id=?) AS historyEvents,'+
-  '(SELECT COUNT(*) FROM v2_media_assets WHERE sender_id=?) AS mediaAssets'
+  '(SELECT COUNT(*) FROM chat_media_assets WHERE sender_id=?) AS mediaAssets'
  ).bind(actorId,actorId,actorId,actorId,actorId,actorId,actorId).first();
  const counts={};
  for(const key of ['sessions','messages','reactions','receipts','historyEvents','mediaAssets'])
