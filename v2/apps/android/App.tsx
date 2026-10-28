@@ -7,7 +7,7 @@ import {
   HAVANA_V2_DEV_API_BASE_URL, fetchBackendHealth, getChatSnapshot, getOlderChatMessages, searchChatMessages, lastReadByOther, messageDeliveryLabel, newClientMessageId,
   reconcileChatMessages, reconcileReactions, reconcileUpdatedMessage, reconcileDeletedMessage, reconcileChatSnapshot, startNamedChatSession, restoreNamedChatSession,
   type ChatMessage, type ChatServerEvent, type ChatSession, type ChatReaction, type ChatEmoji, type ChatReadReceipt,
-  validateChatMediaSelection, type ChatMediaSelection, type ChatMediaKind, type ChatMediaSource,
+  validateChatMediaSelection, CHAT_MEDIA_MAX_PER_SEND, type ChatMediaSelection, type ChatMediaKind, type ChatMediaSource,
 } from '@havana/shared';
 import { loadNativeLocalChat, saveNativeLocalChat } from './chatStorage';
 import * as ImagePicker from 'expo-image-picker';
@@ -15,6 +15,8 @@ import SwipeableBubble, {type BubbleAnchor} from './SwipeableBubble';
 import NativeComposerIcon from './ChatComposerIcon';
 import NativeChatMediaView from './NativeChatMediaView';
 import {uploadNativeOriginal,newMediaUploadId} from './media-upload';
+
+type NativeQueuedMedia=ChatMediaSelection&{id:string;batchIndex?:number};
 
 export default function App() {
   const {width: viewportWidth, height: viewportHeight} = useWindowDimensions();
@@ -25,13 +27,13 @@ export default function App() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState('');
   const [composerPanel,setComposerPanel]=useState<'attachments'|'emojis'|null>(null);
-  const [selectedMedia,setSelectedMedia]=useState<ChatMediaSelection|null>(null);
+  const [selectedMedia,setSelectedMedia]=useState<NativeQueuedMedia[]>([]);
   const [mediaError,setMediaError]=useState('');
   const [mediaPicking,setMediaPicking]=useState(false);
   const [mediaUploading,setMediaUploading]=useState(false);
   const [mediaProgress,setMediaProgress]=useState(0);
   const [mediaReady,setMediaReady]=useState(false);
-  const mediaClientId=useRef<string|null>(null);
+  const mediaBatchId=useRef<string|null>(null);
   const [error, setError] = useState('');
   const [connection, setConnection] = useState('desconectado');
   const [joining, setJoining] = useState(false);
@@ -54,7 +56,9 @@ export default function App() {
   const scroll = useRef<React.ElementRef<typeof ScrollView> | null>(null);
   const chooseNativeMedia=async(source:ChatMediaSource,kind?:ChatMediaKind)=>{
     setComposerPanel(null);setMediaError('');Keyboard.dismiss();
-    if(mediaPicking)return;
+    if(mediaPicking||mediaUploading||mediaBatchId.current)return;
+    const free=CHAT_MEDIA_MAX_PER_SEND-selectedMedia.length;
+    if(free<1){setMediaError('Máximo 5 archivos entre Fotos y Video por envío.');return;}
     setMediaPicking(true);
     try{
       if(source==='camera'){
@@ -65,24 +69,28 @@ export default function App() {
         }
       }
       const options:ImagePicker.ImagePickerOptions={
-        // The clip always filters the gallery; the separate camera icon launches capture.
         mediaTypes:source==='camera'?['images','videos']:kind==='photo'?['images']:['videos'],
-        allowsEditing:false,quality:1,selectionLimit:1
+        allowsEditing:false,quality:1,allowsMultipleSelection:source==='gallery',
+        selectionLimit:source==='gallery'?free:1
       };
       const result=source==='camera'
         ?await ImagePicker.launchCameraAsync(options)
         :await ImagePicker.launchImageLibraryAsync(options);
       if(result.canceled||!result.assets?.length)return;
-      const asset=result.assets[0];
-      if(!asset)return;
-      const pickedKind:ChatMediaKind=asset.type==='video'||asset.mimeType?.startsWith('video/')?'video':'photo';
-      const mimeType=(asset.mimeType||(pickedKind==='photo'?'image/jpeg':'video/mp4')).toLowerCase();
-      const name=asset.fileName||('havana-'+Date.now()+(pickedKind==='photo'?'.jpg':'.mp4'));
-      const sizeBytes=asset.fileSize??0;
-      const issue=validateChatMediaSelection({kind:pickedKind,name,mimeType,sizeBytes});
-      if(issue){setMediaError(issue);return;}
-      mediaClientId.current=newMediaUploadId();
-      setSelectedMedia({kind:pickedKind,source,uri:asset.uri,name,mimeType,sizeBytes});
+      if(result.assets.length>free){
+        setMediaError('Máximo 5 archivos entre Fotos y Video por envío.');return;
+      }
+      const additions:NativeQueuedMedia[]=[];
+      for(const asset of result.assets){
+        const pickedKind:ChatMediaKind=asset.type==='video'||asset.mimeType?.startsWith('video/')?'video':'photo';
+        const mimeType=(asset.mimeType||(pickedKind==='photo'?'image/jpeg':'video/mp4')).toLowerCase();
+        const name=asset.fileName||('havana-'+Date.now()+(pickedKind==='photo'?'.jpg':'.mp4'));
+        const sizeBytes=asset.fileSize??0;
+        const issue=validateChatMediaSelection({kind:pickedKind,name,mimeType,sizeBytes});
+        if(issue){setMediaError(name+': '+issue);return;}
+        additions.push({id:newMediaUploadId(),kind:pickedKind,source,uri:asset.uri,name,mimeType,sizeBytes});
+      }
+      setSelectedMedia(previous=>[...previous,...additions]);
     }catch{
       setMediaError('No se pudo abrir la cámara o la galería. Inténtalo de nuevo.');
     }finally{setMediaPicking(false);}
@@ -656,18 +664,30 @@ export default function App() {
   }
 
   async function sendSelectedMedia(){
-    if(!selectedMedia||!session||mediaUploading)return;
+    if(!selectedMedia.length||!session||mediaUploading)return;
     if(!mediaReady){setMediaError('HAVANA CLOUD todavía no está enlazada.');return;}
+    const batch=mediaBatchId.current||newMediaUploadId();
+    mediaBatchId.current=batch;
+    const items=selectedMedia.map((item,index)=>({...item,batchIndex:item.batchIndex??index}));
+    setSelectedMedia(items);
+    const total=items.reduce((n,item)=>n+item.sizeBytes,0);
+    let completed=0,remaining=items;
     setMediaUploading(true);setMediaError('');setMediaProgress(0);
     try{
-      const id=mediaClientId.current||newMediaUploadId();
-      mediaClientId.current=id;
-      await uploadNativeOriginal(session,selectedMedia,id,(sent,total)=>
-        setMediaProgress(Math.round(sent/total*100)));
-      mediaClientId.current=null;setSelectedMedia(null);setMediaProgress(0);
-      syncLatest.current();
-    }catch(reason){setMediaError(reason instanceof Error?reason.message:'No se pudo subir. Reintenta.');}
-    finally{setMediaUploading(false);}
+      for(const item of items){
+        await uploadNativeOriginal(session,item,item.id,batch,item.batchIndex!, (sent)=>
+          setMediaProgress(Math.floor((completed+sent)/total*100)));
+        completed+=item.sizeBytes;
+        remaining=remaining.filter(x=>x.id!==item.id);
+        setSelectedMedia([...remaining]);
+        setMediaProgress(Math.floor(completed/total*100));
+        syncLatest.current();
+      }
+      mediaBatchId.current=null;
+    }catch(reason){
+      setMediaError((reason instanceof Error?reason.message:'No se pudo subir')+
+        '. Los archivos pendientes siguen disponibles para reintentar.');
+    }finally{setMediaUploading(false);}
   }
   function send() {
     const text = draft.trim();
@@ -920,21 +940,31 @@ export default function App() {
             {typing ? <View style={styles.typingIndicator} accessibilityLiveRegion="polite">
                <Text style={styles.typingIndicatorText}>{typing}</Text>
              </View> : null}
-             {selectedMedia&&<View style={styles.mediaPreview} accessibilityLabel="Archivo seleccionado">
-               {selectedMedia.kind==='photo'
-                 ?<Image source={{uri:selectedMedia.uri}} style={styles.mediaThumb}/>
-                 :<View style={[styles.mediaThumb,styles.videoThumb]}><Text style={styles.videoThumbText}>▶</Text></View>}
-               <View style={styles.mediaInfo}>
-                 <Text style={styles.mediaName} numberOfLines={1}>{selectedMedia.name}</Text>
-                 <Text style={styles.mediaHint}>{selectedMedia.kind==='photo'?'Fotografía':'Video'} · {(selectedMedia.sizeBytes/1048576).toFixed(1)} MB</Text>
-                 <Text style={styles.mediaHint}>{mediaUploading?'Subiendo '+mediaProgress+'%':mediaReady?'Original listo para enviar':'La subida a HAVANA CLOUD aún no está habilitada.'}</Text>
-               </View>
-               <Pressable accessibilityRole="button" accessibilityLabel="Quitar archivo seleccionado"
-                 onPress={()=>{mediaClientId.current=null;setSelectedMedia(null);setMediaError('');}}>
-                 <Text style={styles.mediaClose}>✕</Text>
-               </Pressable>
+             {selectedMedia.length>0&&<View accessibilityLabel="Archivos para enviar">
+               <Text style={styles.mediaHint}>{selectedMedia.length} de {CHAT_MEDIA_MAX_PER_SEND} archivos · Fotos y Video</Text>
+               <ScrollView style={{maxHeight:250}} nestedScrollEnabled keyboardShouldPersistTaps="handled">
+                 {selectedMedia.map(item=><View key={item.id} style={styles.mediaPreview}>
+                   {item.kind==='photo'
+                     ?<Image source={{uri:item.uri}} style={styles.mediaThumb}/>
+                     :<View style={[styles.mediaThumb,styles.videoThumb]}><Text style={styles.videoThumbText}>▶</Text></View>}
+                   <View style={styles.mediaInfo}>
+                     <Text style={styles.mediaName} numberOfLines={1}>{item.name}</Text>
+                     <Text style={styles.mediaHint}>{item.kind==='photo'?'Fotografía':'Video'} · {(item.sizeBytes/1048576).toFixed(1)} MB</Text>
+                   </View>
+                   <Pressable disabled={mediaUploading} accessibilityRole="button"
+                     accessibilityLabel={'Quitar '+item.name}
+                     onPress={()=>{
+                       const remaining=selectedMedia.filter(x=>x.id!==item.id);
+                       if(!remaining.length)mediaBatchId.current=null;
+                       setSelectedMedia(remaining);setMediaError('');
+                     }}>
+                     <Text style={styles.mediaClose}>✕</Text>
+                   </Pressable>
+                 </View>)}
+               </ScrollView>
+               <Text style={styles.mediaHint}>{mediaUploading?'Subiendo '+mediaProgress+'%':mediaReady?'Originales listos para enviar':'La subida a HAVANA CLOUD aún no está habilitada.'}</Text>
              </View>}
-             {!!mediaError&&<Text style={styles.mediaError}>{mediaError}</Text>}
+              {!!mediaError&&<Text style={styles.mediaError}>{mediaError}</Text>}
              <View style={styles.composer}>
                <View style={styles.inputPill}>
                  <Pressable accessibilityRole="button" accessibilityLabel="Insertar emoji"
@@ -948,19 +978,19 @@ export default function App() {
                    placeholder={connection==='en vivo'?'Mensaje':'Sin conexión: se enviará después…'}
                    placeholderTextColor="#85898a"/>
                  <Pressable accessibilityRole="button" accessibilityLabel="Adjuntar fotografía o video"
-                   accessibilityState={{expanded:composerPanel==='attachments'}} style={styles.composerIcon}
+                   accessibilityState={{expanded:composerPanel==='attachments'}} disabled={mediaUploading} style={styles.composerIcon}
                    onPress={()=>{Keyboard.dismiss();setComposerPanel(v=>v==='attachments'?null:'attachments');}}>
                    <NativeComposerIcon name="clip"/>
                  </Pressable>
                  <Pressable accessibilityRole="button" accessibilityLabel="Abrir cámara"
-                   disabled={mediaPicking} style={styles.composerIcon}
+                   disabled={mediaPicking||mediaUploading} style={styles.composerIcon}
                    onPress={()=>void chooseNativeMedia('camera')}>
                    <NativeComposerIcon name="camera"/>
                  </Pressable>
                </View>
-               {draft.trim()||editing||selectedMedia
-                 ?<Pressable accessibilityRole="button" accessibilityLabel={editing?'Guardar mensaje':selectedMedia?'Enviar archivo original':'Enviar mensaje'}
-                    onPress={()=>selectedMedia&&!editing?void sendSelectedMedia():send()} disabled={mediaUploading||savingEdit||(!selectedMedia&&!draft.trim())} style={styles.sendCircle}>
+               {draft.trim()||editing||selectedMedia.length>0
+                 ?<Pressable accessibilityRole="button" accessibilityLabel={editing?'Guardar mensaje':selectedMedia.length?'Enviar archivos originales':'Enviar mensaje'}
+                    onPress={()=>selectedMedia.length&&!editing?void sendSelectedMedia():send()} disabled={mediaUploading||savingEdit||(!selectedMedia.length&&!draft.trim())} style={styles.sendCircle}>
                     <NativeComposerIcon name="send" color="#fff"/>
                   </Pressable>
                  :<Pressable accessibilityRole="button" accessibilityLabel="Grabar audio (próximamente)"
