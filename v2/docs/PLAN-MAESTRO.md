@@ -69,7 +69,7 @@
 | Componente | Fuente única vigente |
 |---|---|
 | GitHub código V2 | `Abnernoa97/havana-nice-pwa` → `havana-nice-v2-foundation` |
-| Android nativo | `v2/apps/android`; `com.havananice.v2`; actual paquete publicado `0.0.6`, versionCode 6 |
+| Android nativo | `v2/apps/android`; `com.havananice.v2`; **APK firmada 0.0.7 (versionCode 7) publicada, instalable ENCIMA de 0.0.6** |
 | iPhone PWA / Chat | https://havana-nice-v2-dev.pages.dev/ |
 | Administrador PWA | https://havana-nice-v2-dev.pages.dev/admin.html |
 | API V2 / DO | `havana-nice-v2-dev` Worker + `CHAT_ROOMS` |
@@ -79,7 +79,12 @@
 | Integración multimedia | **FUNCIONA EN REAL**: V2 Worker 32 optimizado (100 %), CLOUD vinculada (1 token cifrado), 5 fotos + 2 videos guardados; sin modificar CLOUD |
 | CI nativo y distribución | `v2-android-apk.yml` + `v2-apk-direct-download.yml`; protección misma firma |
 
-**Distribución firmada verificada 0.0.6:**
+**Actualización nativa 0.0.7 FIRMADA Y PUBLICADA:**
+https://raw.githubusercontent.com/Abnernoa97/havana-nice-pwa/havana-nice-v2-apk-downloads/HAVANA-NICE-V2-ANDROID-041a5aa51f6b.apk
+
+- Código fuente build `041a5aa51f6bb81add60a81cd3a6a32deaf7f10a`; [APK CI 40717878143 SUCCESS](https://github.com/Abnernoa97/havana-nice-pwa/actions/runs/40717878143) y [distribución CI 40717878425 SUCCESS](https://github.com/Abnernoa97/havana-nice-pwa/actions/runs/40717878425). **SHA-256 `9b071c5e89be860e2cca1154ab21c9cf2e8e47dbb606373e9e7ff79e018fca60`**, 75,511,571 bytes. **Firma X.509 idéntica** a 0.0.6, mismo `com.havananice.v2`, versionCode 6→7, comprobado por `apk-signature-gate.py`. Instalación **en sitio** sin desinstalación ni borrar caché. *El usuario todavía no ha confirmado instalación física 0.0.7.*
+
+**Anterior 0.0.6 (instalada en teléfono, conservada):**
 https://raw.githubusercontent.com/Abnernoa97/havana-nice-pwa/havana-nice-v2-apk-downloads/HAVANA-NICE-V2-ANDROID-828e0682815d.apk
 
 - Fuente exacta APK: `828e0682815dfc0579e3197ed7a4c582372887ad`; CI base `40613744827`, build `40613744649`, distribución `40613744654`: **SUCCESS**.
@@ -94,17 +99,17 @@ https://raw.githubusercontent.com/Abnernoa97/havana-nice-pwa/havana-nice-v2-apk-
 
 **Fotos y videos ya FUNCIONAN:** el propietario mostró en cuatro capturas una selección original y subida en Chat, videos dentro de Chat, fotos visibles en Administrador y originales en la galería habitual de CLOUD. D1 confirma **5 fotos y 2 videos completos, 0 subidas pendientes, 1 token de CLOUD vinculado**; **51 mensajes y 3 músicos**. Este hecho sustituye las hipótesis anteriores sobre almacenamiento no vinculado. M01/M02 aún NO se tachan hasta QA físico de velocidad/reproducción; no volver a pedir la autorización CLOUD que ya existe.
 
-**ÚNICO circuito:** `cloudflare/src/unified-media.js` → `cloud-media-adapter.js` → `cloud-link.js` → Service Binding únicamente V2 a los endpoints EXISTENTES de HAVANA CLOUD. Hasta cinco originales foto/video combinados por envío, fragmentos 4 MiB, confirmación Drive antes de crear burbuja, metadatos D1, galería CLOUD normal, Chat y Administrador. La contraseńa nunca se almacena y el token de dispositivo cifrado queda solo en V2. Mantener reintentos, idempotencia, privacidad y acceso Admin.
+**ÚNICO circuito:** `cloudflare/src/unified-media.js` → `cloud-media-adapter.js` → `cloud-link.js` → Service Binding únicamente V2 a los endpoints EXISTENTES de HAVANA CLOUD. Hasta cinco originales foto/video combinados por envío, fragmentos 4 MiB, confirmación Drive antes de crear burbuja, metadatos D1, galería CLOUD normal, Chat y Administrador. La contraseña nunca se almacena y el token de dispositivo cifrado queda solo en V2. Mantener reintentos, idempotencia, privacidad y acceso Admin.
 
 **OPTIMIZACIÓN DE VELOCIDAD REALIZADA:** se detectó una autorización `/api/auth/device` redundante en cada fragmento y subida **secuencial** de archivos seleccionados. Worker V2 **32, `49f78986-096b-4bc7-b4cd-b30ee945357f`**, publicado al 100 % y sin migraciones destructivas, reutiliza la sesión de CLOUD **2 minutos en memoria exclusiva del servidor** (no en D1/PWA/músicos), coalesciendo autorizaciones simultáneas y renovando al recibir 401. El código PWA y Android prepara **máximo 2 archivos paralelos**, pero cada original conserva sus fragmentos ordenados y el ID de recuperación. **No alterar el tamaño 4 MiB anunciado por la API actual de CLOUD ni comprimir originales.** Versión anterior V2 31 `6909dd0a-f555-4ffb-84a0-679e1d016c1f` disponible para revertir; Cloud sin cambios. GitHub [CI Foundation 40718800489 SUCCESS](https://github.com/Abnernoa97/havana-nice-pwa/actions/runs/40718800489) prueba PWA, Android, Admin, backend real, cifrado y regresiones; optimización de autenticación probada en simulación.
 
 **MEDICIÓN DE REFERENCIA ANTES de v32:** D1 registra 5 fotos completas con tamaño medio **1.63 MiB** y tiempo medio **12.3 s**; 2 videos completos con tamaño medio **20.92 MiB** y tiempo medio **39 s**. Son tiempos de subida reales, no objetivos prometidos. Repetir con archivos nuevos para comprobar mejora: no prometer instantaneidad en la red celular.
 
-**Android:** la 0.0.6 instalada funciona y conserva su caché. La fuente de la **0.0.7 / versionCode 7** incluye la cola paralela y se está compilando con el mismo paquete `com.havananice.v2`; no afirmar que esté distribuida ni pedir desinstalación antes de que CI verifique el certificado y publique el APK. La PWA se publica automáticamente desde la única rama GitHub.
+**Android:** la 0.0.6 instalada funciona. **0.0.7/7 ya publicada y comprobada** (CI y certificado idéntico), con 2 archivos simultáneos; el usuario puede instalarla **encima** de 0.0.6 sin limpiar caché. No declarar instalada hasta que lo confirme. La PWA se publica automáticamente desde la misma rama.
 
 ## 5. Siguientes acciones del Plan Maestro
 
-1. Comprobar que la PWA haya recibido la cola paralela, y completar compilación/distribución **firmada** de Android 0.0.7 para actualizar sobre 0.0.6 **sin borrar datos ni desinstalar**.
+1. **La PWA y APK 0.0.7 ya están publicadas:** instalar APK firmada **encima de 0.0.6** sin desinstalar ni borrar datos, verificar que las sesiones y los archivos anteriores permanecen.
 2. Probar con dos fotos a la vez y un video nuevo; comparar contra tiempos de referencia en D1, confirmar original en Chat, Administrador y galería normal de CLOUD, además de reproducción y Range.
 3. Si hay regresión del Worker V2, revertir a su versión 31 conservada; **nunca modificar HAVANA CLOUD**. No borrar mensajes, archivos reales ni credenciales.
 4. Solo tras QA físico y remoto cerrar M01/M02 del tablero oficial (**12/27** hasta entonces). Seguir el resto de los 27 hitos sin nueva rama ni rutas paralelas.
