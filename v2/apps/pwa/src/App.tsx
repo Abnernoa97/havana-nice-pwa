@@ -8,6 +8,7 @@ import {
 } from '@havana/shared';
 import { loadLocalChat, saveLocalChat } from './local';
 import SwipeMessage, {type MessageAnchor} from './SwipeMessage';
+import ComposerIcon from './ChatComposerIcon';
 
 export default function App() {
   const [health, setHealth] = useState<BackendHealth | null>(null);
@@ -16,11 +17,12 @@ export default function App() {
   const [restoringAccess,setRestoringAccess] = useState(true);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState('');
-  const [mediaMenuOpen,setMediaMenuOpen]=useState(false);
+  const [composerPanel,setComposerPanel]=useState<'attachments'|'emojis'|null>(null);
   const [selectedMedia,setSelectedMedia]=useState<ChatMediaSelection|null>(null);
   const [mediaError,setMediaError]=useState('');
   const mediaObjectUrl=useRef<string|null>(null);
-  const mediaInputs=useRef<Record<string,HTMLInputElement|null>>({});
+  const galleryPicker=useRef<HTMLInputElement|null>(null);
+  const cameraPicker=useRef<HTMLInputElement|null>(null);
   const [connection, setConnection] = useState('desconectado');
   const [error, setError] = useState('');
   const [joining, setJoining] = useState(false);
@@ -53,12 +55,14 @@ export default function App() {
     if(mediaObjectUrl.current){URL.revokeObjectURL(mediaObjectUrl.current);mediaObjectUrl.current=null;}
     setSelectedMedia(null);setMediaError('');
   };
-  const openMediaPicker=(source:ChatMediaSource,kind:ChatMediaKind)=>{
-    setMediaMenuOpen(false);setMediaError('');
-    mediaInputs.current[source+':'+kind]?.click();
+  const openMediaPicker=(source:ChatMediaSource)=>{
+    setComposerPanel(null);setMediaError('');
+    // The browser opens its own image/video chooser or camera, with no upload.
+    (source==='gallery'?galleryPicker:cameraPicker).current?.click();
   };
-  const chooseMedia=(source:ChatMediaSource,kind:ChatMediaKind,file?:File)=>{
+  const chooseMedia=(source:ChatMediaSource,file?:File)=>{
     if(!file)return;
+    const kind:ChatMediaKind=file.type.startsWith('image/')?'photo':'video';
     const issue=validateChatMediaSelection({kind,name:file.name,
       mimeType:file.type.toLowerCase(),sizeBytes:file.size});
     if(issue){setMediaError(issue);return;}
@@ -67,6 +71,11 @@ export default function App() {
     mediaObjectUrl.current=uri;
     setSelectedMedia({kind,source,uri,name:file.name,mimeType:file.type.toLowerCase(),sizeBytes:file.size});
     setMediaError('');
+  };
+  const insertEmoji=(emoji:string)=>{
+    if(editing&&savingEdit)return;
+    if(draft.length+emoji.length<=2000)typeText(draft+emoji);
+    setComposerPanel(null);
   };
   useEffect(()=>()=>{if(mediaObjectUrl.current)URL.revokeObjectURL(mediaObjectUrl.current);},[]);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -701,23 +710,32 @@ export default function App() {
           {editing && <div className="reply-preview">Editando mensaje <button type="button" onClick={finishEditing} disabled={savingEdit}>Cancelar</button></div>}
           {replyTo && !editing && <div className="reply-preview">Respondiendo a: {replyTo.text.slice(0,65)} <button type="button" onClick={() => setReplyTo(null)}>Cancelar</button></div>}
           {typing && <div className="chat-typing-indicator" role="status" aria-live="polite">{typing}</div>}
-          {mediaMenuOpen&&<div className="chat-media-menu" role="group" aria-label="Adjuntar foto o video">
-            <button type="button" onClick={()=>openMediaPicker('gallery','photo')}>Galería · Foto</button>
-            <button type="button" onClick={()=>openMediaPicker('gallery','video')}>Galería · Video</button>
-            <button type="button" onClick={()=>openMediaPicker('camera','photo')}>Cámara · Foto</button>
-            <button type="button" onClick={()=>openMediaPicker('camera','video')}>Cámara · Video</button>
+          {composerPanel&&<div className="chat-panel-dismiss" aria-hidden="true"
+            onClick={()=>setComposerPanel(null)}/>}
+          {composerPanel==='attachments'&&<div className="chat-attachments-popover"
+            role="group" aria-label="Adjuntar al chat">
+            <button type="button" onClick={()=>openMediaPicker('gallery')}>
+              <span className="chat-attachments-symbol"><ComposerIcon name="photo" size={23}/></span>
+              <span>Galería<small>Fotos y videos</small></span>
+            </button>
+            <button type="button" onClick={()=>openMediaPicker('camera')}>
+              <span className="chat-attachments-symbol"><ComposerIcon name="camera" size={23}/></span>
+              <span>Cámara<small>Foto o video</small></span>
+            </button>
           </div>}
-          {(['gallery','camera'] as ChatMediaSource[]).flatMap(source=>
-            (['photo','video'] as ChatMediaKind[]).map(kind=>
-              <input key={source+kind} className="chat-media-hidden-input" type="file"
-                ref={node=>{mediaInputs.current[source+':'+kind]=node;}}
-                tabIndex={-1} aria-hidden="true" accept={kind==='photo'?'image/*':'video/*'}
-                {...(source==='camera'?{capture:'environment' as const}:{})}
-                onChange={event=>{
-                  chooseMedia(source,kind,event.currentTarget.files?.[0]);
-                  event.currentTarget.value='';
-                }}/>)
-          )}
+          {composerPanel==='emojis'&&<div className="chat-emojis-popover"
+            role="group" aria-label="Elegir emoji">
+            {['😀','😂','❤️','👍','🥰','🎉','👏','😍'].map(emoji=>
+              <button type="button" key={emoji} onClick={()=>insertEmoji(emoji)}
+                aria-label={'Insertar '+emoji}>{emoji}</button>)}
+          </div>}
+          <input className="chat-media-hidden-input" type="file" ref={galleryPicker}
+            tabIndex={-1} aria-hidden="true" accept="image/*,video/*"
+            onChange={e=>{chooseMedia('gallery',e.currentTarget.files?.[0]);e.currentTarget.value='';}}/>
+          <input className="chat-media-hidden-input" type="file" ref={cameraPicker}
+            tabIndex={-1} aria-hidden="true" accept="image/*,video/*"
+            capture="environment"
+            onChange={e=>{chooseMedia('camera',e.currentTarget.files?.[0]);e.currentTarget.value='';}}/>
           {selectedMedia&&<div className="chat-media-preview" aria-label="Vista previa del archivo">
             {selectedMedia.kind==='photo'
               ?<img src={selectedMedia.uri} alt="Vista previa de la fotografía seleccionada"/>
@@ -730,16 +748,35 @@ export default function App() {
             <button type="button" aria-label="Quitar archivo seleccionado" onClick={removeSelectedMedia}>✕</button>
           </div>}
           {mediaError&&<p className="chat-media-error" role="alert">{mediaError}</p>}
-          <form className="chat-composer" onSubmit={event => { event.preventDefault(); send(); }}>
-            <button type="button" className="chat-attach-button"
-              aria-label="Adjuntar fotografía o video" aria-expanded={mediaMenuOpen}
-              onClick={()=>setMediaMenuOpen(v=>!v)}>+</button>
-            <input aria-label="Escribir mensaje" disabled={savingEdit} value={draft} maxLength={2000}
-              onChange={event=>typeText(event.target.value)}
-              placeholder={connection==='en vivo'?'Escribe un mensaje…':'Sin conexión: se enviará después…'}/>
-            <button aria-label="Enviar" disabled={!draft.trim()||savingEdit} type="submit">
-              {savingEdit?'Guardando…':editing?'Guardar':'Enviar'}
-            </button>
+          <form className="chat-composer" onSubmit={event=>{event.preventDefault();send();}}>
+            <div className="chat-input-pill">
+              <button type="button" className="chat-icon-button chat-emoji-button"
+                aria-label="Insertar emoji" aria-expanded={composerPanel==='emojis'}
+                onClick={()=>setComposerPanel(p=>p==='emojis'?null:'emojis')}>
+                <ComposerIcon name="emoji" size={25}/>
+              </button>
+              <input aria-label="Escribir mensaje" disabled={savingEdit} value={draft} maxLength={2000}
+                onChange={event=>{typeText(event.target.value);setComposerPanel(null);}}
+                placeholder={connection==='en vivo'?'Mensaje':'Sin conexión: se enviará después…'}/>
+              <button type="button" className="chat-icon-button" aria-label="Adjuntar fotografía o video"
+                aria-expanded={composerPanel==='attachments'}
+                onClick={()=>setComposerPanel(p=>p==='attachments'?null:'attachments')}>
+                <ComposerIcon name="clip" size={25}/>
+              </button>
+              <button type="button" className="chat-icon-button" aria-label="Abrir cámara"
+                onClick={()=>openMediaPicker('camera')}>
+                <ComposerIcon name="camera" size={25}/>
+              </button>
+            </div>
+            {draft.trim()||editing
+              ?<button type="submit" className="chat-action-circle" aria-label={editing?'Guardar mensaje':'Enviar mensaje'}
+                  disabled={!draft.trim()||savingEdit}>
+                  <ComposerIcon name="send" size={24}/>
+                </button>
+              :<button type="button" className="chat-action-circle" aria-label="Grabar audio (próximamente)"
+                  onClick={()=>window.alert('Los mensajes de voz se habilitarán después de fotos y videos.')}>
+                  <ComposerIcon name="mic" size={25}/>
+                </button>}
           </form>
         </>
       )}

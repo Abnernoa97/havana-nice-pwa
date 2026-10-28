@@ -78,15 +78,43 @@ h1 span { font-weight:400; }
   white-space:nowrap;font-weight:600;color:#25251f;min-height:44px}
 .whatsapp-actions .whatsapp-delete{color:#b3261e}
 
-/* M01/M02: local photo/video chooser without affecting the text message composer. */
-.chat-composer .chat-attach-button{flex:0 0 44px;width:44px;height:44px;padding:0;
-  display:grid;place-items:center;border-radius:50%;background:#e0d6c8;color:#2a2923;
-  font-size:31px;font-weight:400;line-height:1;border:1px solid #cbbbaa}
+
+/* One WhatsApp-style dock: controls stay in a single row; popovers NEVER push messages. */
+.chat-app{position:relative}
+.chat-composer{position:relative;z-index:12;gap:8px;padding:7px 12px 9px;
+  background:#f3eddf;border-top:1px solid #ded3c4;align-items:center}
+.chat-input-pill{flex:1;min-width:0;height:50px;background:#fff;border:1px solid #e4e0da;
+  border-radius:27px;display:flex;align-items:center;gap:0;padding:0 5px}
+.chat-composer .chat-input-pill input{flex:1;min-width:0;height:46px;padding:8px 6px;
+  border:0;background:transparent;outline:none;font-size:16px;color:#202322}
+.chat-composer .chat-icon-button{flex:0 0 37px;width:37px;min-width:37px;
+  height:44px;display:grid;place-items:center;border:0;padding:0;border-radius:22px;
+  background:transparent;color:#70787c}
+.chat-composer .chat-icon-button:active{background:#f0f0ed}
+.chat-composer .chat-emoji-button{flex-basis:36px;width:36px;min-width:36px}
+.chat-composer .chat-action-circle{flex:0 0 51px;width:51px;height:51px;padding:0;
+  display:grid;place-items:center;border-radius:50%;background:#222420;color:#fff;border:0}
+.chat-composer .chat-action-circle:disabled{opacity:.4}
 .chat-media-hidden-input{display:none!important}
-.chat-media-menu{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:12px 15px;
-  background:#f3eddf;border-top:1px solid #e4d6c5}
-.chat-media-menu button{font-size:13px;color:#292b27;background:#fffaf4;border:1px solid #d8c9ba;
-  border-radius:13px;min-height:46px;padding:10px 8px;font-weight:600}
+.chat-panel-dismiss{position:fixed;inset:0;background:transparent;z-index:10}
+.chat-attachments-popover,.chat-emojis-popover{position:absolute;bottom:76px;left:15px;
+  z-index:11;background:#fff;border:1px solid #e9e3da;border-radius:20px;
+  box-shadow:0 8px 28px #0002}
+.chat-attachments-popover{width:min(310px,calc(100% - 30px));display:grid;gap:2px;padding:9px}
+.chat-attachments-popover button{border:0;background:transparent;color:#272c29;
+  display:flex;align-items:center;gap:13px;text-align:left;min-height:61px;
+  border-radius:12px;padding:9px 11px;font-size:15px;font-weight:600}
+.chat-attachments-popover button:active,.chat-attachments-popover button:focus-visible{background:#f3f2f0}
+.chat-attachments-symbol{width:40px;height:40px;display:grid;place-items:center;
+  color:#77739b;background:#f0edfb;border-radius:14px}
+.chat-attachments-popover button:nth-child(2) .chat-attachments-symbol{color:#976b67;background:#fbefec}
+.chat-attachments-popover button span:nth-child(2){display:flex;flex-direction:column;gap:2px}
+.chat-attachments-popover button small{color:#7b817c;font-size:11px;font-weight:400}
+.chat-emojis-popover{width:min(310px,calc(100% - 30px));display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;padding:12px}
+.chat-emojis-popover button{font-size:27px;border:0;background:transparent;
+  min-height:45px;border-radius:12px}
+.chat-emojis-popover button:active{background:#f5f3ef}
 .chat-media-preview{display:flex;gap:12px;align-items:center;background:#faf5ed;
   border-top:1px solid #ded3c4;padding:10px 15px;min-height:75px}
 .chat-media-preview img,.chat-media-preview video{height:69px;width:76px;max-width:76px;
@@ -96,4 +124,6 @@ h1 span { font-weight:400; }
 .chat-media-preview-info small{font-size:10px;color:#736b61;line-height:1.3}
 .chat-media-preview>button{background:transparent;border:0;color:#6e5f53;font-size:23px;padding:8px 4px}
 .chat-media-error{font-size:12px;color:#b23d2e;margin:0;padding:8px 16px;background:#fff4ee}
-@media(max-width:380px){.chat-media-menu{gap:5px;padding:9px}.chat-media-menu button{font-size:12px}}
+@media(max-width:360px){.chat-composer{padding-inline:7px;gap:5px}
+  .chat-composer .chat-icon-button{flex-basis:33px;width:33px;min-width:33px}
+  .chat-composer .chat-action-circle{flex-basis:47px;width:47px;height:47px}}
