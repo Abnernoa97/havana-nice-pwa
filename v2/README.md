@@ -10,7 +10,7 @@
 - Chat iPhone PWA, sincronizado con el Chat nativo mediante contratos, mensajes, sesión y WebSocket del mismo Worker/D1.
 - Administrador real e independiente en `/admin.html`: «Acceso a músicos» y «Chat general» activos. El Chat Admin muestra y modera los mensajes de todos sin iniciar sesión como músico ni escribir; comparte D1 y WebSocket, y su papelera elimina para todos con registro lógico. Calendario, Repertorio y Más aún no tienen datos conectados.
 - `/visual.html` es únicamente una **maqueta sin datos privados ni permisos de Chat o Administrador** destinada a futuros módulos no-Chat de Android WebView/PWA (H02–H04). No es una segunda puerta de ingreso.
-- R2 descartado; medios privados solo mediante una solución de almacenamiento autorizada y presupuestada. No activar Google Drive/puentes ni servicios de pago por presunción.
+- R2 pendiente de activación del plan gratuito por el propietario. No existe almacenamiento multimedia configurado todavía.
 
 ## Acceso a músicos actual — sin mecanismos paralelos
 
