@@ -3,7 +3,7 @@
 **Auditoría cruzada y consolidación: 29 de octubre de 2026.**  
 **Fuente de desarrollo única:** repositorio `Abnernoa97/havana-nice-pwa`, rama `havana-nice-v2-foundation`.  
 **Tablero inalterado:** **12/27 hitos cerrados (44,4 %) · 15 abiertos**.  
-**Estado:** sistema Chat/Administrador base existente, depuración transversal prioritaria antes de R2.  
+**Estado:** Chat/Administrador base conservados; seis tareas de saneamiento ya ejecutadas y publicación Android aún pendiente de verificar antes de R2.  
 **Documento auxiliar:** [CONTINUIDAD-EXACTA.md](./CONTINUIDAD-EXACTA.md) es únicamente una bitácora de estado y relevo; **este archivo es el único plan de decisiones, hitos y prioridades**.
 
 ## 1. Objetivo y arquitectura que no se negocian
@@ -30,10 +30,10 @@ Actualmente el **único código fuente V2** se desarrolla en `havana-nice-v2-fou
 |---|---|---|
 | Código de V2 | 82 archivos bajo la rama canónica; pruebas generales del commit `177ac4eb23ed` aprobadas | **En orden** |
 | Cloudflare Worker | `havana-nice-v2-dev`, sin Service Binding externo | **En orden** |
-| Configuración runtime Worker | Cinco bindings: `CHAT_ROOMS`, `DB`, `HAVANA_ENV`, `V2_ADMIN_LOGIN_MODE`, `V2_ADMIN_LOGIN_SECRET` | **Publicado; fuente incompleta** |
+| Configuración runtime Worker | Cinco bindings: `CHAT_ROOMS`, `DB`, `HAVANA_ENV`, `V2_ADMIN_LOGIN_MODE`, `V2_ADMIN_LOGIN_SECRET` | **Publicado; fuente sincronizada** |
 | D1 | 11 tablas actuales, sin `chat_cloud_*` ni tablas multimedia antiguas | **En orden** |
 | Datos Chat | 44 mensajes, 3 músicos con modo de dispositivo único, 3 sesiones, 12 reacciones | **Conservados** |
-| Administrador | 28 filas históricas de sesión, 21 revocadas; ninguna vigente según el reloj servidor en la consulta | **Pendiente política de limpieza segura** |
+| Administrador | 28 filas históricas de sesión, 21 revocadas; ninguna vigente según el reloj servidor en la consulta | **Depuración completada: 0 sesiones antiguas** |
 | PWA de V2 | Despliegue confirmado del commit `177ac4eb23ed` | **Publicado** |
 | Android 0.0.10 | Compilación APK y prueba general GitHub **exitosas**; mismo paquete/versionCode 10 | **Compilado** |
 | Entrega 0.0.10 | Workflow de enlace directo **falló** al consultar GitHub con `unexpected EOF`; no se confirmó instalación en teléfono | **Pendiente** |
@@ -63,8 +63,8 @@ Actualmente el **único código fuente V2** se desarrolla en `havana-nice-v2-fou
 - [ ] **H02** — Módulos no-Chat con PWA solo como capa visual Android. **Auditoría:** `visual.html` es una maqueta sin datos reales.
 - [ ] **H03** — Navegación, sesión y persistencia entre módulos. **Auditoría:** implementación completa pendiente.
 - [ ] **H04** — Actualización del aspecto visual PWA sin reinstalar Android. **Auditoría:** validación de actualización y caché pendiente.
-- [x] **S01** — Altas y bajas de músicos desde Administrador. **Auditoría:** conservar la sesión administrativa separada; alinear configuración deploy en S-C.
-- [x] **S02** — Una instalación por músico, con alerta de acceso duplicado. **Auditoría:** los 3 músicos actuales tienen `single_device_mode=1`; hay una excepción de compatibilidad para usuarios históricos sin esa restricción, por revisar en S-D antes de eliminarla.
+- [x] **S01** — Altas y bajas de músicos desde Administrador. **Auditoría:** sesión administrativa separada; configuración no secreta de despliegue alineada en S-C.
+- [x] **S02** — Una instalación por músico, con alerta de acceso duplicado. **Auditoría:** los 3 músicos usan `single_device_mode=1`; la excepción de acceso heredado ya se eliminó y se publicó en el Worker.
 
 ### Multimedia: 0 de 5 cerrados
 
@@ -84,28 +84,28 @@ Actualmente el **único código fuente V2** se desarrolla en `havana-nice-v2-fou
 - [ ] **Q01** — QA integral Android/PWA/Admin: firma, actualización sobre instalada, sesión, reconexión, caché, privacidad y reproducción. **Debe absorber las pruebas del saneamiento y de M01/M02.**
 - [ ] **Q02** — Paso a producción después de autorización y QA completos.
 
-**TOTAL INALTERADO: 12/27.** Ninguna tarea de limpieza siguiente es un hito 28 ni reemplaza el tablero original.
+**TOTAL INALTERADO: 12/27.** Saneamiento transversal: **6/10 tareas ejecutadas**; entrega Android, poda de APK, contrato R2 y QA pendientes. Ninguna tarea de limpieza siguiente es un hito 28 ni reemplaza el tablero original.
 
 ## 4. Fase prioritaria: SANEAMIENTO TRANSVERSAL DE V2
 
 **Objetivo:** resolver la auditoría ANTES de integrar R2. Esta es una lista operativa dentro de B01/B04/H01/S01/S02/Q01, **no una nueva versión ni un plan paralelo**. Cada casilla solo se marca con evidencia, nunca por intención.
 
-- [ ] **S-A — Una sola línea de fuente:** formalizar `havana-nice-v2-foundation` como **única fuente V2**; mantener aislada la rama histórica `main`. No crear más ramas de trabajo ni migrar/reposicionar V1. Revisar configuración y documentación que aún confunde `main` con la fuente actual.
-- [ ] **S-B — Una cadena Android:** reemplazar los dos workflows independientes de build y distribución por **un solo flujo `build → firma/compatibilidad → publicación`** en la misma ejecución, con reintentos acotados para fallos transitorios. Publicar **0.0.10** solo tras demostrar certificado idéntico, `com.havananice.v2`, `versionCode=10` y actualización sobre 0.0.9. Mantener una sola URL vigente de descarga.
-- [ ] **S-B2 — Depuración de binarios:** la rama `havana-nice-v2-apk-downloads` contiene **24 APK históricas (≈1,78 GB)**. No borrar ni deshabilitar descargas existentes hasta que S-B ofrezca entrega y recuperación verificadas. Después retirar instaladores redundantes **de la referencia actual**, conservando únicamente los necesarios y teniendo en cuenta que borrar archivos en Git NO elimina por sí solo objetos del historial.
-- [ ] **S-C — Configuración reproducible del Worker:** `wrangler.jsonc` declara `HAVANA_ENV` pero omite `V2_ADMIN_LOGIN_MODE=enabled`, presente en producción. Sincronizar configuración no secreta y proteger `V2_ADMIN_LOGIN_SECRET` **solo como secret gestionado en Cloudflare**; probar que despliegues futuros no deshabiliten Administrador ni alteren D1/DO.
-- [ ] **S-D — Autenticación sin reglas históricas paralelas:** investigar y, tras pruebas de regresión con usuarios/sesiones existentes, retirar la excepción `single_device_mode=0` y el cierre de sesión heredado si ya no tienen consumidores reales. **Jamás eliminar sesiones activas para simplificar el código.**
-- [ ] **S-E — Retirar automatizaciones de una sola ejecución:** verificar que `expo-video@58.0.12` y su lock ya están fijados; entonces eliminar `.github/workflows/v2-media-deps-once.yml` (workflow de sincronización única que puede escribir en la rama). Conservar pruebas que impiden reintroducir los puentes descartados.
-- [ ] **S-F — Documentación y pruebas congruentes:** corregir `v2/README.md`, que todavía afirma «no hay usuarios ni sesiones» y presenta cifras históricas. `v2/tests/cross-platform/README.md` describe una suite futura pero no la implementa: convertirla en pruebas de verdad cuando alcance Q01, o señalarla claramente como guía. Alinear PLAN, CONTINUIDAD y README sin copiar el mismo tablero tres veces.
-- [ ] **S-G — Higiene de D1 y sesiones:** aplicar una política prudente de caducidad para `chat_admin_sessions` (28 filas históricas, 21 revocadas y ninguna vigente al consultar); eliminar SOLO vencidas/revocadas con comprobaciones, sin afectar músicos, lectores o sesiones válidas.
+- [x] **S-A — Una sola línea de fuente:** formalizar `havana-nice-v2-foundation` como **única fuente V2**; mantener aislada la rama histórica `main`. No crear más ramas de trabajo ni migrar/reposicionar V1. Revisar configuración y documentación que aún confunde `main` con la fuente actual.
+- [ ] **S-B — Una cadena Android:** los dos workflows anteriores se unificaron en `v2-android-apk.yml`, con `build → firma/compatibilidad → publicación`. **Pendiente confirmar la ejecución completa y la entrega de APK 0.0.10** con certificado igual, `com.havananice.v2`, `versionCode=10`; una única URL estable `HAVANA-NICE-V2-LATEST.apk`.
+- [ ] **S-B2 — Depuración de binarios:** la rama `havana-nice-v2-apk-downloads` aún tiene **24 APK históricas (≈1,78 GB)**. El pipeline nuevo las sustituirá **solo tras firmar/verificar la actualización**, dejando `LATEST` y `PREVIOUS`. No confundir el borrado de archivos del HEAD con la eliminación de objetos Git históricos.
+- [x] **S-C — Configuración reproducible del Worker:** `wrangler.jsonc` ya declara `V2_ADMIN_LOGIN_MODE=enabled` y el secreto sigue exclusivamente en Cloudflare; las pruebas de fuente impiden divergencias. Verificar nuevamente al desplegar R2.
+- [x] **S-D — Autenticación sin reglas históricas paralelas:** se retiró la excepción `single_device_mode=0`, el inicio de sesión sin dueño y la ruta de salida heredada de músicos. El Worker final está desplegado con un único control de instalación. **No se eliminaron sesiones de músico.**
+- [x] **S-E — Retirar automatizaciones de una sola ejecución:** `expo-video@58.0.12` y el lock están fijados. Eliminado físicamente `.github/workflows/v2-media-deps-once.yml`; las pruebas prohíben su reaparición.
+- [x] **S-F — Documentación y pruebas congruentes:** corregir `v2/README.md` ya informa los músicos y sesiones reales; se eliminó `v2/tests/cross-platform/README.md` por ser una guía vacía. El Plan Maestro es la única fuente de decisiones; Continuidad solamente registra evidencias.
+- [x] **S-G — Higiene de D1 y sesiones:** aplicar una política prudente de caducidad para `chat_admin_sessions` (28 filas históricas, 21 revocadas, 28 vencidas): se eliminaron las 28 mediante filtro de vencimiento/revocación; quedaron 0 sesiones Admin, 3 músicos, 3 sesiones de músicos y 44 mensajes.
 - [ ] **S-H — Contrato de multimedia futuro:** mantener temporalmente las vistas de fotos/video ya aprobadas pero no las antiguas subidas. Diseñar **un único contrato de subida, lectura y borrado R2** para los tres clientes, evitando adaptadores adicionales y eliminando referencias técnicas cuando sean sustituidas. Esto se implementará dentro de M01/M02/M04, una vez saneado el resto.
 - [ ] **S-I — QA de salida de saneamiento:** CI general en verde, PWA publicada, un solo flujo de APK confirmado, actualización in-place sin pérdida de sesión, login Admin y Chat, un músico por dispositivo, WebSocket, y D1/Worker sin residuo externo. **No instalar/desinstalar por comodidad de pruebas.**
 
 ### Orden obligatorio y dependencias
 
-**Primero:** S-A, S-C, S-E, S-F (higiene y configuración reproducible, sin alterar funciones).  
+**Primero:** S-A, S-C, S-E, S-F — ya ejecutadas y validadas en la fuente.  
 **Segundo:** S-B y S-B2 (unificar publicación antes de depurar APK).  
-**Tercero:** S-D, S-G, S-I (acceso, limpieza segura y QA).  
+**Tercero:** S-D y S-G — ejecutadas; S-I permanece abierto hasta QA y distribución comprobada.  
 **Cuarto:** cuando todo lo anterior esté confirmado, el propietario habilita R2 y comenzamos M01 → M02 → M04 de forma simultánea en Android nativo/PWA/Admin. M03/M05 permanecen aplazados según el plan.
 
 ## 5. Reglas de finalización y preservación
@@ -119,6 +119,6 @@ Actualmente el **único código fuente V2** se desarrolla en `havana-nice-v2-fou
 
 ## 6. Próxima decisión operacional
 
-**Bloque actual: saneamiento S-A a S-I, no R2.** El primer entregable debe ser **un flujo Android único con APK 0.0.10 verificable, configuración Worker sin divergencias y documentación sin afirmaciones falsas**, preservando los 12 hitos cerrados.
+**Bloque actual: terminar S-B, S-B2 y S-I; S-H está ligado a R2.** El primer entregable debe ser **un flujo Android único con APK 0.0.10 verificable, configuración Worker sin divergencias y documentación sin afirmaciones falsas**, preservando los 12 hitos cerrados.
 
 Tras ello: activar R2 Standard privado dentro de la misma cuenta Cloudflare y desarrollar M01/M02/M04 sin migrar archivos de prueba.
