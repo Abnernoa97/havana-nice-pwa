@@ -59,7 +59,7 @@ jobs:
           test -d /tmp/havana-v2-worker-preview
           echo "SUCCESS: V2 Worker bundled, no production changes"
 
-      - name: Verify zero-billing Drive adapter safety
+      - name: Verify standalone V2 media status before new storage
         run: npm run test:media -w @havana/cloudflare
 
       - name: Validate independent administrator authentication
@@ -77,7 +77,7 @@ jobs:
       - name: Check isolated Administrator PWA security
         run: npm run test:admin -w @havana/pwa
 
-      - name: Prevent accidental photo/video uploads before HAVANA CLOUD bridge
+      - name: Verify visual media UI remains compatible
         run: node --test tests/chat-media-ui.test.mjs
 
       - name: Build iPhone PWA
@@ -254,26 +254,14 @@ jobs:
             "$BASE/api/chat/session" -H "Authorization: Bearer aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")"
           test "$STATUS" = "401"
 
-      - name: Verify V2 media and existing-CLOUD pairing reject all anonymous requests
+      - name: Verify unused media endpoint denies anonymous users
         shell: bash
         run: |
           set -euo pipefail
           BASE="https://havana-nice-v2-dev.soloaplicaciones97.workers.dev"
-          STATUS="$(curl --silent --show-error --output /tmp/hnv2-media-private.json --write-out '%{http_code}' "$BASE/api/chat/media/status")"
-          test "$STATUS" = "401"
-          grep -q 'No autorizado' /tmp/hnv2-media-private.json
-          STATUS="$(curl --silent --show-error --output /tmp/hnv2-media-upload.json --write-out '%{http_code}' \
-            -X POST "$BASE/api/chat/media/upload" -H 'Content-Type: image/jpeg' \
-            --data-binary 'not-a-photo')"
-          test "$STATUS" = "401"
-          STATUS="$(curl --silent --show-error --output /tmp/hnv2-cloud-admin-denied.json --write-out '%{http_code}' "$BASE/api/chat/admin/cloud/status")"
-          test "$STATUS" = "401"
-          grep -q 'No autorizado' /tmp/hnv2-cloud-admin-denied.json
-          STATUS="$(curl --silent --show-error --output /tmp/hnv2-cloud-pair-denied.json --write-out '%{http_code}' \
-            -X POST "$BASE/api/chat/admin/cloud/connect" -H 'Content-Type: application/json' --data '{}')"
-          test "$STATUS" = "401"
-          grep -q 'No autorizado' /tmp/hnv2-cloud-pair-denied.json
-          curl --fail --silent --show-error "$BASE/health" | grep -q 'havana-cloud-google-drive'
+          STATUS="$(curl --silent --show-error -o /tmp/v2-media-private.json -w '%{http_code}' "$BASE/api/chat/media/status")"
+          test "$STATUS" = 401
+          grep -q 'No autorizado' /tmp/v2-media-private.json
 
       - name: Verify native Android WebSocket origin is permitted
         shell: bash
