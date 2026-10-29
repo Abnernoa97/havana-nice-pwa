@@ -120,6 +120,7 @@ jobs:
           git diff --cached --check
           git commit -m "Publish single verified HAVANA NICE V2 Android update for $GITHUB_SHA"
           git -c http.postBuffer=524288000 push origin "HEAD:refs/heads/$DEST_BRANCH"
+          cp /tmp/havana-v2-latest.apk HAVANA-NICE-V2-FOUNDATION-STANDALONE.apk
 
       - name: Verify stable direct download
         shell: bash
