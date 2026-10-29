@@ -14,7 +14,7 @@ import * as ImagePicker from 'expo-image-picker';
 import SwipeableBubble, {type BubbleAnchor} from './SwipeableBubble';
 import NativeComposerIcon from './ChatComposerIcon';
 import NativeChatMediaView from './NativeChatMediaView';
-import {uploadNativeOriginal,newMediaUploadId} from './media-upload';
+const newMediaUploadId=()=>String(Date.now())+'-'+Math.random().toString(36).slice(2);
 
 type NativeQueuedMedia=ChatMediaSelection&{id:string;batchIndex?:number};
 
@@ -663,47 +663,9 @@ export default function App() {
     }
   }
 
-  async function sendSelectedMedia(){
-    if(!selectedMedia.length||!session||mediaUploading)return;
-    if(!mediaReady){setMediaError('El almacenamiento de archivos todavía no está configurado.');return;}
-    const batch=mediaBatchId.current||newMediaUploadId();
-    mediaBatchId.current=batch;
-    const items=selectedMedia.map((item,index)=>({...item,batchIndex:item.batchIndex??index}));
-    setSelectedMedia(items);
-    const total=items.reduce((n,item)=>n+item.sizeBytes,0);
-    const confirmed=new Map<string,number>();
-    let next=0;
-    const failures:string[]=[];
-    const report=()=>{
-      const sent=items.reduce((n,item)=>n+(confirmed.get(item.id)||0),0);
-      setMediaProgress(Math.min(100,Math.floor(sent/total*100)));
-    };
-    setMediaUploading(true);setMediaError('');setMediaProgress(0);
-    try{
-      // Bounded parallel originals; each original continues sequentially
-      // through its own protected Google Drive resumable session.
-      const worker=async()=>{
-        while(next<items.length){
-          const item=items[next++];
-          if(!item)break;
-          try{
-            await uploadNativeOriginal(session,item,item.id,batch,item.batchIndex!, (sent)=>{
-              confirmed.set(item.id,sent);report();
-            });
-            confirmed.set(item.id,item.sizeBytes);report();
-            setSelectedMedia(current=>current.filter(x=>x.id!==item.id));
-            syncLatest.current();
-          }catch(reason){
-            failures.push(reason instanceof Error?reason.message:'No se pudo subir');
-          }
-        }
-      };
-      await Promise.all(Array.from({length:Math.min(2,items.length)},()=>worker()));
-      // Preserve failed file IDs and their original batch for recovery.
-      if(!failures.length)mediaBatchId.current=null;
-      else setMediaError(failures[0]+
-        '. Los archivos pendientes siguen disponibles para reintentar.');
-    }finally{setMediaUploading(false);}
+  function sendSelectedMedia(){
+    if(!selectedMedia.length)return;
+    setMediaError('Almacenamiento multimedia no configurado.');
   }
   function send() {
     const text = draft.trim();
