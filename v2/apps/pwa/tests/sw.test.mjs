@@ -10,12 +10,18 @@ function serviceWorkerHarness(fetchImpl = async () => ({ok:true,type:'basic',clo
   const handlers = {};
   const writes = [];
   const removed = [];
+  const assetRemoved = [];
   const existingCaches = new Map();
   const caches = {
     async open(name) {
       return {
         async addAll(keys) { for (const key of keys) existingCaches.set(key, {type:'basic',ok:true}); },
         async put(key, value) { writes.push({name,key,value});existingCaches.set(typeof key==='string'?key:key.url,value); },
+        async keys() {return [...existingCaches.keys()].map(key=>({url:new URL(key,ORIGIN).toString()}));},
+        async delete(key) {
+          const uri=typeof key==='string'?key:key.url;
+          assetRemoved.push(uri);return existingCaches.delete(uri);
+        },
       };
     },
     async keys() {return ['havana-nice-v2-foundation-v1','unrelated-app-cache'];},
@@ -47,7 +53,7 @@ function serviceWorkerHarness(fetchImpl = async () => ({ok:true,type:'basic',clo
     await Promise.all(pending);
     return {handled:Boolean(responded),result};
   }
-  return {dispatch,writes,removed,handlers,caches};
+  return {dispatch,writes,removed,assetRemoved,handlers,caches};
 }
 
 test('never intercept chat API even on same origin',async()=>{
@@ -78,6 +84,24 @@ test('cache only approved same-origin application assets',async()=>{
   assert.equal(c.handled,true);
   assert.equal(sw.writes.length,3);
   assert.equal(sw.writes[2].key,'/');
+});
+
+test('many deployments retain only the newest 40 static assets, not unlimited hashes',async()=>{
+ const sw=serviceWorkerHarness();
+ for(let i=0;i<45;i++){
+  const path='/assets/index-'+String(i).padStart(2,'0')+'.js';
+  await sw.dispatch({url:ORIGIN+path});
+ }
+ const cache=await sw.caches.open('havana-nice-v2-static-v4');
+ const latest=await cache.keys();
+ const assets=latest.filter(x=>x.url.includes('/assets/'));
+ assert.equal(assets.length,40);
+ assert.equal(sw.assetRemoved.length,5);
+ assert.ok(sw.assetRemoved.every(x=>x.startsWith(ORIGIN+'/assets/index-')));
+ assert.equal(await sw.caches.match(ORIGIN+'/assets/index-00.js'),null);
+ assert.ok(await sw.caches.match(ORIGIN+'/assets/index-44.js'));
+ // Static caching must not intercept a private API even after pruning.
+ assert.equal((await sw.dispatch({url:ORIGIN+'/api/chat/messages'})).handled,false);
 });
 
 test('replace old V2 caches without deleting unrelated app caches',async()=>{
