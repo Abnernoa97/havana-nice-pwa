@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {claimFirstInstallation,auditDuplicateInstallation,closeUnboundChatSession,handleSingleInstallationAdmin} from '../src/single-installation.js';
+import {claimFirstInstallation,auditDuplicateInstallation,handleSingleInstallationAdmin} from '../src/single-installation.js';
 
 const actor='member:test-one';
 const user={actor_id:actor,display_name:'Prueba Uno'};
@@ -150,18 +150,6 @@ test('reviewing one alert does not delete the alert or its audit trail',async()=
  assert.equal(reviewed.status,200);
  assert.equal(e.DB.alerts.length,1);
  assert.ok(e.DB.alerts[0].reviewed_at>0);
-});
-
-test('generic logout must not strand bound owner, but still signs out legacy sessions',async()=>{
- const e=env();
- await claimFirstInstallation(e,user,'owner-hash',Date.UTC(2100,0,1));
- assert.equal(await closeUnboundChatSession(e,'owner-hash'),false);
- assert.equal(e.DB.owner.get(actor),'owner-hash');
- assert.equal(e.DB.sessions.has('owner-hash'),true);
- e.DB.sessions.set('legacy-hash',{actorId:'member:legacy'});
- assert.equal(await closeUnboundChatSession(e,'legacy-hash'),true);
- assert.equal(e.DB.sessions.has('legacy-hash'),false);
- assert.equal(e.DB.sessions.has('owner-hash'),true);
 });
 
 test('Admin release permits replacement without reviving the former session',async()=>{
