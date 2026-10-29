@@ -7,13 +7,14 @@ on:
     branches: [havana-nice-v2-foundation]
     paths:
       - 'v2/apps/android/app.json'
+      - '.github/workflows/v2-android-apk.yml'
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
-  group: havana-nice-v2-android-apk
+  group: havana-nice-v2-build-and-publish
   cancel-in-progress: true
 
 jobs:
@@ -72,7 +73,71 @@ jobs:
           cp v2/apps/android/android/app/build/outputs/apk/release/app-release.apk \
              HAVANA-NICE-V2-FOUNDATION-STANDALONE.apk
 
-      - name: Upload APK
+      - name: Verify previous signed APK before publishing
+        shell: bash
+        run: |
+          set -euo pipefail
+          DEST_BRANCH=havana-nice-v2-apk-downloads
+          APK=HAVANA-NICE-V2-FOUNDATION-STANDALONE.apk
+          NEW=HAVANA-NICE-V2-LATEST.apk
+          git fetch origin "$DEST_BRANCH"
+          RECORD="$(git show FETCH_HEAD:SHA256SUMS.txt |
+            grep -E '^[0-9a-f]{64}  HAVANA-NICE-V2-(LATEST|ANDROID-[0-9a-f]{12})\\.apk$' | tail -n 1)"
+          test -n "$RECORD"
+          read -r PREVIOUS_SHA PREVIOUS_NAME <<< "$RECORD"
+          git show "FETCH_HEAD:$PREVIOUS_NAME" > /tmp/havana-v2-previous.apk
+          echo "$PREVIOUS_SHA  /tmp/havana-v2-previous.apk" | sha256sum -c -
+          SDK_BUILD_TOOLS="$(find "${ANDROID_HOME:-$ANDROID_SDK_ROOT}/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+          "$SDK_BUILD_TOOLS/apksigner" verify "$APK"
+          "$SDK_BUILD_TOOLS/apksigner" verify /tmp/havana-v2-previous.apk
+          python3 v2/scripts/apk-signature-gate.py /tmp/havana-v2-previous.apk "$APK"
+          previous_code="$("$SDK_BUILD_TOOLS/aapt" dump badging /tmp/havana-v2-previous.apk | sed -nE "s/.*versionCode='([0-9]+)'.*/\\1/p" | head -n 1)"
+          current_code="$("$SDK_BUILD_TOOLS/aapt" dump badging "$APK" | sed -nE "s/.*versionCode='([0-9]+)'.*/\\1/p" | head -n 1)"
+          [[ "$previous_code" =~ ^[0-9]+$ ]]
+          [[ "$current_code" =~ ^[0-9]+$ ]]
+          test "$current_code" -gt "$previous_code"
+          "$SDK_BUILD_TOOLS/aapt" dump badging "$APK" | grep -F "package: name='com.havananice.v2'" >/dev/null
+          cp "$APK" /tmp/havana-v2-latest.apk
+          echo "Compatible signed update: versionCode $previous_code -> $current_code"
+          sha256sum /tmp/havana-v2-previous.apk /tmp/havana-v2-latest.apk
+
+      - name: Publish one stable download (and one verified rollback APK)
+        shell: bash
+        run: |
+          set -euo pipefail
+          DEST_BRANCH=havana-nice-v2-apk-downloads
+          git config user.name havana-nice-v2-automation
+          git config user.email actions@users.noreply.github.com
+          git fetch origin "$DEST_BRANCH"
+          git switch -C "$DEST_BRANCH" FETCH_HEAD
+          # Do not keep 24 obsolete binary variants in the live branch.
+          find . -maxdepth 1 -name '*.apk' -type f -delete
+          cp /tmp/havana-v2-previous.apk HAVANA-NICE-V2-PREVIOUS.apk
+          cp /tmp/havana-v2-latest.apk HAVANA-NICE-V2-LATEST.apk
+          sha256sum HAVANA-NICE-V2-PREVIOUS.apk HAVANA-NICE-V2-LATEST.apk > SHA256SUMS.txt
+          printf 'HAVANA NICE V2: a single signed Android APK, updated in place.\\nPublished source: %s\\nLatest: HAVANA-NICE-V2-LATEST.apk\\nPrevious verified rollback: HAVANA-NICE-V2-PREVIOUS.apk\\n' "$GITHUB_SHA" > README.txt
+          git add -A
+          git diff --cached --check
+          git commit -m "Publish single verified HAVANA NICE V2 Android update for $GITHUB_SHA"
+          git -c http.postBuffer=524288000 push origin "HEAD:refs/heads/$DEST_BRANCH"
+
+      - name: Verify stable direct download
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL="https://raw.githubusercontent.com/$GITHUB_REPOSITORY/havana-nice-v2-apk-downloads/HAVANA-NICE-V2-LATEST.apk"
+          for attempt in $(seq 1 12); do
+            HTTP="$(curl -L --connect-timeout 10 --max-time 20 -s -o /dev/null -w '%{http_code}' -I "$URL" || true)"
+            if [ "$HTTP" = 200 ]; then
+              echo "V2 latest signed APK available: $URL"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Android update not confirmed available" >&2
+          exit 1
+
+      - name: Upload signed APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: HAVANA-NICE-V2-FOUNDATION-STANDALONE-APK
