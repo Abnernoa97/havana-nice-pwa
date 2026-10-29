@@ -3,7 +3,7 @@
 **Auditoría cruzada y consolidación: 29 de octubre de 2026.**  
 **Fuente de desarrollo única:** repositorio `Abnernoa97/havana-nice-pwa`, rama `havana-nice-v2-foundation`.  
 **Tablero inalterado:** **12/27 hitos cerrados (44,4 %) · 15 abiertos**.  
-**Estado:** Chat/Administrador base conservados; ocho tareas de saneamiento ejecutadas. Android 0.0.10 firmado, publicado y disponible; QA físico y contrato R2 todavía pendientes.  
+**Estado:** Chat/Administrador base conservados; saneamiento 10/10 cerrado. Android 0.0.10 firmado y publicado, con instalación confirmada por el propietario. Contrato R2 diseñado, no implementado; Q01 pendiente.  
 **Documento auxiliar:** [CONTINUIDAD-EXACTA.md](./CONTINUIDAD-EXACTA.md) es únicamente una bitácora de estado y relevo; **este archivo es el único plan de decisiones, hitos y prioridades**.
 
 ## 1. Objetivo y arquitectura que no se negocian
@@ -132,7 +132,7 @@ Actualmente el **único código fuente V2** se desarrolla en `havana-nice-v2-fou
 
 **Primero:** S-A, S-C, S-E, S-F — ya ejecutadas y validadas en la fuente.  
 **Segundo:** S-B y S-B2 — ejecutadas, publicación y dos binarios verificados.  
-**Tercero:** S-D y S-G — ejecutadas; S-I permanece abierto hasta QA y distribución comprobada.  
+**Tercero:** S-D y S-G ejecutadas; S-I se cerró con confirmación de actualización del propietario. Q01 conserva la validación integral.  
 **Cuarto:** S-H ya definió la arquitectura única R2; cuando S-I esté validado y el propietario habilite R2, comenzamos M01 → M02 → M04 en Android nativo/PWA/Admin. M03/M05 permanecen aplazados según el plan.
 
 ## 5. Reglas de finalización y preservación
