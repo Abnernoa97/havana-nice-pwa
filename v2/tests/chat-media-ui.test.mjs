@@ -113,18 +113,12 @@ test('Emoji stays enabled; microphone is informative until M03',()=>{
  assert.doesNotMatch(pwa,/getUserMedia|MediaRecorder/);
 });
 
-test('Cloud is an untouched existing product: no proposed service binding or unused lab bridge',()=>{
+test('V2 does not contain an external storage service binding',()=>{
  const config=JSON.parse(read('cloudflare/wrangler.jsonc'));
  assert.equal(config.name,'havana-nice-v2-dev');
- assert.equal(config.vars?.V2_CLOUD_LINK_ENABLED,'enabled','One-time storage pairing is administered solely within V2');
- assert.equal(config.vars?.V2_CLOUD_MEDIA_ENABLED,'enabled','Source is ready for V2 deploy; all media requests remain denied until owner pairs Cloud');
- assert.deepEqual(config.services||[],[{
-  binding:'HAVANA_CLOUD_BRIDGE',service:'havana-nice-cloud'
- }],'Caller-only V2 service binding may invoke the published Cloud endpoints without changing Cloud');
- assert.equal(existsSync(new URL('../cloudflare/src/havana-cloud-bridge-client.js',import.meta.url)),false,
-   'Obsolete unused Cloud-private bridge module must remain deleted');
- const contract=read('cloudflare/src/unified-media.js');
- assert.match(contract,/maxFilesPerSend:MAX_BATCH_FILES/,'Retain the accepted five-file media policy');
+ assert.deepEqual(config.services||[],[]);
+ assert.equal(config.vars?.V2_CLOUD_LINK_ENABLED,undefined);
+ assert.equal(config.vars?.V2_CLOUD_MEDIA_ENABLED,undefined);
 });
 
 test('Faster batches are strictly bounded: two original files concurrently, ordered resumable chunks per file',()=>{
