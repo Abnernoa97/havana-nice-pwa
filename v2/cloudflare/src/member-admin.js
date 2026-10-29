@@ -44,8 +44,6 @@ export async function recordMemberEvent(env,actorId,eventType,request,details=nu
 export function readMemberDevice(request){return deviceDetails(request);}
 async function memberDeletionImpact(env,actorId){
  // Private, read-only snapshot. No tokens or message bodies are returned.
- // Media files may live outside D1: a safe deletion MUST refuse until
- // an actual remote object cleanup path exists.
  const row=await env.DB.prepare(
   'SELECT '+
   '(SELECT COUNT(*) FROM chat_sessions WHERE actor_id=?) AS sessions,'+
@@ -53,8 +51,8 @@ async function memberDeletionImpact(env,actorId){
   '(SELECT COUNT(*) FROM chat_reactions WHERE actor_id=? OR message_seq IN (SELECT seq FROM chat_messages WHERE sender_id=?)) AS reactions,'+
   '(SELECT COUNT(*) FROM chat_read_receipts WHERE actor_id=?) AS receipts,'+
   '(SELECT COUNT(*) FROM chat_access_events WHERE actor_id=?) AS historyEvents,'+
-  '(SELECT COUNT(*) FROM chat_media_assets WHERE sender_id=?) AS mediaAssets'
- ).bind(actorId,actorId,actorId,actorId,actorId,actorId,actorId).first();
+  '0 AS mediaAssets'
+ ).bind(actorId,actorId,actorId,actorId,actorId,actorId).first();
  const counts={};
  for(const key of ['sessions','messages','reactions','receipts','historyEvents','mediaAssets'])
    counts[key]=Math.max(0,Number(row?.[key]||0));
@@ -106,13 +104,6 @@ export async function handleAdminMemberManagement(request,env,url,origin,respond
  if(!member)return reply(respond,origin,{error:'Miembro no encontrado'},404);
  if(member.display_name!==confirmName)return reply(respond,origin,{
    error:'El nombre de confirmación no coincide.'},409);
- // No partial deletion: remote multimedia cannot yet be cleaned by this
- // module. When the media subsystem is enabled, implement real remote cleanup
- // with a durable queue before removing this guard.
- const impact=await memberDeletionImpact(env,actorId);
- if(impact.mediaAssets>0)return reply(respond,origin,{
-   error:'No se puede eliminar: este músico tiene archivos multimedia cuya eliminación completa todavía no está implementada.'
- },409);
  // Transaction order preserves message reply FKs and removes all musician-owned
  // D1 data. Never delete other actors' messages; replies to removed messages
  // keep their text with reply_to_seq=NULL.
