@@ -140,7 +140,7 @@ test('only Administrator-created active names reach the session-minting endpoint
  const app=read('../src/App.tsx');
  assert.match(app,/startNamedChatSession\(name\.trim\(\)\)/);
  const login=index.indexOf("if (url.pathname === '/api/chat/session' && request.method === 'POST')");
- const lookup=index.indexOf("SELECT username,actor_id,display_name,single_device_mode FROM chat_members WHERE username=? AND active=1",login);
+ const lookup=index.indexOf("SELECT username,actor_id,display_name FROM chat_members WHERE username=? AND active=1",login);
  const denial=index.indexOf("if (!member) return respond({ error: 'Tu nombre todavía no está autorizado.",lookup);
  const mint=index.indexOf("const session=await createSession(env,member,request);",denial);
  assert.ok(login>=0 && lookup>login && denial>lookup && mint>denial,
@@ -247,7 +247,7 @@ test('one-musician one-installation alerts never display bearer tokens and relea
  assert.match(panel,/No se borrarán sus mensajes/);
  assert.match(api,/adminDuplicateLogins\(token:string\)/);
  assert.match(api,/authenticated\(token\)/);
- assert.match(worker,/single_device_mode/);
+ assert.doesNotMatch(worker,/single_device_mode/);
  assert.match(worker,/code:'name_already_bound'/);
  assert.match(worker,/claimFirstInstallation/);
  assert.doesNotMatch(panel,/token_hash|installation_secret|cf-connecting-ip/i);
