@@ -12,6 +12,8 @@ export interface NativeLocalChat {
   editing?: ChatMessage | null;
   beforeEdit?: { draft:string; replyTo:ChatMessage|null } | null;
 }
+// Persistent storage identifier shared with installed Android 0.0.10. Do not
+// rename for cleanup: it would orphan the existing session, drafts and outbox.
 const KEY = 'havana-v2-chat-local-v1';
 
 export async function loadNativeLocalChat(): Promise<NativeLocalChat | null> {
