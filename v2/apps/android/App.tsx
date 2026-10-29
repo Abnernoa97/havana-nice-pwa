@@ -14,7 +14,7 @@ import * as ImagePicker from 'expo-image-picker';
 import SwipeableBubble, {type BubbleAnchor} from './SwipeableBubble';
 import NativeComposerIcon from './ChatComposerIcon';
 import NativeChatMediaView from './NativeChatMediaView';
-const newMediaUploadId=()=>String(Date.now())+'-'+Math.random().toString(36).slice(2);
+const newMediaSelectionId=()=>String(Date.now())+'-'+Math.random().toString(36).slice(2);
 
 type NativeQueuedMedia=ChatMediaSelection&{id:string};
 
@@ -85,7 +85,7 @@ export default function App() {
         const sizeBytes=asset.fileSize??0;
         const issue=validateChatMediaSelection({kind:pickedKind,name,mimeType,sizeBytes});
         if(issue){setMediaError(name+': '+issue);return;}
-        additions.push({id:newMediaUploadId(),kind:pickedKind,source,uri:asset.uri,name,mimeType,sizeBytes});
+        additions.push({id:newMediaSelectionId(),kind:pickedKind,source,uri:asset.uri,name,mimeType,sizeBytes});
       }
       setSelectedMedia(previous=>[...previous,...additions]);
     }catch{
