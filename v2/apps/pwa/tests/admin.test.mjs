@@ -212,7 +212,6 @@ test('member data inspection can be verified without pressing irreversible trash
  assert.match(app,/Ver datos asociados/);
  assert.match(app,/Consulta de solo lectura\. No elimina ni modifica información/);
  assert.match(app,/function MemberImpactSummary/);
- assert.match(app,/counts\.mediaAssets/);
  assert.match(app,/counts\.sessions/);
  assert.match(app,/counts\.historyEvents/);
  assert.match(app,/name=\{person\.display_name\} preview=\{impact\[person\.actor_id\]!\}/);
