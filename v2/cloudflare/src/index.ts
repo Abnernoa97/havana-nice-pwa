@@ -377,9 +377,12 @@ export default {
     }
     // No multimedia backend is configured. Only authenticated clients may read availability.
     if (url.pathname.startsWith('/api/chat/media/')) {
+      // A future private R2 object is readable by an authorized musician OR
+      // Administrator. Both roles share this single authentication boundary.
       const token=(request.headers.get('authorization')||'').replace(/^Bearer\s+/i,'');
-      const session=await verifySession(env,token);
-      if(!session)return respond({error:'No autorizado'},401,origin);
+      const member=await verifySession(env,token);
+      if(!member&&!await verifyAdminSession(request,env))
+        return respond({error:'No autorizado'},401,origin);
       if(url.pathname==='/api/chat/media/status'&&request.method==='GET')
         return respond({enabled:false,maxFilesPerSend:5},200,origin);
       return respond({error:'Almacenamiento multimedia no configurado'},503,origin);
