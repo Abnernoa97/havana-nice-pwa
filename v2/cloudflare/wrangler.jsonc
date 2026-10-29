@@ -4,7 +4,8 @@
   "main": "./src/index.ts",
   "compatibility_date": "2026-10-23",
   "vars": {
-    "HAVANA_ENV": "development"
+    "HAVANA_ENV": "development",
+    "V2_ADMIN_LOGIN_MODE": "enabled"
   },
   "d1_databases": [
     {
