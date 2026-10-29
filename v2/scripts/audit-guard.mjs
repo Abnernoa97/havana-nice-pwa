@@ -88,10 +88,10 @@ present(worker,/if \(!member\) return respond\(\{ error: 'Tu nombre todavía no 
   'Unknown names must not be enrolled automatically');
 present(worker,/const claimed=await claimFirstInstallation/,
   'Every musician must pass the single-installation guard');
-absent(worker,/single_device_mode=0|closeUnboundChatSession/,
+absent(worker,/single_device_mode|closeUnboundChatSession/,
   'No legacy multi-device bypasses permitted');
 present(worker,/INSERT OR IGNORE INTO chat_members\(username,actor_id,display_name,active,single_device_mode\) VALUES\(\?,\?,\?,1,1\)/,
-  'New musician records must always require the one-installation mode');
+  'New musician records must use one Administrator-only enrollment path; every login claims its sole owner');
 present(android,/restoreNamedChatSession/,'Android must restore only authorized remembered sessions');
 present(pwa,/restoreNamedChatSession/,'PWA must restore only authorized remembered sessions');
 
