@@ -7,7 +7,7 @@ test('V2 has no external storage bridge or authorization routes',()=>{
  const cfg=JSON.parse(src('wrangler.jsonc'));
  assert.equal(cfg.name,'havana-nice-v2-dev');
  assert.equal(cfg.services,undefined);
- assert.deepEqual(Object.keys(cfg.vars||{}),['HAVANA_ENV']);
+ assert.deepEqual(cfg.vars,{HAVANA_ENV:'development',V2_ADMIN_LOGIN_MODE:'enabled'});
  const worker=src('src/index.ts');
  assert.doesNotMatch(worker,/attachChatMedia|handleCloudLinkAdmin/);
  assert.match(worker,/media: 'not-configured'/);
