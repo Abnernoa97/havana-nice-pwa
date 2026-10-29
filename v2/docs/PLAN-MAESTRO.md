@@ -1,6 +1,6 @@
 # HAVANA NICE V2 — PLAN MAESTRO ÚNICO
 
-**Continuidad vigente: 29 de octubre de 2026 — decisión R2 para M01/M02 y QA pendiente de Android 0.0.9/M04.** Este documento **sustituye íntegramente el Plan Maestro anterior** en su misma ubicación, sin segundo plan ni anexos contradictorios. Mantener los **27 hitos originales**. La descripción técnica operativa para el siguiente chat está en [CONTINUIDAD-EXACTA.md](./CONTINUIDAD-EXACTA.md), también sustituida en el mismo lugar.
+**Continuidad vigente: 29 de octubre de 2026 — retiro autorizado del enlace multimedia V2 con almacenamiento externo, previo a R2.** Este documento **sustituye íntegramente el Plan Maestro anterior** en su misma ubicación, sin segundo plan ni anexos contradictorios. Mantener los **27 hitos originales**. La descripción técnica operativa para el siguiente chat está en [CONTINUIDAD-EXACTA.md](./CONTINUIDAD-EXACTA.md), también sustituida en el mismo lugar.
 
 ## LEER PRIMERO — Punto exacto de continuidad
 
