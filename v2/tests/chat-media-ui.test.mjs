@@ -172,6 +172,20 @@ test('Native photo uses a fully verified local cache and modal without a browser
  assert.doesNotMatch(native,/Linking\.openURL|media\.name\} ·|Reproducir video/);
  assert.match(native,/setPhoto\(cached\.uri\)/);
 });
+test('Native photo-cache housekeeping touches only stale incomplete V2 transfers',()=>{
+ const native=read('apps/android/NativeChatMediaView.tsx');
+ assert.match(native,/PARTIAL_TRANSFER_TTL=24\*60\*60\*1000/);
+ assert.match(native,/function pruneAbandonedPhotoTransfers\(\)/);
+ assert.match(native,/Paths\.cache\.list\(\)/);
+ assert.match(native,/entry instanceof File/);
+ assert.match(native,/entry\.modificationTime/);
+ assert.match(native,/hn-v2-photo-transfer-/);
+ assert.match(native,/\.part\$/);
+ assert.match(native,/if\(now-lastPartialTransferSweep<PARTIAL_TRANSFER_TTL\)return/);
+ assert.match(native,/cached\.exists&&cached\.size===media\.sizeBytes/);
+ assert.doesNotMatch(native,/Paths\.cache\.delete\(\)|hn-v2-chat-photo-.*\.delete\(/);
+});
+
 test('Web/Admin originals are fully downloaded once before opening, without forced gray letterboxes',()=>{
  const web=read('apps/pwa/src/ChatMediaView.tsx');
  const css=read('apps/pwa/src/styles.css');
