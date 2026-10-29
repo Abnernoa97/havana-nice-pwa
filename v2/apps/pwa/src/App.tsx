@@ -115,7 +115,7 @@ export default function App() {
   },[session?.token]);
   async function sendSelectedMedia(){
     if(!session||!mediaQueue.current.length||mediaUploading)return;
-    if(!mediaReady){setMediaError('HAVANA CLOUD todavía no está enlazada.');return;}
+    if(!mediaReady){setMediaError('El almacenamiento de archivos todavía no está configurado.');return;}
     const batch=mediaBatchId.current||crypto.randomUUID();
     mediaBatchId.current=batch;
     const items=mediaQueue.current.map((item,index)=>({
@@ -839,7 +839,7 @@ export default function App() {
               </div>
               <button type="button" disabled={mediaUploading} aria-label={'Quitar '+item.selection.name} onClick={()=>removeSelectedMedia(item.id)}>✕</button>
             </div>)}
-            <small>{mediaUploading?'Subiendo '+mediaProgress+'%':mediaReady?'Originales listos para enviar':'La subida a HAVANA CLOUD aún no está habilitada.'}</small>
+            <small>{mediaUploading?'Subiendo '+mediaProgress+'%':mediaReady?'Originales listos para enviar':'Almacenamiento de archivos aún no configurado.'}</small>
           </div>}
           {mediaError&&<p className="chat-media-error" role="alert">{mediaError}</p>}
           <form className="chat-composer" onSubmit={event=>{event.preventDefault();if(selectedMedia.length&&!editing)void sendSelectedMedia();else send();}}>
