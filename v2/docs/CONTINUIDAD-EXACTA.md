@@ -10,7 +10,7 @@
 
 ## Avance comprobado
 
-- **27 hitos oficiales:** 12 cerrados, 15 abiertos. **Saneamiento transversal: 8/10** (S-A, S-B, S-B2, S-C, S-D, S-E, S-F, S-G). Pendientes S-H — contrato R2 y S-I — QA de actualización física y conjunto Chat/Admin.
+- **27 hitos oficiales:** 12 cerrados, 15 abiertos. **Saneamiento transversal: 9/10** (S-A, S-B, S-B2, S-C, S-D, S-E, S-F, S-G, S-H). Solo S-I sigue abierto: prueba física de actualización 0.0.9→0.0.10 y QA de Chat/Admin/sesiones. S-H es únicamente el diseño del contrato de R2, NO su instalación.
 - **S-C (config):** `v2/cloudflare/wrangler.jsonc` declara `HAVANA_ENV=development` y `V2_ADMIN_LOGIN_MODE=enabled`. `V2_ADMIN_LOGIN_SECRET` solo está como secreto remoto; D1 y `CHAT_ROOMS` están enlazados. CI prohíbe otro Service Binding y una configuración Admin incompleta.
 - **S-D (acceso):** eliminado el acceso de sesión heredada sin dueño, la excepción `single_device_mode=0` y su antigua ruta DELETE de músico. La sesión de cada nombre se conserva mediante un solo dispositivo. El Administrador sigue teniendo su propia sesión/credencial y la acción exclusiva de liberar el dispositivo. Worker `havana-nice-v2-dev` **versión `0b563838-5b5f-48ca-bb85-82297a52eee6` desplegada al 100 %**, validada previamente con el secreto existente, D1 y Durable Object.
 - **S-E (automatizaciones):** eliminado físicamente `.github/workflows/v2-media-deps-once.yml`; `expo-video@58.0.12` permanece exactamente fijado en manifest y lock. Existe ya una protección de CI que exige solo `v2-foundation-check.yml` y `v2-android-apk.yml`.
@@ -24,7 +24,8 @@
 
 1. **Completado:** Android unificado compiló/publicó APK 0.0.10 con firma y versión compatibles. No rehacer flujo ni crear más ramas.
 2. **Completado:** rama de binarios contiene solo LATEST y PREVIOUS, la fuente está en la rama V2 única.
-3. Verificar versión PWA publicada, Chat/Administrador, las sesiones ya existentes y WebSockets sin regresión. Prueba física de actualización Android 0.0.9→0.0.10 necesaria para Q01/S-I.
+3. **Pendiente S-I:** instalar la APK 0.0.10 encima de la existente sin borrar caché, validar Chat/Administrador, sesión, WebSocket y bloqueo de acceso duplicado; cerrar solamente con prueba física.
+4. **S-H definido:** contrato único de archivos en Plan Maestro con un Worker V2, una tabla D1 y un bucket R2 privado; todavía no existe el bucket. GET R2 devolvió 403/10042 indicando que el propietario debe habilitar el servicio en Cloudflare.
 4. Solo entonces el propietario habilita R2 Standard gratuito y se implementan M01/M02/M04 en la misma API sin intermediarios.
 
 **Regla:** nada de APK múltiples, caché reiniciada por comodidad, nuevos repositorios, ramas de trabajo o integración con aplicaciones independientes. No presentar R2 como activo ni los hitos M01/M02 como cerrados.
