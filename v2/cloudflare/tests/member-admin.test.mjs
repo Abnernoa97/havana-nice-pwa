@@ -7,7 +7,7 @@ const token='Q'.repeat(43),actor='member:orly';
 const digest=async value=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value)))]
   .map(x=>x.toString(16).padStart(2,'0')).join('');
 class FakeDB{
- constructor(){this.members=new Map([[actor,{actor_id:actor,display_name:'Orly'}]]);this.statements=[];this.sessionHash='';this.revoked=false;this.mediaAssets=0;}
+ constructor(){this.members=new Map([[actor,{actor_id:actor,display_name:'Orly'}]]);this.statements=[];this.sessionHash='';this.revoked=false;}
  prepare(sql){
   return {bind:(...args)=>({
     first:async()=>{
@@ -15,9 +15,7 @@ class FakeDB{
       if(sql.startsWith('SELECT actor_id,display_name FROM chat_members'))return this.members.get(args[0])||null;
       if(sql.startsWith('SELECT actor_id FROM chat_members'))return this.members.get(args[0])||null;
       if(sql.startsWith('SELECT COUNT(*) AS entries'))return {entries:2};
-      if(sql.includes('AS mediaAssets')){
-        return {sessions:2,messages:3,reactions:1,receipts:1,historyEvents:4,mediaAssets:0};
-      }
+
       throw Error('Unexpected first: '+sql);
     },
     all:async()=>{
@@ -175,7 +173,7 @@ test('member delete preview requires Admin auth and never mutates data',async()=
  assert.equal(result.body.displayName,'Orly');
  assert.equal(result.body.canDelete,true);
  assert.deepEqual(result.body.counts,{
-  sessions:2,messages:3,reactions:1,receipts:1,historyEvents:4,mediaAssets:0
+  sessions:2,messages:3,reactions:1,receipts:1,historyEvents:4
  });
  assert.equal(e.DB.statements.length,0);
  assert.equal(e.DB.members.size,1);
