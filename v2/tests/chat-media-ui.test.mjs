@@ -14,6 +14,18 @@ test('One shared photo/video original quality policy; runtime Worker controls en
  assert.doesNotMatch(src,/audio\/mpeg|mimeTypes:\['audio\//);
 });
 
+test('Android and PWA share one authenticated media-availability fetch without obsolete upload state',()=>{
+ const shared=read('packages/shared/src/index.ts');
+ assert.match(shared,/export async function getChatMediaAvailability/);
+ assert.match(shared,/cache:'no-store'/);
+ for(const path of ['apps/android/App.tsx','apps/pwa/src/App.tsx']){
+  const source=read(path);
+  assert.match(source,/getChatMediaAvailability\(session\)/);
+  assert.doesNotMatch(source,/mediaUploading|setMediaUploading|mediaProgress|setMediaProgress|mediaBatchId|batchIndex/);
+  assert.doesNotMatch(source,/fetch\(HAVANA_V2_DEV_API_BASE_URL\+'\/api\/chat\/media\/status'/);
+ }
+});
+
 test('PWA attachment menu only offers Fotos and Video, with distinct media filters',()=>{
  const src=read('apps/pwa/src/App.tsx');
  const css=read('apps/pwa/src/styles.css');
