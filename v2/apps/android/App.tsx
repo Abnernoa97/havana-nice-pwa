@@ -16,7 +16,7 @@ import NativeComposerIcon from './ChatComposerIcon';
 import NativeChatMediaView from './NativeChatMediaView';
 const newMediaUploadId=()=>String(Date.now())+'-'+Math.random().toString(36).slice(2);
 
-type NativeQueuedMedia=ChatMediaSelection&{id:string;batchIndex?:number};
+type NativeQueuedMedia=ChatMediaSelection&{id:string};
 
 export default function App() {
   const {width: viewportWidth, height: viewportHeight} = useWindowDimensions();
@@ -30,10 +30,7 @@ export default function App() {
   const [selectedMedia,setSelectedMedia]=useState<NativeQueuedMedia[]>([]);
   const [mediaError,setMediaError]=useState('');
   const [mediaPicking,setMediaPicking]=useState(false);
-  const [mediaUploading,setMediaUploading]=useState(false);
-  const [mediaProgress,setMediaProgress]=useState(0);
   const [mediaReady,setMediaReady]=useState(false);
-  const mediaBatchId=useRef<string|null>(null);
   const [error, setError] = useState('');
   const [connection, setConnection] = useState('desconectado');
   const [joining, setJoining] = useState(false);
@@ -56,7 +53,7 @@ export default function App() {
   const scroll = useRef<React.ElementRef<typeof ScrollView> | null>(null);
   const chooseNativeMedia=async(source:ChatMediaSource,kind?:ChatMediaKind)=>{
     setComposerPanel(null);setMediaError('');Keyboard.dismiss();
-    if(mediaPicking||mediaUploading||mediaBatchId.current)return;
+    if(mediaPicking)return;
     const free=CHAT_MEDIA_MAX_PER_SEND-selectedMedia.length;
     if(free<1){setMediaError('Máximo 5 archivos entre Fotos y Video por envío.');return;}
     setMediaPicking(true);
@@ -929,18 +926,18 @@ export default function App() {
                      <Text style={styles.mediaName} numberOfLines={1}>{item.name}</Text>
                      <Text style={styles.mediaHint}>{item.kind==='photo'?'Fotografía':'Video'} · {(item.sizeBytes/1048576).toFixed(1)} MB</Text>
                    </View>
-                   <Pressable disabled={mediaUploading} accessibilityRole="button"
+                   <Pressable accessibilityRole="button"
                      accessibilityLabel={'Quitar '+item.name}
                      onPress={()=>{
                        const remaining=selectedMedia.filter(x=>x.id!==item.id);
-                       if(!remaining.length)mediaBatchId.current=null;
+                       
                        setSelectedMedia(remaining);setMediaError('');
                      }}>
                      <Text style={styles.mediaClose}>✕</Text>
                    </Pressable>
                  </View>)}
                </ScrollView>
-               <Text style={styles.mediaHint}>{mediaUploading?'Subiendo '+mediaProgress+'%':mediaReady?'Originales listos para enviar':'Almacenamiento de archivos aún no configurado.'}</Text>
+               <Text style={styles.mediaHint}>{mediaReady?'Originales listos para enviar':'Almacenamiento de archivos aún no configurado.'}</Text>
              </View>}
               {!!mediaError&&<Text style={styles.mediaError}>{mediaError}</Text>}
              <View style={styles.composer}>
@@ -956,19 +953,19 @@ export default function App() {
                    placeholder={connection==='en vivo'?'Mensaje':'Sin conexión: se enviará después…'}
                    placeholderTextColor="#85898a"/>
                  <Pressable accessibilityRole="button" accessibilityLabel="Adjuntar fotografía o video"
-                   accessibilityState={{expanded:composerPanel==='attachments'}} disabled={mediaUploading} style={styles.composerIcon}
+                   accessibilityState={{expanded:composerPanel==='attachments'}} style={styles.composerIcon}
                    onPress={()=>{Keyboard.dismiss();setComposerPanel(v=>v==='attachments'?null:'attachments');}}>
                    <NativeComposerIcon name="clip"/>
                  </Pressable>
                  <Pressable accessibilityRole="button" accessibilityLabel="Abrir cámara"
-                   disabled={mediaPicking||mediaUploading} style={styles.composerIcon}
+                   disabled={mediaPicking} style={styles.composerIcon}
                    onPress={()=>void chooseNativeMedia('camera')}>
                    <NativeComposerIcon name="camera"/>
                  </Pressable>
                </View>
                {draft.trim()||editing||selectedMedia.length>0
                  ?<Pressable accessibilityRole="button" accessibilityLabel={editing?'Guardar mensaje':selectedMedia.length?'Enviar archivos originales':'Enviar mensaje'}
-                    onPress={()=>selectedMedia.length&&!editing?void sendSelectedMedia():send()} disabled={mediaUploading||savingEdit||(!selectedMedia.length&&!draft.trim())} style={styles.sendCircle}>
+                    onPress={()=>selectedMedia.length&&!editing?void sendSelectedMedia():send()} disabled={savingEdit||(!selectedMedia.length&&!draft.trim())} style={styles.sendCircle}>
                     <NativeComposerIcon name="send" color="#fff"/>
                   </Pressable>
                  :<Pressable accessibilityRole="button" accessibilityLabel="Grabar audio (próximamente)"
