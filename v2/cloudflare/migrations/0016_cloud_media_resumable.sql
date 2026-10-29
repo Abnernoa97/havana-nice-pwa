@@ -1,2 +1,0 @@
-CREATE TABLE IF NOT EXISTS chat_cloud_uploads (asset_id TEXT PRIMARY KEY NOT NULL REFERENCES chat_media_assets(asset_id), upload_key TEXT, next_offset INTEGER NOT NULL DEFAULT 0, cloud_media_key TEXT, owner_nonce TEXT NOT NULL, stage TEXT NOT NULL CHECK(stage IN ('starting','uploading','ready','failed')), updated_at INTEGER NOT NULL);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_chat_cloud_uploads_key ON chat_cloud_uploads(cloud_media_key) WHERE cloud_media_key IS NOT NULL;
