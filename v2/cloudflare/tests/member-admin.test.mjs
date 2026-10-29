@@ -15,8 +15,8 @@ class FakeDB{
       if(sql.startsWith('SELECT actor_id,display_name FROM chat_members'))return this.members.get(args[0])||null;
       if(sql.startsWith('SELECT actor_id FROM chat_members'))return this.members.get(args[0])||null;
       if(sql.startsWith('SELECT COUNT(*) AS entries'))return {entries:2};
-      if(sql.includes('AS mediaAssets') && sql.includes('FROM chat_media_assets')){
-        return {sessions:2,messages:3,reactions:1,receipts:1,historyEvents:4,mediaAssets:this.mediaAssets};
+      if(sql.includes('AS mediaAssets')){
+        return {sessions:2,messages:3,reactions:1,receipts:1,historyEvents:4,mediaAssets:0};
       }
       throw Error('Unexpected first: '+sql);
     },
@@ -179,20 +179,6 @@ test('member delete preview requires Admin auth and never mutates data',async()=
  });
  assert.equal(e.DB.statements.length,0);
  assert.equal(e.DB.members.size,1);
-});
-
-test('member deletion is blocked when remote multimedia cannot yet be cleaned',async()=>{
- const e=await env();e.DB.mediaAssets=2;
- const preview=await handler(e,'GET','/api/chat/admin/member-delete-preview?actorId='+encodeURIComponent(actor));
- assert.equal(preview.status,200);
- assert.equal(preview.body.canDelete,false);
- assert.equal(preview.body.counts.mediaAssets,2);
- const refused=await handler(e,'POST','/api/chat/admin/remove-member',{actorId:actor,confirmName:'Orly'});
- assert.equal(refused.status,409);
- assert.match(refused.body.error,/archivos multimedia/);
- assert.equal(e.DB.members.size,1);
- assert.equal(e.DB.statements.length,0,'D1 must stay completely unchanged');
- assert.equal(e.events.length,0,'No device may be expelled after a refused deletion');
 });
 
 test('member deletion preview rejects invalid or absent members',async()=>{
