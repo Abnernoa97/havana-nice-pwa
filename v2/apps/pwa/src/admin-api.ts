@@ -41,7 +41,7 @@ export function adminRevokeOtherSessions(token:string){
 }
 export type AdminMember={
  actor_id:string;username:string;display_name:string;active:number;session_count:number;
- single_device_mode?:number;installation_bound?:number;
+ installation_bound?:number;
 };
 export function adminMembers(token:string){
  return api<{members:AdminMember[]}>('/api/chat/admin/members',authenticated(token));
