@@ -84,7 +84,7 @@ Actualmente el **único código fuente V2** se desarrolla en `havana-nice-v2-fou
 - [ ] **Q01** — QA integral Android/PWA/Admin: firma, actualización sobre instalada, sesión, reconexión, caché, privacidad y reproducción. **Debe absorber las pruebas del saneamiento y de M01/M02.**
 - [ ] **Q02** — Paso a producción después de autorización y QA completos.
 
-**TOTAL INALTERADO: 12/27.** Saneamiento transversal: **8/10 tareas ejecutadas**; contrato R2 y QA físico pendientes. Ninguna tarea de limpieza siguiente es un hito 28 ni reemplaza el tablero original.
+**TOTAL INALTERADO: 12/27.** Saneamiento transversal: **9/10 tareas completadas**, incluida la definición del contrato R2. **S-I / QA físico pendiente**; M01/M02/M04 todavía no implementados. Ninguna tarea de limpieza siguiente es un hito 28 ni reemplaza el tablero original.
 
 ## 4. Fase prioritaria: SANEAMIENTO TRANSVERSAL DE V2
 
@@ -98,15 +98,42 @@ Actualmente el **único código fuente V2** se desarrolla en `havana-nice-v2-fou
 - [x] **S-E — Retirar automatizaciones de una sola ejecución:** `expo-video@58.0.12` y el lock están fijados. Eliminado físicamente `.github/workflows/v2-media-deps-once.yml`; las pruebas prohíben su reaparición.
 - [x] **S-F — Documentación y pruebas congruentes:** corregir `v2/README.md` ya informa los músicos y sesiones reales; se eliminó `v2/tests/cross-platform/README.md` por ser una guía vacía. El Plan Maestro es la única fuente de decisiones; Continuidad solamente registra evidencias.
 - [x] **S-G — Higiene de D1 y sesiones:** aplicar una política prudente de caducidad para `chat_admin_sessions` (28 filas históricas, 21 revocadas, 28 vencidas): se eliminaron las 28 mediante filtro de vencimiento/revocación; quedaron 0 sesiones Admin, 3 músicos, 3 sesiones de músicos y 44 mensajes.
-- [ ] **S-H — Contrato de multimedia futuro:** mantener temporalmente las vistas de fotos/video ya aprobadas pero no las antiguas subidas. Diseñar **un único contrato de subida, lectura y borrado R2** para los tres clientes, evitando adaptadores adicionales y eliminando referencias técnicas cuando sean sustituidas. Esto se implementará dentro de M01/M02/M04, una vez saneado el resto.
+- [x] **S-H — Contrato único multimedia R2 (DISEÑO, no implementación):** definido más abajo para Android nativo, PWA y Admin. Una sola API en el Worker V2, un bucket privado, un registro D1, sin otros Workers ni puentes. **M01/M02/M04 siguen abiertos hasta implementar y probar.**
 - [ ] **S-I — QA de salida de saneamiento:** CI general en verde, PWA publicada, un solo flujo de APK confirmado, actualización in-place sin pérdida de sesión, login Admin y Chat, un músico por dispositivo, WebSocket, y D1/Worker sin residuo externo. **No instalar/desinstalar por comodidad de pruebas.**
+
+### Contrato único de archivos aprobado para construcción — S-H
+
+**Diseño previo, aún sin R2 activo.** Este bloque forma parte del mismo Plan Maestro; no es un proyecto ni servicio independiente.
+
+**Una ruta de datos:** Android nativo / PWA / Administrador → **Worker V2 existente** → bucket **R2 privado** con binding `CHAT_MEDIA_R2`; metadatos y permisos solamente en **D1 V2**. Sin enlaces con otras aplicaciones; sin API de almacenamiento paralela, Dropbox, Google Drive, Supabase ni segundo Worker.
+
+**Una sola entidad:** tabla nueva `chat_media_objects` (nueva migración, nunca reutilizar las tablas del puente eliminado), con ID opaco, actor, ID de mensaje/cliente para idempotencia, clave privada R2, tipo, MIME, tamaño, estado, marcas de tiempo y datos de carga reanudable. Estados `pending → ready` o `failed/aborted`. **No crear la burbuja definitiva antes de confirmar el objeto R2.**
+
+**Un único contrato HTTP y una única autorización:**
+
+| Endpoint del Worker V2 | Comportamiento |
+|---|---|
+| `GET /api/chat/media/status` | Configuración y límites que los clientes consultan al abrir el Chat; requiere sesión válida |
+| `POST /api/chat/media/start` | Solicitud idempotente: validar miembro, clase, MIME, tamaño/cuota y registrar carga pendiente |
+| `PUT /api/chat/media/:id/content` o `PUT /api/chat/media/:id/part/:number` | Original pequeño o partes reanudables de un video, respectivamente, con el **mismo** control de propietario |
+| `POST /api/chat/media/:id/complete` | Verificar objeto/tamaño/tipo, finalizar multipart cuando corresponda, registrar estado ready y emitir el único mensaje/evento |
+| `GET /api/chat/media/:id/grant` + `GET /api/chat/media/:id/file` | Acceso privado a fotos/videos por autorización corta y específica del archivo; soportar peticiones HTTP Range para reproducción y reanudación |
+| `DELETE /api/chat/media/:id` | Borrado autorizado del original y metadatos, coordinado con el borrado canónico del mensaje, sin duplicar la moderación |
+
+**Una política de uso:** máximo cinco adjuntos por envío según contratos compartidos, sin compresión de los originales. Videos multipart: partes iguales de al menos **5 MiB**, excepto la última; aplicar ciclos de vida para subidas incompletas. Límite de archivo y presupuesto de almacenamiento **se validan en servidor**, ajustados al nivel gratuito que efectivamente active el propietario; 10 GB de franquicia no significan almacenamiento ilimitado ni ausencia de cargos por excedentes.
+
+**Una experiencia visual:** reutilizar los selectores Fotos/Video y visores aprobados, sin etiquetas técnicas, códigos ni texto superpuesto en miniaturas. Android usará su reproductor nativo; la PWA y el Administrador compartirán permisos y metadatos. Cachear localmente lo imprescindible, por archivo y con reglas de expiración; nunca guardar respuestas privadas de API indiscriminadamente en el Service Worker. Probar carga inmediata percibida, Range, miniaturas, fotos completas y renovación de autorizaciones.
+
+**Reglas ante fallos:** deduplicar por ID de cliente, no publicar mensajes incompletos, permitir reanudar multipart, invalidar permisos tras revocación y reconciliar objetos R2 huérfanos sin borrar mensajes de texto. Tests de acceso, eliminación, cuotas, fallo de red y reproducción en Android/PWA/Admin. Ningún modo viejo quedará escondido detrás de flags.
+
+**Referencia técnica:** [R2 multipart en Workers](https://developers.cloudflare.com/r2/api/workers/workers-multipart-usage/) y [límites por parte](https://developers.cloudflare.com/r2/objects/upload-objects/). **No implementar hasta que Cloudflare confirme R2 habilitado.**
 
 ### Orden obligatorio y dependencias
 
 **Primero:** S-A, S-C, S-E, S-F — ya ejecutadas y validadas en la fuente.  
 **Segundo:** S-B y S-B2 — ejecutadas, publicación y dos binarios verificados.  
 **Tercero:** S-D y S-G — ejecutadas; S-I permanece abierto hasta QA y distribución comprobada.  
-**Cuarto:** cuando todo lo anterior esté confirmado, el propietario habilita R2 y comenzamos M01 → M02 → M04 de forma simultánea en Android nativo/PWA/Admin. M03/M05 permanecen aplazados según el plan.
+**Cuarto:** S-H ya definió la arquitectura única R2; cuando S-I esté validado y el propietario habilite R2, comenzamos M01 → M02 → M04 en Android nativo/PWA/Admin. M03/M05 permanecen aplazados según el plan.
 
 ## 5. Reglas de finalización y preservación
 
@@ -119,6 +146,6 @@ Actualmente el **único código fuente V2** se desarrolla en `havana-nice-v2-fou
 
 ## 6. Próxima decisión operacional
 
-**Bloque actual: S-I (prueba física de actualización Android, Chat/Admin/sesiones) y S-H (contrato R2).** El flujo Android ya tiene un único instalador vigente con firma comprobada. Mantener 12 hitos cerrados hasta QA real.
+**Bloque actual: S-I (prueba física de actualización Android, Chat/Admin/sesiones). S-H quedó definido en este plan; R2 aún deshabilitado.** El flujo Android ya tiene un único instalador vigente con firma comprobada. Mantener 12 hitos cerrados hasta QA real.
 
 Tras ello: activar R2 Standard privado dentro de la misma cuenta Cloudflare y desarrollar M01/M02/M04 sin migrar archivos de prueba.
