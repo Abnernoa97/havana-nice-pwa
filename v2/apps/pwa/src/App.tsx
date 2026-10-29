@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  fetchBackendHealth, getChatSnapshot, getOlderChatMessages, searchChatMessages, lastReadByOther, messageDeliveryLabel, newClientMessageId,
+  fetchBackendHealth, getChatMediaAvailability, getChatSnapshot, getOlderChatMessages, searchChatMessages, lastReadByOther, messageDeliveryLabel, newClientMessageId,
   openChatSocket, reconcileChatMessages, startNamedChatSession, restoreNamedChatSession,
   type BackendHealth, type ChatMessage, type ChatServerEvent, type ChatSession,
   validateChatMediaSelection, CHAT_MEDIA_MAX_PER_SEND, HAVANA_V2_DEV_API_BASE_URL, type ChatMediaSelection, type ChatMediaKind, type ChatMediaSource,
@@ -102,10 +102,8 @@ export default function App() {
   useEffect(()=>{
     if(!session){setMediaReady(false);return;}
     let live=true;
-    void fetch(HAVANA_V2_DEV_API_BASE_URL+'/api/chat/media/status',{
-      cache:'no-store',headers:{Authorization:'Bearer '+session.token}
-    }).then(async r=>r.json()).then(status=>{
-      if(live)setMediaReady(status.enabled===true);
+    void getChatMediaAvailability(session).then(enabled=>{
+      if(live)setMediaReady(enabled);
     }).catch(()=>{if(live)setMediaReady(false);});
     return()=>{live=false;};
   },[session?.token]);
