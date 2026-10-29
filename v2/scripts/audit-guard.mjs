@@ -16,6 +16,17 @@ const pwaStyles = read('apps/pwa/src/styles.css');
 const serviceWorker = read('apps/pwa/public/sw.js');
 const workerConfig = read('cloudflare/wrangler.jsonc');
 const androidWorkflow = read('../.github/workflows/v2-android-apk.yml');
+const workflows=readdirSync(new URL('../../.github/workflows/',import.meta.url)).sort();
+assert.deepEqual(workflows,['v2-android-apk.yml','v2-foundation-check.yml'],
+  'V2 must have one release workflow and one verification workflow, no historical automation');
+const reproducibleWorker=JSON.parse(workerConfig);
+assert.equal(reproducibleWorker.vars?.V2_ADMIN_LOGIN_MODE,'enabled',
+  'Admin login mode must be declared in source, never set only by hand on deployed Worker');
+assert.equal(reproducibleWorker.vars?.V2_ADMIN_LOGIN_SECRET,undefined,
+  'Admin login secret must never enter source-controlled Wrangler configuration');
+assert.equal(reproducibleWorker.services,undefined,
+  'No separate service bridge may be reintroduced');
+
 const readme = read('README.md');
 
 function absent(content,pattern,label) {
