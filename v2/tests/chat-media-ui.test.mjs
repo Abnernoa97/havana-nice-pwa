@@ -42,8 +42,7 @@ test('PWA attachment menu only offers Fotos and Video, with distinct media filte
  assert.match(src,/multiple onChange=/);
  assert.match(src,/mediaQueue\.current\.length\+files\.length>CHAT_MEDIA_MAX_PER_SEND/);
  assert.match(src,/selectedMedia\.map\(item=>/);
- assert.match(read('apps/pwa/src/media-upload.ts'),/file.slice\(offset/);
- assert.match(read('apps/pwa/src/media-upload.ts'),/batchId,batchIndex/);
+ assert.equal(existsSync(new URL('../apps/pwa/src/media-upload.ts',import.meta.url)),false);
 });
 
 test('PWA camera icon requests camera capture directly instead of media gallery',()=>{
@@ -95,11 +94,7 @@ test('Android native: two gallery filters, camera direct, no legacy extra menu',
  assert.match(src,/selectionLimit:source==='gallery'\?free:1/);
  assert.match(src,/selectedMedia\.map\(item=>/);
  assert.equal(manifest.dependencies['expo-file-system'],'~58.0.11');
- const nativeUpload=read('apps/android/media-upload.ts');
- assert.match(nativeUpload,/import \{fetch as expoFetch\} from 'expo\/fetch'/);
- assert.match(nativeUpload,/original\.slice\(offset/);
- assert.match(nativeUpload,/body:piece/);
- assert.doesNotMatch(nativeUpload,/new Blob\(\[piece\]\)|FileMode\.ReadOnly/);
+ assert.equal(existsSync(new URL('../apps/android/media-upload.ts',import.meta.url)),false);
 });
 
 test('Emoji stays enabled; microphone is informative until M03',()=>{
