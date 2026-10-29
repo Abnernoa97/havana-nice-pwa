@@ -1,33 +1,30 @@
 # HAVANA NICE V2 — CONTINUIDAD EXACTA
 
-**Corte: 29 de octubre de 2026, después de la auditoría integral.**
+**Corte de saneamiento: 29 de octubre de 2026.** Este documento es una **bitácora técnica**, no otro plan. Los hitos, prioridades y casillas se controlan SOLO desde [PLAN-MAESTRO.md](./PLAN-MAESTRO.md).
 
-> **La única fuente de decisiones, prioridades, 27 hitos y lista de saneamiento es [PLAN-MAESTRO.md](./PLAN-MAESTRO.md).** Este archivo solo contiene el estado técnico y las pruebas de relevo; no es otro plan.
+## Línea única V2
 
-## Fuente y límites
+- Código fuente único: `Abnernoa97/havana-nice-pwa` → `havana-nice-v2-foundation`. No cambiar ni modificar la rama histórica `main`; la rama `havana-nice-v2-apk-downloads` contiene exclusivamente instaladores de distribución y no es una rama de código.
+- Superficies previstas: Chat **Android 100 % React Native nativo**, PWA y Administrador web, compartiendo el **mismo Worker**, D1, Durable Object y contratos. `visual.html` es la representación visual no-Chat pendiente de integrar; no una app ni backend alternativo.
+- Nunca volver a vincular otro proyecto como almacenamiento ni duplicar servicios. HAVANA CLOUD y otros productos no se han modificado.
 
-- Repositorio `Abnernoa97/havana-nice-pwa`; **única rama canónica de código V2:** `havana-nice-v2-foundation`.
-- La rama `main` del repositorio compartido es histórica, fuera de alcance; **no tocarla ni cambiar el default automáticamente**. La rama `havana-nice-v2-apk-downloads` solo almacena binarios, no un segundo código V2. Revisar su simplificación según S-B/S-B2.
-- No modificar la aplicación original, HAVANA CLOUD ni otros proyectos; no recrear puente, otra base, login alternativo, API paralela o migración de laboratorio.
-- Android conserva `com.havananice.v2`, Chat 100 % nativo, sesión/caché local, firma e instalación sobre la APK existente. PWA/iPhone y Administrador comparten Worker, D1 y Chat DO. `visual.html` es maqueta sin datos, no backend alternativo.
+## Avance comprobado
 
-## Verificaciones recientes
+- **27 hitos oficiales:** 12 cerrados, 15 abiertos. **Saneamiento transversal:** S-A, S-C, S-D, S-E, S-F, S-G marcados, **6/10**; S-B, S-B2, S-H, S-I siguen pendientes de su comprobación final.
+- **S-C (config):** `v2/cloudflare/wrangler.jsonc` declara `HAVANA_ENV=development` y `V2_ADMIN_LOGIN_MODE=enabled`. `V2_ADMIN_LOGIN_SECRET` solo está como secreto remoto; D1 y `CHAT_ROOMS` están enlazados. CI prohíbe otro Service Binding y una configuración Admin incompleta.
+- **S-D (acceso):** eliminado el acceso de sesión heredada sin dueño, la excepción `single_device_mode=0` y su antigua ruta DELETE de músico. La sesión de cada nombre se conserva mediante un solo dispositivo. El Administrador sigue teniendo su propia sesión/credencial y la acción exclusiva de liberar el dispositivo. Worker `havana-nice-v2-dev` **versión `0b563838-5b5f-48ca-bb85-82297a52eee6` desplegada al 100 %**, validada previamente con el secreto existente, D1 y Durable Object.
+- **S-E (automatizaciones):** eliminado físicamente `.github/workflows/v2-media-deps-once.yml`; `expo-video@58.0.12` permanece exactamente fijado en manifest y lock. Existe ya una protección de CI que exige solo `v2-foundation-check.yml` y `v2-android-apk.yml`.
+- **S-F (fuentes y pruebas):** README corregido sobre músicos y sesiones. Eliminado `v2/tests/cross-platform/README.md` porque era un marcador sin pruebas ejecutables. Plan Maestro y Continuidad no contienen otro tablero.
+- **S-G (D1):** 28 filas de sesiones administrativas estaban vencidas, de las cuales 21 estaban revocadas. Se eliminaron SOLO mediante criterio `revoked_at IS NOT NULL OR expires_at<=now` sobre `chat_admin_sessions`. Consulta inmediata posterior: **0 sesiones Admin, 3 músicos, 3 sesiones de músico y 44 mensajes**. Músicos y mensajes no se tocaron.
+- **S-B (Android):** se eliminaron el workflow independiente de distribución `v2-apk-direct-download.yml` y el polling de otra ejecución de GitHub. El único `v2-android-apk.yml` ahora compila, valida paquete/firma/versionCode, compara con la APK previa, publica una descarga estable `HAVANA-NICE-V2-LATEST.apk` y guarda `HAVANA-NICE-V2-PREVIOUS.apk` para recuperación. **La primera ejecución completa está pendiente de resultado; NO marcar S-B hasta confirmarla.**
+- **S-B2 (archivos):** los 24 instaladores históricos (≈1,78 GB) siguen en la rama de binarios mientras el nuevo pipeline no confirme entrega y firma de 0.0.10. El pipeline pretende dejar dos APK en su HEAD; no equivale a reescribir el historial Git antiguo. No borrar a mano antes de prueba de publicación.
+- **Pruebas:** GitHub Actions pasó el chequeo fundacional tras retirar la excepción de acceso y añadir las protecciones de workflow/configuración. El último APK confirmado anteriormente fue Android 0.0.9; el 0.0.10 compilado anteriormente no había podido distribuirse por el flujo viejo. **La versión descargable nueva aún requiere comprobación**.
 
-- **Fundación V2:** suite GitHub Actions exitosa en commit `177ac4eb23ed9cd631f44752ce07d33d16c45d8b`; continúa **12/27 hitos**. No reinterpretar los 27.
-- **Worker `havana-nice-v2-dev`:** versión `f7d5e3d1-0611-4cb8-b7e6-9dc9899779c6` desplegada al 100 % con cinco bindings: `CHAT_ROOMS`, `DB`, `HAVANA_ENV`, `V2_ADMIN_LOGIN_MODE`, `V2_ADMIN_LOGIN_SECRET`. No existe servicio externo vinculado.
-- **D1:** 11 tablas útiles; 44 mensajes, 3 músicos, 3 sesiones, 3 vínculos, 12 reacciones. Se eliminaron los 15 mensajes multimedia de laboratorio, los 19 registros multimedia y 19 transferencias, una vinculación, y cinco tablas antiguas. Ninguna se migró a R2. Los datos de la aplicación independiente quedaron intactos.
-- **Administrador:** 28 registros históricos de sesión, 21 revocados, ninguno vigente en la lectura del 29/10. No borrar las tablas ni sesiones de usuario sin filtros y verificación. `wrangler.jsonc` declara `HAVANA_ENV` pero **no** `V2_ADMIN_LOGIN_MODE=enabled` que sí está en producción; alinear fuente y conservar `V2_ADMIN_LOGIN_SECRET` estrictamente como secreto externo.
-- **PWA:** Pages `havana-nice-v2-dev` confirmó publicación del commit `177ac4eb23ed9cd631f44752ce07d33d16c45d8b` con estado success.
-- **Android 0.0.10:** la compilación standalone y comprobación del paquete/firma pasaron en GitHub; `versionCode=10`. La distribución automática directa **falló por `unexpected EOF`** al consultar la API GitHub. No declarar la APK pública ni instalada. La anterior aprobada fue 0.0.9.
-- **R2:** aún sin activar. API `403/10042`; no hay bucket, originales ni carga activa. No avanzar antes de resolver saneamiento.
-- **Ramas/entregas:** una rama de código V2, una de binarios con 24 APK (≈1,78 GB), y la rama histórica `main`. Un workflow de APK build, otro de distribución y otro workflow de sincronización única de dependencia. Consolidar, no multiplicar.
+## Siguiente punto exacto
 
-## Próxima ejecución exacta
+1. Revisar resultado del workflow Android unificado del commit `b4ef03a6cba2969c85814de18b7117ca3f9d283f` y sus logs. Si falla, corregir el mismo workflow **sin crear otro**; confirmar hash, certificado, paquete y versión 10 antes de indicar enlace de descarga.
+2. Confirmar que la rama de binarios contiene solamente LATEST y PREVIOUS tras el flujo exitoso, y que la fuente queda en una única rama.
+3. Verificar versión PWA publicada, Chat/Administrador, las sesiones ya existentes y WebSockets sin regresión. Prueba física de actualización Android 0.0.9→0.0.10 necesaria para Q01/S-I.
+4. Solo entonces el propietario habilita R2 Standard gratuito y se implementan M01/M02/M04 en la misma API sin intermediarios.
 
-**SANEAMIENTO TRANSVERSAL S-A → S-I del Plan Maestro, sin crear hitos nuevos.**
-
-Prioridad inmediata: alinear configuración no secreta Worker/Admin; unificar build + firma + publicación de APK y recuperar la distribución de 0.0.10; eliminar workflow puntual obsoleto; corregir residuos documentales y de pruebas; revisar excepciones heredadas de acceso y limpieza de sesiones caducadas; pasar QA sin perder la instalación ni el Chat.
-
-**Después, y solo después:** activación gratuita R2 por el propietario e implementación **M01 fotos → M02 videos → M04 visores** con R2 directo y privado, desarrolladas a la vez en Android/PWA/Administrador. M03 audio y M05 push permanecen abiertos.
-
-**Regla de continuidad:** no marcar «terminado» sin estado GitHub/Cloudflare y, en su caso, prueba real en teléfono. El Plan Maestro es el documento que se marca; este archivo solo registra evidencia y posición de reanudación.
+**Regla:** nada de APK múltiples, caché reiniciada por comodidad, nuevos repositorios, ramas de trabajo o integración con aplicaciones independientes. No presentar R2 como activo ni los hitos M01/M02 como cerrados.
