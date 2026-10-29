@@ -4,7 +4,9 @@
   "main": "./src/index.ts",
   "compatibility_date": "2026-10-23",
   "vars": {
-    "HAVANA_ENV": "development"
+    "HAVANA_ENV": "development",
+    "V2_CLOUD_LINK_ENABLED": "enabled",
+    "V2_CLOUD_MEDIA_ENABLED": "enabled"
   },
   "d1_databases": [
     {
@@ -12,6 +14,9 @@
       "database_name": "havana-nice-v2-dev",
       "database_id": "6a4abd3a-c01b-4d4f-b0ed-49f7eaca0cc5"
     }
+  ],
+  "services": [
+    {"binding": "HAVANA_CLOUD_BRIDGE", "service": "havana-nice-cloud"}
   ],
   "durable_objects": {
     "bindings": [
@@ -24,9 +29,7 @@
   "migrations": [
     {
       "tag": "v1",
-      "new_sqlite_classes": [
-        "ChatRoom"
-      ]
+      "new_sqlite_classes": ["ChatRoom"]
     }
   ],
   "observability": {
