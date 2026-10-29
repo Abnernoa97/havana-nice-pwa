@@ -92,6 +92,15 @@ absent(worker,/single_device_mode|closeUnboundChatSession/,
   'No legacy multi-device bypasses permitted');
 present(worker,/INSERT OR IGNORE INTO chat_members\(username,actor_id,display_name,active\) VALUES\(\?,\?,\?,1\)/,
   'New musician records must use one Administrator-only enrollment path; every login claims its sole owner');
+absent(read('cloudflare/src/single-installation.js'),/single_device_mode/,
+  'The owner record must be the only musician installation policy');
+absent(read('apps/pwa/src/AdminChatAccess.tsx'),/single_device_mode|Acceso anterior protegido/,
+  'Administrator cannot show or enforce historical alternative access');
+absent(read('apps/pwa/src/admin-api.ts'),/single_device_mode/,
+  'Administrator API must not expose a discarded mode flag');
+present(read('cloudflare/migrations/0017_remove_legacy_member_mode.sql'),
+  /ALTER TABLE chat_members DROP COLUMN single_device_mode;/,
+  'Old schema field must be physically removed by a forward migration');
 present(android,/restoreNamedChatSession/,'Android must restore only authorized remembered sessions');
 present(pwa,/restoreNamedChatSession/,'PWA must restore only authorized remembered sessions');
 
