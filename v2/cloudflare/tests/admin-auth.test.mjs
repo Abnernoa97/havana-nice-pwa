@@ -126,6 +126,17 @@ test('successful Admin login prunes only expired/revoked Admin credentials and s
  assert.equal(e.DB.attempts.has('recent-limit'),true);
 });
 
+test('a temporary D1 housekeeping failure cannot block a valid Administrator login',async()=>{
+ const e=env(),original=e.DB.batch.bind(e.DB);
+ e.DB.batch=async()=>{throw Error('temporary D1 maintenance error');};
+ const signed=await fetchAdmin(e,'POST','/api/chat/admin/auth/session',{password:adminPassword});
+ assert.equal(signed.status,200);
+ assert.equal(signed.data.role,'chat-admin');
+ assert.equal(e.DB.sessions.size,1);
+ assert.equal(await verifyAdminSession(request('GET','/x',undefined,signed.data.token),e),true);
+ e.DB.batch=original;
+});
+
 test('five incorrect logins limit a single device but do not block another IP',async()=>{
  const e=env();
  for(let i=0;i<5;i++){
