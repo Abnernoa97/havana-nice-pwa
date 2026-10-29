@@ -8,7 +8,24 @@ const endpoint='https://havana-nice-v2-dev.soloaplicaciones97.workers.dev';
 class FakeD1 {
  constructor(){this.sessions=new Map();this.attempts=new Map();}
  prepare(sql){
-  return {bind:(...args)=>({first:async()=>this.first(sql,args),run:async()=>this.run(sql,args)})};
+  return {bind:(...args)=>({first:async()=>this.first(sql,args),run:async()=>this.run(sql,args),sql,args})};
+ }
+ async batch(statements){
+  const changes=[];
+  for(const {sql,args} of statements){
+   let count=0;
+   if(sql.startsWith('DELETE FROM chat_admin_sessions WHERE expires_at<=')){
+    for(const [key,row] of this.sessions){
+     if(row.expires_at<=args[0]||row.revoked_at!==null){this.sessions.delete(key);count++;}
+    }
+   }else if(sql.startsWith('DELETE FROM chat_admin_login_limits WHERE window_start<')){
+    for(const [key,row] of this.attempts){
+     if(row.window_start<args[0]){this.attempts.delete(key);count++;}
+    }
+   }else throw Error('Unexpected cleanup SQL '+sql);
+   changes.push({meta:{changes:count}});
+  }
+  return changes;
  }
  async first(sql,p){
   if(sql.startsWith('SELECT failures,window_start')) return this.attempts.get(p[0])||null;
@@ -92,6 +109,23 @@ test('authentication creates an expiring D1-backed admin token, revocable by log
  assert.equal(await verifyAdminSession(request('GET','/x',undefined,token),e),false);
  assert.equal((await fetchAdmin(e,'GET','/api/chat/admin/auth/session',undefined,token)).status,401);
 });
+test('successful Admin login prunes only expired/revoked Admin credentials and stale attempts',async()=>{
+ const e=env(),now=Date.now();
+ e.DB.sessions.set('expired-session',{expires_at:now-1000,revoked_at:null});
+ e.DB.sessions.set('revoked-session',{expires_at:now+100000,revoked_at:now-100});
+ e.DB.sessions.set('valid-other-session',{expires_at:now+100000,revoked_at:null});
+ e.DB.attempts.set('old-limit',{window_start:now-48*60*60*1000,failures:2});
+ e.DB.attempts.set('recent-limit',{window_start:now-60*1000,failures:1});
+ const logged=await fetchAdmin(e,'POST','/api/chat/admin/auth/session',{password:adminPassword});
+ assert.equal(logged.status,200);
+ assert.equal(e.DB.sessions.has('expired-session'),false);
+ assert.equal(e.DB.sessions.has('revoked-session'),false);
+ assert.equal(e.DB.sessions.has('valid-other-session'),true);
+ assert.equal(e.DB.sessions.size,2,'retain previous live Admin and newly issued session');
+ assert.equal(e.DB.attempts.has('old-limit'),false);
+ assert.equal(e.DB.attempts.has('recent-limit'),true);
+});
+
 test('five incorrect logins limit a single device but do not block another IP',async()=>{
  const e=env();
  for(let i=0;i<5;i++){
