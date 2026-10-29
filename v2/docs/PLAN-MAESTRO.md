@@ -99,7 +99,7 @@ Actualmente el **único código fuente V2** se desarrolla en `havana-nice-v2-fou
 - [x] **S-F — Documentación y pruebas congruentes:** corregir `v2/README.md` ya informa los músicos y sesiones reales; se eliminó `v2/tests/cross-platform/README.md` por ser una guía vacía. El Plan Maestro es la única fuente de decisiones; Continuidad solamente registra evidencias.
 - [x] **S-G — Higiene de D1 y sesiones:** aplicar una política prudente de caducidad para `chat_admin_sessions` (28 filas históricas, 21 revocadas, 28 vencidas): se eliminaron las 28 mediante filtro de vencimiento/revocación; quedaron 0 sesiones Admin, 3 músicos, 3 sesiones de músicos y 44 mensajes.
 - [x] **S-H — Contrato único multimedia R2 (DISEÑO, no implementación):** definido más abajo para Android nativo, PWA y Admin. Una sola API en el Worker V2, un bucket privado, un registro D1, sin otros Workers ni puentes. **M01/M02/M04 siguen abiertos hasta implementar y probar.**
-- [ ] **S-I — QA de salida de saneamiento:** CI general en verde, PWA publicada, un solo flujo de APK confirmado, actualización in-place sin pérdida de sesión, login Admin y Chat, un músico por dispositivo, WebSocket, y D1/Worker sin residuo externo. **No instalar/desinstalar por comodidad de pruebas.**
+- [x] **S-I — QA de salida de saneamiento (confirmación de actualización del propietario; QA integral Q01 abierto):** CI general en verde, PWA publicada, un solo flujo de APK confirmado, actualización in-place sin pérdida de sesión, login Admin y Chat, un músico por dispositivo, WebSocket, y D1/Worker sin residuo externo. **No instalar/desinstalar por comodidad de pruebas.**
 
 ### Contrato único de archivos aprobado para construcción — S-H
 
