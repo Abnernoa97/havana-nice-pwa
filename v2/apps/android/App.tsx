@@ -4,7 +4,7 @@ import {
   StatusBar, StyleSheet, Text, TextInput, View, Image, useWindowDimensions,
 } from 'react-native';
 import {
-  HAVANA_V2_DEV_API_BASE_URL, fetchBackendHealth, getChatSnapshot, getOlderChatMessages, searchChatMessages, lastReadByOther, messageDeliveryLabel, newClientMessageId,
+  HAVANA_V2_DEV_API_BASE_URL, fetchBackendHealth, getChatMediaAvailability, getChatSnapshot, getOlderChatMessages, searchChatMessages, lastReadByOther, messageDeliveryLabel, newClientMessageId,
   reconcileChatMessages, reconcileReactions, reconcileUpdatedMessage, reconcileDeletedMessage, reconcileChatSnapshot, startNamedChatSession, restoreNamedChatSession,
   type ChatMessage, type ChatServerEvent, type ChatSession, type ChatReaction, type ChatEmoji, type ChatReadReceipt,
   validateChatMediaSelection, CHAT_MEDIA_MAX_PER_SEND, type ChatMediaSelection, type ChatMediaKind, type ChatMediaSource,
@@ -95,10 +95,8 @@ export default function App() {
   useEffect(()=>{
     if(!session){setMediaReady(false);return;}
     let active=true;
-    void fetch(HAVANA_V2_DEV_API_BASE_URL+'/api/chat/media/status',{
-      headers:{Authorization:'Bearer '+session.token}
-    }).then(async r=>r.json()).then(value=>{
-      if(active)setMediaReady(value.enabled===true);
+    void getChatMediaAvailability(session).then(enabled=>{
+      if(active)setMediaReady(enabled);
     }).catch(()=>{if(active)setMediaReady(false);});
     return()=>{active=false;};
   },[session?.token]);
