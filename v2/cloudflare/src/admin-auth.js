@@ -112,5 +112,14 @@ export async function handleAdminSessionApi(request,env,url,origin,respond){
  const token=opaque(),expiresAt=now+SESSION_DURATION;
  await env.DB.prepare('INSERT INTO chat_admin_sessions(token_hash,created_at,expires_at) VALUES(?,?,?)')
    .bind(await hash(token),now,expiresAt).run();
+ // Only on a successful Administrator login: prune dead credentials and stale
+ // rate-limit counters. Never prune musician sessions, Chat, or access history.
+ // A transient cleanup error must not turn a valid login into a failure.
+ try{
+   await env.DB.batch([
+     env.DB.prepare('DELETE FROM chat_admin_sessions WHERE expires_at<=? OR revoked_at IS NOT NULL').bind(now),
+     env.DB.prepare('DELETE FROM chat_admin_login_limits WHERE window_start<?').bind(now-24*HOUR),
+   ]);
+ }catch{/* Credential expiry remains enforced during verification. */}
  return reply({token,expiresAt:new Date(expiresAt).toISOString(),role:'chat-admin'});
 }
