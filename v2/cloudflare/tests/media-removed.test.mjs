@@ -12,6 +12,8 @@ test('V2 has no external storage bridge or authorization routes',()=>{
  assert.doesNotMatch(worker,/attachChatMedia|handleCloudLinkAdmin/);
  assert.match(worker,/media: 'not-configured'/);
  assert.match(worker,/enabled:false,maxFilesPerSend:5/);
+ assert.match(worker,/if\(!member&&!await verifyAdminSession\(request,env\)\)/,
+  'Musician and Administrator must share the same private media authorization gate');
 });
 test('Text message deletion is independent of any outside file storage',()=>{
  const source=src('src/message-removal.js');
