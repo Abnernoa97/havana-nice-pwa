@@ -4,7 +4,7 @@ import { adminSocketToken, adminTokenRequest, notifyAdminClients } from './admin
 import {handleAdminMemberManagement,recordMemberEvent,readMemberDevice} from './member-admin.js';
 import {handleAdminChat} from './admin-chat.js';
 import {deleteChatMessageRecord} from './message-removal.js';
-import {claimFirstInstallation,auditDuplicateInstallation,closeUnboundChatSession,handleSingleInstallationAdmin} from './single-installation.js';
+import {claimFirstInstallation,auditDuplicateInstallation,handleSingleInstallationAdmin} from './single-installation.js';
 // HAVANA NICE V2 isolated Worker. Only D1-authorized musician names may enroll.
 // Random durable device credentials are issued once and validated against D1 on every request.
 const encoder = new TextEncoder();
@@ -50,17 +50,11 @@ function normalizeMusicianName(value) {
 async function createSession(env, member, request) {
   const token = b64(crypto.getRandomValues(new Uint8Array(32)));
   const tokenHash=await sha256(token);
-  if(Number(member.single_device_mode)===1){
-    // First named login claims the only installation; concurrent contenders
-    // cannot mint a second Chat token. Legacy users are deliberately exempt.
-    const claimed=await claimFirstInstallation(env,member,tokenHash,MEMBER_SESSION_EXPIRY);
-    if(!claimed){
-      await auditDuplicateInstallation(env,member.actor_id,request);
-      return null;
-    }
-  }else{
-    await env.DB.prepare('INSERT INTO chat_sessions (token_hash, actor_id, display_name, expires_at) VALUES (?, ?, ?, ?)')
-      .bind(tokenHash, member.actor_id, member.display_name, MEMBER_SESSION_EXPIRY).run();
+  // Every Admin-authorized musician name belongs to one installation.
+  const claimed=await claimFirstInstallation(env,member,tokenHash,MEMBER_SESSION_EXPIRY);
+  if(!claimed){
+    await auditDuplicateInstallation(env,member.actor_id,request);
+    return null;
   }
   await recordMemberEvent(env,member.actor_id,'login',request).catch(()=>{});
   return { token, actorId: member.actor_id, displayName: member.display_name, expiresAt: new Date(MEMBER_SESSION_EXPIRY).toISOString() };
@@ -71,8 +65,8 @@ async function verifySession(env, token) {
     const row = await env.DB.prepare(
       'SELECT s.actor_id, m.display_name, s.expires_at ' +
       'FROM chat_sessions s JOIN chat_members m ON m.actor_id=s.actor_id AND m.active=1 WHERE s.token_hash=? ' +
-      'AND (m.single_device_mode=0 OR EXISTS (SELECT 1 FROM chat_single_device_owners owner '+
-      'WHERE owner.actor_id=m.actor_id AND owner.token_hash=s.token_hash))'
+      'AND EXISTS (SELECT 1 FROM chat_single_device_owners owner '+
+      'WHERE owner.actor_id=m.actor_id AND owner.token_hash=s.token_hash)'
     ).bind(await sha256(token)).first();
     if (!row || !Number.isFinite(row.expires_at) || row.expires_at <= Date.now()) return null;
     return { actorId: row.actor_id, displayName: row.display_name, exp: row.expires_at };
@@ -455,18 +449,6 @@ export default {
       const valid = await verifySession(env, token);
       if (!valid) return respond({ error: 'Acceso revocado o no autorizado' }, 401, origin);
       return respond({ token, actorId: valid.actorId, displayName: valid.displayName, expiresAt: new Date(valid.exp).toISOString() }, 200, origin);
-    }
-    if (url.pathname === '/api/chat/session' && request.method === 'DELETE') {
-      const token = (request.headers.get('authorization') || '').replace(/^Bearer\s+/i, '');
-      const current = await verifySession(env, token);
-      if (!current) return respond({ error: 'Acceso no autorizado' }, 401, origin);
-      // An owner token must be released via Admin, never orphaned by logout.
-      // The legacy single-session sign-out remains available.
-      if(!await closeUnboundChatSession(env,await sha256(token)))
-        return respond({code:'admin_release_required',
-          error:'Este dispositivo está vinculado. Solo el Administrador puede liberarlo.'
-        },409,origin);
-      return respond({ok:true}, 200, origin);
     }
     if (url.pathname === '/api/chat/messages' && request.method === 'GET') {
       const session = await verifySession(env, (request.headers.get('authorization') || '').replace(/^Bearer\s+/i, ''));
