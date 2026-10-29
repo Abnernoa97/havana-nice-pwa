@@ -62,13 +62,11 @@ export async function handleSingleInstallationAdmin(request,env,url,origin,respo
       typeof body?.confirmName!=='string')
      return reply(respond,origin,{error:'Confirmación inválida'},400);
    const m=await env.DB.prepare(
-     'SELECT actor_id,display_name,single_device_mode FROM chat_members WHERE actor_id=? AND active=1'
+     'SELECT actor_id,display_name FROM chat_members WHERE actor_id=? AND active=1'
    ).bind(body.actorId).first();
    if(!m)return reply(respond,origin,{error:'Miembro no encontrado'},404);
    if(m.display_name!==body.confirmName)
      return reply(respond,origin,{error:'El nombre de confirmación no coincide'},409);
-   if(Number(m.single_device_mode)!==1)
-     return reply(respond,origin,{error:'La configuración de acceso requiere revisión'},409);
    // The member, its messages, and access history are NEVER deleted by release.
    // Invalidate all of this member's credentials before clearing the owner
    // record; on next login the first claimant becomes the new sole owner.
