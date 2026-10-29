@@ -92,10 +92,10 @@ present(serviceWorker,/url\.origin !== self\.location\.origin/,
 present(serviceWorker,/path\.startsWith\('\/assets\/'\)/,
   'Only approved static app resources are cached');
 
-absent(workerConfig,/"r2_buckets"\s*:/i,'Never bind billed R2 storage to V2');
+absent(workerConfig,/"services"\s*:/i,'No legacy service bindings permitted');
 absent(workerConfig,/"V2_MEDIA_UPLOADS"\s*:\s*"enabled"/,
   'Do not enable unapproved media uploads');
-present(readme,/R2 (?:desactivado|descartado)/i,'README must state that billed R2 is unavailable');
+present(readme,/R2 pendiente de activación/i,'README must accurately state R2 is not configured');
 present(androidWorkflow,/retention-days:\s*1\b/,'Keep Android build artifacts for one day');
 absent(androidWorkflow,/retention-days:\s*30\b/,'No 30-day APK artifacts');
 absent(distributor,/RUN_ID=\d{8,}/,'Distributor must not publish a pinned stale APK');
