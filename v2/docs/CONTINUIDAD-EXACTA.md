@@ -1,35 +1,33 @@
 # HAVANA NICE V2 — CONTINUIDAD EXACTA
 
-**Fecha: 29 de octubre de 2026.** Documento único complementario al [PLAN-MAESTRO.md](./PLAN-MAESTRO.md). Repositorio `Abnernoa97/havana-nice-pwa`, rama `havana-nice-v2-foundation`. **12/27 hitos cerrados, 15 abiertos.**
+**Corte: 29 de octubre de 2026, después de la auditoría integral.**
 
-## Estado de arquitectura y retirada terminada
+> **La única fuente de decisiones, prioridades, 27 hitos y lista de saneamiento es [PLAN-MAESTRO.md](./PLAN-MAESTRO.md).** Este archivo solo contiene el estado técnico y las pruebas de relevo; no es otro plan.
 
-La integración multimedia externa anterior ha sido retirada **solo de HAVANA NICE V2**. Los proyectos independientes no fueron alterados. No existe una migración de fotos/videos antiguos a R2.
+## Fuente y límites
 
-**Fuente V2:** se eliminaron físicamente módulos de enlace, credenciales remotas, adaptador, transferencias por fragmentos, pantalla de autorización, sus pruebas dedicadas y migraciones específicas. El Worker V2 se actualizó para eliminar las rutas de vinculación, conservar el Chat de texto y responder `media: 'not-configured'` en `/health`. `/api/chat/media/status` solo responde a músicos autorizados, con `enabled:false`. No guardar archivos en otro servicio durante esta etapa.
+- Repositorio `Abnernoa97/havana-nice-pwa`; **única rama canónica de código V2:** `havana-nice-v2-foundation`.
+- La rama `main` del repositorio compartido es histórica, fuera de alcance; **no tocarla ni cambiar el default automáticamente**. La rama `havana-nice-v2-apk-downloads` solo almacena binarios, no un segundo código V2. Revisar su simplificación según S-B/S-B2.
+- No modificar la aplicación original, HAVANA CLOUD ni otros proyectos; no recrear puente, otra base, login alternativo, API paralela o migración de laboratorio.
+- Android conserva `com.havananice.v2`, Chat 100 % nativo, sesión/caché local, firma e instalación sobre la APK existente. PWA/iPhone y Administrador comparten Worker, D1 y Chat DO. `visual.html` es maqueta sin datos, no backend alternativo.
 
-**Worker publicado:** `havana-nice-v2-dev` desplegó versión `f7d5e3d1-0611-4cb8-b7e6-9dc9899779c6` al **100 %**, despliegue `7fedfce0-12f7-4c91-b235-a6585a2539b6`. Configuración verificada directamente: existen exactamente cinco bindings: `CHAT_ROOMS` (Durable Object), `DB` (D1), `HAVANA_ENV`, `V2_ADMIN_LOGIN_MODE`, `V2_ADMIN_LOGIN_SECRET`. Ningún Service Binding a almacenamiento externo, sin las dos variables de integración antiguas. El secreto del Administrador se conservó mediante herencia estricta.
+## Verificaciones recientes
 
-**D1:** se borraron, con confirmación de cambios y lectura posterior, 15 mensajes multimedia de laboratorio; 19 filas de multimedia y transferencias; una autorización cifrada; cinco tablas (`chat_cloud_link`, `chat_cloud_uploads`, `chat_media_assets`, `v2_media_assets`, `v2_media_quota`). **44 mensajes de texto quedaron intactos.** No borrar los mensajes de texto, respuestas, cuentas, sesiones o permisos en cambios futuros. Los originales en servicios ajenos no se tocaron, por orden del propietario de limitarse exclusivamente a V2.
+- **Fundación V2:** suite GitHub Actions exitosa en commit `177ac4eb23ed9cd631f44752ce07d33d16c45d8b`; continúa **12/27 hitos**. No reinterpretar los 27.
+- **Worker `havana-nice-v2-dev`:** versión `f7d5e3d1-0611-4cb8-b7e6-9dc9899779c6` desplegada al 100 % con cinco bindings: `CHAT_ROOMS`, `DB`, `HAVANA_ENV`, `V2_ADMIN_LOGIN_MODE`, `V2_ADMIN_LOGIN_SECRET`. No existe servicio externo vinculado.
+- **D1:** 11 tablas útiles; 44 mensajes, 3 músicos, 3 sesiones, 3 vínculos, 12 reacciones. Se eliminaron los 15 mensajes multimedia de laboratorio, los 19 registros multimedia y 19 transferencias, una vinculación, y cinco tablas antiguas. Ninguna se migró a R2. Los datos de la aplicación independiente quedaron intactos.
+- **Administrador:** 28 registros históricos de sesión, 21 revocados, ninguno vigente en la lectura del 29/10. No borrar las tablas ni sesiones de usuario sin filtros y verificación. `wrangler.jsonc` declara `HAVANA_ENV` pero **no** `V2_ADMIN_LOGIN_MODE=enabled` que sí está en producción; alinear fuente y conservar `V2_ADMIN_LOGIN_SECRET` estrictamente como secreto externo.
+- **PWA:** Pages `havana-nice-v2-dev` confirmó publicación del commit `177ac4eb23ed9cd631f44752ce07d33d16c45d8b` con estado success.
+- **Android 0.0.10:** la compilación standalone y comprobación del paquete/firma pasaron en GitHub; `versionCode=10`. La distribución automática directa **falló por `unexpected EOF`** al consultar la API GitHub. No declarar la APK pública ni instalada. La anterior aprobada fue 0.0.9.
+- **R2:** aún sin activar. API `403/10042`; no hay bucket, originales ni carga activa. No avanzar antes de resolver saneamiento.
+- **Ramas/entregas:** una rama de código V2, una de binarios con 24 APK (≈1,78 GB), y la rama histórica `main`. Un workflow de APK build, otro de distribución y otro workflow de sincronización única de dependencia. Consolidar, no multiplicar.
 
-**PWA y Android:** las fuentes ya no contienen referencias al servicio multimedia anterior; se conservaron los selectores, superficies y visores para reutilizar al integrar R2. La función de enviar multimedia muestra «no configurado». La app nativa conserva `com.havananice.v2` y su firma; **no desinstalar**. APK **0.0.10** solicitada mediante GitHub Actions con la misma firma/paquete y versionCode 10 (compilación/distribución pendientes de comprobar); 0.0.9 es la anterior, todavía sin QA físico definitivo de video. Si se publica una nueva APK, usar `versionCode` creciente y actualizar encima.
+## Próxima ejecución exacta
 
-**QA:** la suite general de GitHub Actions sobre el código limpio y la actualización Android 0.0.10 finalizó satisfactoriamente. La publicación final de Pages y del APK Android debe confirmarse expresamente antes de informar que ambas están disponibles. **No afirmar que ambas capas ya están publicadas hasta verificar explícitamente CI y Pages.** El nuevo Worker fue aceptado, validado y desplegado por Cloudflare.
+**SANEAMIENTO TRANSVERSAL S-A → S-I del Plan Maestro, sin crear hitos nuevos.**
 
-## Principios obligatorios
+Prioridad inmediata: alinear configuración no secreta Worker/Admin; unificar build + firma + publicación de APK y recuperar la distribución de 0.0.10; eliminar workflow puntual obsoleto; corregir residuos documentales y de pruebas; revisar excepciones heredadas de acceso y limpieza de sesiones caducadas; pasar QA sin perder la instalación ni el Chat.
 
-- Todo se desarrolla **en este Chat y en una única rama V2**, usando las conexiones existentes de GitHub y Cloudflare; el propietario solo realiza acciones indispensables en su cuenta (como activar R2) o pruebas físicas.
-- Un Chat: Android 100 % React Native nativo, PWA iPhone y Administrador conectado al mismo backend D1/DO. La PWA visual no sustituye el Chat nativo.
-- Una sola fuente, sin parches ocultos, sin duplicar APIs, repositorios, archivos ni documentos.
-- Proteger lo aprobado: menús del Chat, envío/edición/borrado de texto, reacciones, respuesta, sesión persistente, offline y borradores, control de instalación única y alertas Admin, credenciales y caché de APK.
-- Multimedia no está activa actualmente. **No reactivar la integración anterior, no realizar migración de archivos ni conectar otro backend intermedio.**
+**Después, y solo después:** activación gratuita R2 por el propietario e implementación **M01 fotos → M02 videos → M04 visores** con R2 directo y privado, desarrolladas a la vez en Android/PWA/Administrador. M03 audio y M05 push permanecen abiertos.
 
-## Próxima implementación: R2 nuevo, sin transición
-
-1. Confirmar CI sobre la rama limpia, el despliegue de Pages y seguridad del Chat. Mantener 12/27 hasta QA.
-2. Activación del nivel gratuito R2 Standard por el propietario en **la cuenta Cloudflare que aloja V2**. Al último intento previo, la API R2 respondió `403/10042` indicando servicio no habilitado. No suponer bucket creado, cuenta activada ni gratuidad ilimitada.
-3. Crear bucket privado de HAVANA NICE V2; Worker autentica y autoriza, nunca entrega credenciales permanentes al cliente. Subida de originales pequeños directa a R2 con autorización temporal y multipart resumible para videos. R2 requiere partes de al menos 5 MiB excepto la última.
-4. Confirmar existencia, tamaño, MIME y permisos antes de crear cada burbuja de Chat. Streaming de videos nativos con Range; precarga/caché de fotos y visualización amplia inmediata, sin texto técnico dentro de la burbuja.
-5. Desarrollar a la par Android, PWA y Administrador. **No instalar una nueva app ni borrar datos locales.** Validar tiempos de transferencia reales antes de declarar «instantáneo».
-
-**Prioridad: cerrar comprobaciones técnicas de la limpieza y, después de activar R2, M01/M02/M04. Documento Plan Maestro contiene los 27 hitos originales.**
+**Regla de continuidad:** no marcar «terminado» sin estado GitHub/Cloudflare y, en su caso, prueba real en teléfono. El Plan Maestro es el documento que se marca; este archivo solo registra evidencia y posición de reanudación.
