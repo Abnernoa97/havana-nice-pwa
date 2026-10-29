@@ -6,7 +6,7 @@
 
 - Una sola rama V2 de desarrollo: `havana-nice-v2-foundation`. `main` y el sitio HAVANA NICE original son otra línea existente y NO se modifican.
 - Un solo backend V2: Worker `havana-nice-v2-dev`, base D1 `havana-nice-v2-dev` y Durable Object `CHAT_ROOMS`.
-- Chat Android 100 % React Native, sin WebView, conservando firma del paquete `com.havananice.v2`, sesiones SQLite, historial y borradores; el dispositivo instalado de referencia usa 0.0.4. No reinstalar.
+- Chat Android 100 % React Native, sin WebView, conservando firma del paquete `com.havananice.v2`, sesiones SQLite, historial y borradores; la actualización se instala sobre la aplicación existente. No reinstalar.
 - Chat iPhone PWA, sincronizado con el Chat nativo mediante contratos, mensajes, sesión y WebSocket del mismo Worker/D1.
 - Administrador real e independiente en `/admin.html`: «Acceso a músicos» y «Chat general» activos. El Chat Admin muestra y modera los mensajes de todos sin iniciar sesión como músico ni escribir; comparte D1 y WebSocket, y su papelera elimina para todos con registro lógico. Calendario, Repertorio y Más aún no tienen datos conectados.
 - `/visual.html` es únicamente una **maqueta sin datos privados ni permisos de Chat o Administrador** destinada a futuros módulos no-Chat de Android WebView/PWA (H02–H04). No es una segunda puerta de ingreso.
@@ -28,9 +28,6 @@
 - El código de aprobación antigua de teléfonos, peticiones individuales y contraseñas de laboratorio **no forma parte de la aplicación V2 actual**. El guard de CI prohíbe revivir sus rutas.
 - Las migraciones SQL y tablas del sistema se conservan. La migración histórica `0007` ya no contiene altas automáticas de los seis músicos: una base V2 nueva comienza con cero nombres hasta que el Administrador los agregue.
 - **Rama V2 limpia:** se retiraron de `havana-nice-v2-foundation` 55 copias idénticas de los archivos históricos de la raíz (19 704 817 bytes), tras comprobar cada hash contra `main`. Se conservan intactas en `main` y en el historial Git. Esto reduce archivos en el checkout de V2, pero no elimina objetos históricos del repositorio. Cloudflare Pages de V2 compila únicamente `v2`.
-- El archivo `cloudflare/src/havana-cloud-bridge-client.js` no participa actualmente en el Worker desplegado; es una propuesta de integración futura para multimedia, **no** un acceso alternativo y no debe activarse sin decisión sobre almacenamiento.
 - No crear otra rama, otro backend, login paralelo, APK de prueba innecesaria ni cambios destructivos de datos.
 
-**Chat general Admin publicado:** Worker versión `0450e895-84db-469e-af27-4894b4a6b0ea`, Foundation CI `40572364562` éxito, sin borrar datos reales; falta QA visual en teléfono. La funcionalidad de moderación multimedia vendrá cuando existan mensajes foto/video/audio.
-
-**Próxima funcionalidad:** M01 — fotos privadas reales, respetando Chat nativo Android, Chat PWA iPhone, el Administrador y una sola API.
+**Estado actual:** Chat de texto, Administrador, sesiones y control de dispositivos preservados. Toda integración externa anterior de archivos se retira de la fuente V2. La subida multimedia está temporalmente deshabilitada hasta que se configure R2. El QA de la app Android se mantiene pendiente.
