@@ -7,9 +7,9 @@
 **La conexión anterior de almacenamiento externo fue retirada de V2, SIN migración de laboratorio.**
 
 - Código fuente de autenticación, adaptación multimedia, fragmentación de subidas y panel administrativo antiguos: **eliminados físicamente de la rama V2**.
-- Worker de V2: **versión `db55ac36-137c-4bbc-bb21-de3d633287b3` desplegada al 100 %**, con D1, Durable Object, autenticación de Administrador y sin Service Binding externo, verificado por API Cloudflare.
+- Worker de V2: **versión `f7d5e3d1-0611-4cb8-b7e6-9dc9899779c6` desplegada al 100 %**, con D1, Durable Object, autenticación de Administrador y sin Service Binding externo, verificado por API Cloudflare.
 - D1 V2: borradas **15 burbujas multimedia**, **19 registros de archivo**, **19 transferencias**, **una vinculación** y **cinco tablas del almacenamiento anterior**. Verificación posterior: **44 mensajes de texto permanecen**, cero tablas antiguas. Ninguna foto ni video fue trasladado a R2.
-- PWA/Android: su fuente ya no utiliza el cargador anterior. Selectores/visor mantienen su interfaz; envíos de multimedia no disponibles hasta activar R2. **La publicación PWA y el QA de Android deben comprobarse antes de declarar ese frente terminado**.
+- PWA/Android: su fuente ya no utiliza el cargador anterior. Selectores/visor mantienen su interfaz; envíos de multimedia no disponibles hasta activar R2. **La publicación PWA y el QA de Android 0.0.10 deben comprobarse antes de declarar ese frente terminado**.
 - Los servicios y repositorios de aplicaciones independientes se preservan; no modificar sistemas ajenos para completar V2.
 - **Cloudflare R2 Standard privado:** pendiente de alta gratuita del propietario y de integración técnica. No existe bucket ni subida activa. Diseñar desde cero y sin usar sistemas intermedios.
 
