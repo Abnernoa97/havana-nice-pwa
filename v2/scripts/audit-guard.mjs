@@ -63,20 +63,22 @@ for(const [value,label] of [[worker,'Worker'],[android,'Android'],[pwa,'PWA'],
 }
 
 // Access-surface invariant: one Admin-controlled name creation route and one
-// musician enrollment route. GET restore / DELETE do not mint new identities.
+// musician enrollment route. GET restoration never mints a second identity.
 // The Administrator has its own session endpoint, not another musician login.
 const musicianRouteMethods=[...worker.matchAll(/url\.pathname === '\/api\/chat\/session' && request\.method === '(POST|GET|DELETE)'/g)]
   .map(match=>match[1]).sort();
-assert.deepEqual(musicianRouteMethods,['DELETE','GET','POST'],
-  'Chat must have exactly one enrollment POST plus GET restoration and DELETE sign-out');
+assert.deepEqual(musicianRouteMethods,['GET','POST'],
+  'Musician Chat must expose only enrollment POST and restoration GET');
 assert.equal((worker.match(/INSERT OR IGNORE INTO chat_members\(username,actor_id,display_name,active,single_device_mode\)/g)||[]).length,1,
   'Only one Administrator-created musician account INSERT is allowed');
 present(worker,/if \(!await verifyAdminSession\(request,env\)\)/,
   'Only authenticated Administrator may create a musician');
 present(worker,/if \(!member\) return respond\(\{ error: 'Tu nombre todavía no está autorizado/,
   'Unknown names must not be enrolled automatically');
-present(worker,/if\(Number\(member\.single_device_mode\)===1\)/,
-  'All newly added musicians must pass single-installation enforcement');
+present(worker,/const claimed=await claimFirstInstallation/,
+  'Every musician must pass the single-installation guard');
+absent(worker,/single_device_mode=0|closeUnboundChatSession/,
+  'No legacy multi-device bypasses permitted');
 present(worker,/INSERT OR IGNORE INTO chat_members\(username,actor_id,display_name,active,single_device_mode\) VALUES\(\?,\?,\?,1,1\)/,
   'New musician records must always require the one-installation mode');
 present(android,/restoreNamedChatSession/,'Android must restore only authorized remembered sessions');
