@@ -14,6 +14,19 @@ test('One shared photo/video original quality policy; runtime Worker controls en
  assert.doesNotMatch(src,/audio\/mpeg|mimeTypes:\['audio\//);
 });
 
+test('installed Chat local storage keys stay compatible across cleanup releases',()=>{
+ const android=read('apps/android/chatStorage.ts');
+ const pwa=read('apps/pwa/src/local.ts');
+ assert.match(android,/const KEY = 'havana-v2-chat-local-v1';/);
+ assert.match(pwa,/const DB = 'havana-nice-v2-lab';/);
+ assert.match(pwa,/const STORE = 'chat';/);
+ assert.match(pwa,/const KEY = 'offline-outbox-v1';/);
+ assert.match(android,/session: ChatSession/);
+ assert.match(pwa,/session: ChatSession/);
+ assert.match(android,/outbox: ChatMessage\[\]/);
+ assert.match(pwa,/outbox: ChatMessage\[\]/);
+});
+
 test('Android native and iPhone PWA share the same Chat decisions, not alternate backends',()=>{
  const android=read('apps/android/App.tsx');
  const pwa=read('apps/pwa/src/App.tsx');
