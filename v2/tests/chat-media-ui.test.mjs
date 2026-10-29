@@ -117,8 +117,7 @@ test('V2 does not contain an external storage service binding',()=>{
  const config=JSON.parse(read('cloudflare/wrangler.jsonc'));
  assert.equal(config.name,'havana-nice-v2-dev');
  assert.deepEqual(config.services||[],[]);
- assert.equal(config.vars?.V2_CLOUD_LINK_ENABLED,undefined);
- assert.equal(config.vars?.V2_CLOUD_MEDIA_ENABLED,undefined);
+ assert.deepEqual(Object.keys(config.vars||{}),['HAVANA_ENV']);
 });
 
 test('Media-only bubbles remain visual across Chat PWA, native and Administrator',()=>{
