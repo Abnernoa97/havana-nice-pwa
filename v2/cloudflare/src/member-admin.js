@@ -50,11 +50,10 @@ async function memberDeletionImpact(env,actorId){
   '(SELECT COUNT(*) FROM chat_messages WHERE sender_id=?) AS messages,'+
   '(SELECT COUNT(*) FROM chat_reactions WHERE actor_id=? OR message_seq IN (SELECT seq FROM chat_messages WHERE sender_id=?)) AS reactions,'+
   '(SELECT COUNT(*) FROM chat_read_receipts WHERE actor_id=?) AS receipts,'+
-  '(SELECT COUNT(*) FROM chat_access_events WHERE actor_id=?) AS historyEvents,'+
-  '0 AS mediaAssets'
+  '(SELECT COUNT(*) FROM chat_access_events WHERE actor_id=?) AS historyEvents'
  ).bind(actorId,actorId,actorId,actorId,actorId,actorId).first();
  const counts={};
- for(const key of ['sessions','messages','reactions','receipts','historyEvents','mediaAssets'])
+ for(const key of ['sessions','messages','reactions','receipts','historyEvents'])
    counts[key]=Math.max(0,Number(row?.[key]||0));
  return counts;
 }
@@ -89,7 +88,7 @@ export async function handleAdminMemberManagement(request,env,url,origin,respond
      .bind(actorId).first();
    if(!member)return reply(respond,origin,{error:'Miembro no encontrado'},404);
    const counts=await memberDeletionImpact(env,actorId);
-   return reply(respond,origin,{displayName:member.display_name,counts,canDelete:counts.mediaAssets===0});
+   return reply(respond,origin,{displayName:member.display_name,counts,canDelete:true});
  }
  if(url.pathname!=='/api/chat/admin/remove-member'||request.method!=='POST')
    return reply(respond,origin,{error:'Ruta no válida'},404);
