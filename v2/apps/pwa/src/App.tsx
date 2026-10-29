@@ -11,7 +11,7 @@ import SwipeMessage, {type MessageAnchor} from './SwipeMessage';
 import ComposerIcon from './ChatComposerIcon';
 import ChatMediaView from './ChatMediaView';
 
-type PwaQueuedMedia={id:string;file:File;selection:ChatMediaSelection;batchIndex?:number};
+type PwaQueuedMedia={id:string;file:File;selection:ChatMediaSelection};
 
 export default function App() {
   const [health, setHealth] = useState<BackendHealth | null>(null);
@@ -24,10 +24,7 @@ export default function App() {
   const [selectedMedia,setSelectedMedia]=useState<PwaQueuedMedia[]>([]);
   const [mediaError,setMediaError]=useState('');
   const mediaQueue=useRef<PwaQueuedMedia[]>([]);
-  const mediaBatchId=useRef<string|null>(null);
   const [mediaReady,setMediaReady]=useState(false);
-  const [mediaUploading,setMediaUploading]=useState(false);
-  const [mediaProgress,setMediaProgress]=useState(0);
   const photosPicker=useRef<HTMLInputElement|null>(null);
   const videoPicker=useRef<HTMLInputElement|null>(null);
   const cameraPicker=useRef<HTMLInputElement|null>(null);
@@ -60,16 +57,16 @@ export default function App() {
   const scrollOlderOnce=useRef(false);
   const typingLast = useRef(0);
   const removeSelectedMedia=(id:string)=>{
-    if(mediaUploading)return;
+    
     const removed=mediaQueue.current.find(x=>x.id===id);
     if(removed)URL.revokeObjectURL(removed.selection.uri);
     mediaQueue.current=mediaQueue.current.filter(x=>x.id!==id);
-    if(!mediaQueue.current.length)mediaBatchId.current=null;
+    
     setSelectedMedia([...mediaQueue.current]);setMediaError('');
   };
   const openGalleryMedia=(kind:ChatMediaKind)=>{
     setComposerPanel(null);setMediaError('');
-    if(mediaUploading||mediaBatchId.current)return;
+    
     if(mediaQueue.current.length>=CHAT_MEDIA_MAX_PER_SEND){
       setMediaError('Máximo 5 archivos por envío, entre fotos y videos.');return;
     }
@@ -77,14 +74,14 @@ export default function App() {
   };
   const openCamera=()=>{
     setComposerPanel(null);setMediaError('');
-    if(mediaUploading||mediaBatchId.current)return;
+    
     if(mediaQueue.current.length>=CHAT_MEDIA_MAX_PER_SEND){
       setMediaError('Máximo 5 archivos por envío, entre fotos y videos.');return;
     }
     cameraPicker.current?.click();
   };
   const chooseMedia=(source:ChatMediaSource,kind:ChatMediaKind,files:File[])=>{
-    if(!files.length||mediaUploading||mediaBatchId.current)return;
+    if(!files.length)return;
     if(mediaQueue.current.length+files.length>CHAT_MEDIA_MAX_PER_SEND){
       setMediaError('Máximo 5 archivos por envío, entre fotos y videos.');return;
     }
@@ -793,9 +790,9 @@ export default function App() {
                 <strong>{item.selection.name}</strong>
                 <small>{item.selection.kind==='photo'?'Fotografía':'Video'} · {(item.selection.sizeBytes/1048576).toFixed(1)} MB</small>
               </div>
-              <button type="button" disabled={mediaUploading} aria-label={'Quitar '+item.selection.name} onClick={()=>removeSelectedMedia(item.id)}>✕</button>
+              <button type="button" aria-label={'Quitar '+item.selection.name} onClick={()=>removeSelectedMedia(item.id)}>✕</button>
             </div>)}
-            <small>{mediaUploading?'Subiendo '+mediaProgress+'%':mediaReady?'Originales listos para enviar':'Almacenamiento de archivos aún no configurado.'}</small>
+            <small>{mediaReady?'Originales listos para enviar':'Almacenamiento de archivos aún no configurado.'}</small>
           </div>}
           {mediaError&&<p className="chat-media-error" role="alert">{mediaError}</p>}
           <form className="chat-composer" onSubmit={event=>{event.preventDefault();if(selectedMedia.length&&!editing)void sendSelectedMedia();else send();}}>
@@ -810,17 +807,17 @@ export default function App() {
                 placeholder={connection==='en vivo'?'Mensaje':'Sin conexión: se enviará después…'}/>
               <button type="button" className="chat-icon-button" aria-label="Adjuntar fotografía o video"
                 aria-expanded={composerPanel==='attachments'}
-                disabled={mediaUploading} onClick={()=>setComposerPanel(p=>p==='attachments'?null:'attachments')}>
+                onClick={()=>setComposerPanel(p=>p==='attachments'?null:'attachments')}>
                 <ComposerIcon name="clip" size={25}/>
               </button>
               <button type="button" className="chat-icon-button" aria-label="Abrir cámara"
-                disabled={mediaUploading} onClick={openCamera}>
+                onClick={openCamera}>
                 <ComposerIcon name="camera" size={25}/>
               </button>
             </div>
             {draft.trim()||editing||selectedMedia.length>0
               ?<button type="submit" className="chat-action-circle" aria-label={editing?'Guardar mensaje':selectedMedia.length?'Enviar archivos originales':'Enviar mensaje'}
-                  disabled={mediaUploading||savingEdit||(!selectedMedia.length&&!draft.trim())}>
+                  disabled={savingEdit||(!selectedMedia.length&&!draft.trim())}>
                   <ComposerIcon name="send" size={24}/>
                 </button>
               :<button type="button" className="chat-action-circle" aria-label="Grabar audio (próximamente)"
