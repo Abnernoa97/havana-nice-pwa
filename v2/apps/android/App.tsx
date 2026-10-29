@@ -665,7 +665,7 @@ export default function App() {
 
   async function sendSelectedMedia(){
     if(!selectedMedia.length||!session||mediaUploading)return;
-    if(!mediaReady){setMediaError('HAVANA CLOUD todavía no está enlazada.');return;}
+    if(!mediaReady){setMediaError('El almacenamiento de archivos todavía no está configurado.');return;}
     const batch=mediaBatchId.current||newMediaUploadId();
     mediaBatchId.current=batch;
     const items=selectedMedia.map((item,index)=>({...item,batchIndex:item.batchIndex??index}));
@@ -978,7 +978,7 @@ export default function App() {
                    </Pressable>
                  </View>)}
                </ScrollView>
-               <Text style={styles.mediaHint}>{mediaUploading?'Subiendo '+mediaProgress+'%':mediaReady?'Originales listos para enviar':'La subida a HAVANA CLOUD aún no está habilitada.'}</Text>
+               <Text style={styles.mediaHint}>{mediaUploading?'Subiendo '+mediaProgress+'%':mediaReady?'Originales listos para enviar':'Almacenamiento de archivos aún no configurado.'}</Text>
              </View>}
               {!!mediaError&&<Text style={styles.mediaError}>{mediaError}</Text>}
              <View style={styles.composer}>
