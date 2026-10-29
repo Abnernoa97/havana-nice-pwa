@@ -7,7 +7,7 @@ type Section='access'|'chat'|'repertoire'|'calendar'|'more';
 type Readiness='loading'|'disabled'|'enabled'|'error';
 
 function MemberImpactSummary({name,preview}:{name:string;preview:AdminDeletionPreview}){
- const {counts,canDelete}=preview;
+ const {counts}=preview;
  return <div className="a-member-impact-summary" role="status">
    <strong>Datos asociados a {name}</strong>
    <dl>
@@ -16,12 +16,8 @@ function MemberImpactSummary({name,preview}:{name:string;preview:AdminDeletionPr
      <div><dt>Reacciones</dt><dd>{counts.reactions}</dd></div>
      <div><dt>Lecturas</dt><dd>{counts.receipts}</dd></div>
      <div><dt>Historial</dt><dd>{counts.historyEvents}</dd></div>
-     <div><dt>Archivos multimedia</dt><dd>{counts.mediaAssets}</dd></div>
    </dl>
    <small>Las credenciales registradas no equivalen a teléfonos conectados en este momento. Las reacciones incluyen las vinculadas al músico o a sus mensajes.</small>
-   {canDelete?
-     <small>Sin archivos multimedia pendientes de eliminación externa.</small>:
-     <p className="a-admin-error">La eliminación está bloqueada para proteger los archivos multimedia externos.</p>}
  </div>;
 }
 
@@ -238,8 +234,8 @@ export default function AdminChatAccess({section}:{section:Section}){
      // Fail closed: no preview, no deletion.
      const preview=await adminDeletionPreview(session.token,person.actor_id);
      if(preview.displayName!==person.display_name)throw new Error('El nombre cambió. Actualiza la lista antes de eliminar.');
-     if(!preview.canDelete||preview.counts.mediaAssets>0)
-       throw new Error('Este músico tiene archivos multimedia: la eliminación completa todavía no está disponible.');
+     if(!preview.canDelete)
+       throw new Error('No se permite eliminar este músico en este momento.');
      const counts=preview.counts;
      const approved=window.confirm(
        '¿Eliminar DEFINITIVAMENTE a '+person.display_name+'?\n\n'+
