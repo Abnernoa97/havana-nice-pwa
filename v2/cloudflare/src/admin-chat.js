@@ -1,7 +1,6 @@
 // The authenticated administrator moderates the same D1 room as musicians.
 import {verifyAdminSession} from './admin-auth.js';
 import {deleteChatMessageRecord} from './message-removal.js';
-import {attachChatMedia} from './unified-media.js';
 const MAX_HISTORY=100,ROOM='main-chat-v2';
 const COLUMNS='seq,client_message_id,sender_id,sender_name,body,created_at,reply_to_seq,edited_at,deleted_at';
 function mapped(row){
@@ -24,7 +23,7 @@ export async function handleAdminChat(request,env,url,origin,respond){
    const query=await env.DB.prepare('SELECT message_seq,actor_id,emoji FROM chat_reactions WHERE message_seq IN ('+ids.map(()=>'?').join(',')+')').bind(...ids).all();
    reactions=(query.results||[]).map(x=>({messageSeq:x.message_seq,actorId:x.actor_id,emoji:x.emoji}));
   }
-  return reply({messages:await attachChatMedia(env,rows.reverse().map(mapped)),reactions,hasMore:rows.length===MAX_HISTORY});
+  return reply({messages:rows.reverse().map(mapped),reactions,hasMore:rows.length===MAX_HISTORY});
  }
  const match=/^\/api\/chat\/admin\/messages\/(\d+)$/.exec(url.pathname);
  if(!match||request.method!=='DELETE')return reply({error:'Ruta no válida'},404);
