@@ -175,6 +175,19 @@ export function reconcileChatMessages(
   });
 }
 
+/** One authenticated availability check shared by native Android and the PWA.
+ * Never cache a status tied to a private member session.
+ * R2 availability is determined by the Worker, not by the client UI.
+ */
+export async function getChatMediaAvailability(session:ChatSession,base=HAVANA_V2_DEV_API_BASE_URL):Promise<boolean>{
+ const response=await fetch(base+'/api/chat/media/status',{
+  cache:'no-store',headers:{Authorization:'Bearer '+session.token}
+ });
+ if(!response.ok)return false;
+ const status=await response.json() as {enabled?:unknown};
+ return status.enabled===true;
+}
+
 // M01/M02: one selection policy shared by the PWA and native Chat.
 // Photos and videos share one original-file contract; runtime Worker gates enforce rollout.
 // One send may contain at most five ORIGINAL files in any photo/video mix.
