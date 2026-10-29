@@ -14,6 +14,23 @@ test('One shared photo/video original quality policy; runtime Worker controls en
  assert.doesNotMatch(src,/audio\/mpeg|mimeTypes:\['audio\//);
 });
 
+test('Android native and iPhone PWA share the same Chat decisions, not alternate backends',()=>{
+ const android=read('apps/android/App.tsx');
+ const pwa=read('apps/pwa/src/App.tsx');
+ const common=[
+  'restoreNamedChatSession','getChatSnapshot','reconcileChatSnapshot',
+  'reconcileUpdatedMessage','reconcileDeletedMessage','reconcileReactions',
+  'messageDeliveryLabel','newClientMessageId','validateChatMediaSelection',
+  'CHAT_MEDIA_MAX_PER_SEND','getChatMediaAvailability(session)'
+ ];
+ for(const [label,src] of [['Android',android],['PWA',pwa]]){
+  for(const symbol of common)assert.ok(src.includes(symbol),label+' missing canonical '+symbol);
+  assert.match(src,/function sendSelectedMedia\(\)\{/);
+  assert.match(src,/setMediaError\('Almacenamiento multimedia no configurado\.'\)/);
+  assert.doesNotMatch(src,/HAVANA_CLOUD|cloud-media-adapter|media-upload\./);
+ }
+});
+
 test('Android and PWA share one authenticated media-availability fetch without obsolete upload state',()=>{
  const shared=read('packages/shared/src/index.ts');
  assert.match(shared,/export async function getChatMediaAvailability/);
