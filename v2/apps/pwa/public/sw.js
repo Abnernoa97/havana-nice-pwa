@@ -3,6 +3,23 @@
 const CACHE = 'havana-nice-v2-static-v4';
 const PREFIX = 'havana-nice-v2-';
 const APP_SHELL = ['/', '/visual.html', '/manifest.webmanifest'];
+const MAX_VERSIONED_ASSETS = 40;
+
+// One bounded static cache, not a new cache for every build.
+// Keep the most recent versioned app assets for offline navigation. Never
+// inspect or store private Chat/Admin/Worker API responses.
+async function cacheVersionedAsset(request,response){
+  const cache=await caches.open(CACHE);
+  await cache.put(request,response);
+  const entries=await cache.keys();
+  const assets=entries.filter(key=>{
+    const url=new URL(key.url);
+    return url.origin===self.location.origin&&url.pathname.startsWith('/assets/');
+  });
+  const excess=Math.max(0,assets.length-MAX_VERSIONED_ASSETS);
+  await Promise.all(assets.slice(0,excess).map(key=>cache.delete(key)));
+}
+
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(APP_SHELL)));
@@ -37,9 +54,10 @@ self.addEventListener('fetch', event => {
     fetch(req).then(response => {
       if (response.ok && response.type === 'basic') {
         // Only app shell/static assets, never private responses.
-        event.waitUntil(caches.open(CACHE).then(cache => cache.put(
-          navigation ? shellKey : req, response.clone()
-        )).catch(() => {}));
+        const write=!navigation&&path.startsWith('/assets/')?
+          cacheVersionedAsset(req,response.clone()):
+          caches.open(CACHE).then(cache=>cache.put(navigation?shellKey:req,response.clone()));
+        event.waitUntil(write.catch(()=>{}));
       }
       return response;
     }).catch(async () => {
