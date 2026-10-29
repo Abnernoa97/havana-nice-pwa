@@ -7,7 +7,7 @@ const user={actor_id:actor,display_name:'Prueba Uno'};
 class FakeD1{
  constructor(){
    this.owner=new Map();this.sessions=new Map();this.alerts=[];
-   this.member={actor_id:actor,display_name:'Prueba Uno',single_device_mode:1};
+   this.member={actor_id:actor,display_name:'Prueba Uno'};
  }
  prepare(sql){
    return {
@@ -40,7 +40,7 @@ class FakeD1{
  async first(sql,args){
    if(sql.startsWith('SELECT expires_at,revoked_at FROM chat_admin_sessions'))
      return {expires_at:Date.now()+100000,revoked_at:null};
-   if(sql.startsWith('SELECT actor_id,display_name,single_device_mode FROM chat_members'))
+   if(sql.startsWith('SELECT actor_id,display_name FROM chat_members'))
      return args[0]===actor?this.member:null;
    throw Error('Unexpected D1 first '+sql);
  }
