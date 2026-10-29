@@ -281,7 +281,7 @@ export default function AdminChatAccess({section}:{section:Section}){
    finally{setDuplicateBusy('');}
  }
  async function releaseInstallation(person:AdminMember){
-   if(!session||releaseBusy||person.single_device_mode!==1||person.installation_bound!==1)return;
+   if(!session||releaseBusy||person.installation_bound!==1)return;
    if(!window.confirm(
      '¿Liberar el dispositivo vinculado a '+person.display_name+'?\n\n'+
      'Se cerrarán sus sesiones actuales. El primer dispositivo que vuelva a entrar con este nombre podrá vincularse. '+
@@ -419,7 +419,6 @@ export default function AdminChatAccess({section}:{section:Section}){
                <small>{history[person.actor_id]?.since}</small>
              </>}
            <div className="a-member-impact">
-             {person.single_device_mode===1?
                <div className="a-member-installation">
                  <strong>{person.installation_bound===1?'Dispositivo único vinculado':'Dispositivo aún sin vincular'}</strong>
                  <small>{person.installation_bound===1?
@@ -429,8 +428,7 @@ export default function AdminChatAccess({section}:{section:Section}){
                    disabled={!!releaseBusy||!!removing} onClick={()=>void releaseInstallation(person)}>
                    {releaseBusy===person.actor_id?'Liberando…':'Liberar dispositivo'}
                  </button>}
-               </div>:
-               <small>Acceso anterior protegido: la vinculación a un dispositivo se habilitará tras verificar la migración sin perder sesiones.</small>}
+               </div>
 
              <button type="button" onClick={()=>void inspectMemberData(person)}
                disabled={impactLoading===person.actor_id||!!removing}
