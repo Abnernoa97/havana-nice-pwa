@@ -1,7 +1,6 @@
 // HAVANA NICE V2 — single installation per Admin-created musician name.
-// Existing accounts are deliberately exempt until their owner installation is
-// migrated. An installation's credential is the already-issued random Chat
-// session; never compare User-Agent, IP, or live WebSocket presence.
+// Every member uses one installation. The installation credential is the
+// issued Chat session; never compare User-Agent, IP or WebSocket presence.
 import {verifyAdminSession} from './admin-auth.js';
 import {notifyAdminClients} from './admin-realtime.js';
 import {readMemberDevice} from './member-admin.js';
@@ -21,14 +20,6 @@ export async function claimFirstInstallation(env,member,tokenHash,expiry){
    ).bind(tokenHash,member.actor_id,member.display_name,expiry,member.actor_id,tokenHash)
  ]);
  return Number(rows[1]?.meta?.changes)===1;
-}
-// Do not orphan a bound installation on generic logout. Only Admin may release it.
-export async function closeUnboundChatSession(env,tokenHash){
- const result=await env.DB.prepare(
-   'DELETE FROM chat_sessions WHERE token_hash=? AND NOT EXISTS '+
-   '(SELECT 1 FROM chat_single_device_owners WHERE token_hash=?)'
- ).bind(tokenHash,tokenHash).run();
- return Number(result.meta?.changes)===1;
 }
 export async function auditDuplicateInstallation(env,actorId,request){
  // Bounded per account to avoid an unbounded audit table from guessed names.
@@ -77,7 +68,7 @@ export async function handleSingleInstallationAdmin(request,env,url,origin,respo
    if(m.display_name!==body.confirmName)
      return reply(respond,origin,{error:'El nombre de confirmación no coincide'},409);
    if(Number(m.single_device_mode)!==1)
-     return reply(respond,origin,{error:'Este miembro todavía utiliza el acceso anterior'},409);
+     return reply(respond,origin,{error:'La configuración de acceso requiere revisión'},409);
    // The member, its messages, and access history are NEVER deleted by release.
    // Invalidate all of this member's credentials before clearing the owner
    // record; on next login the first claimant becomes the new sole owner.
