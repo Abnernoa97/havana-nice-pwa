@@ -82,7 +82,7 @@ jobs:
           NEW=HAVANA-NICE-V2-LATEST.apk
           git fetch origin "$DEST_BRANCH"
           RECORD="$(git show FETCH_HEAD:SHA256SUMS.txt |
-            grep -E '^[0-9a-f]{64}  HAVANA-NICE-V2-(LATEST|ANDROID-[0-9a-f]{12})\\.apk$' | tail -n 1)"
+            grep -E '^[0-9a-f]{64}  HAVANA-NICE-V2-(LATEST|ANDROID-[0-9a-f]{12})\.apk$' | tail -n 1)"
           test -n "$RECORD"
           read -r PREVIOUS_SHA PREVIOUS_NAME <<< "$RECORD"
           git show "FETCH_HEAD:$PREVIOUS_NAME" > /tmp/havana-v2-previous.apk
@@ -91,8 +91,8 @@ jobs:
           "$SDK_BUILD_TOOLS/apksigner" verify "$APK"
           "$SDK_BUILD_TOOLS/apksigner" verify /tmp/havana-v2-previous.apk
           python3 v2/scripts/apk-signature-gate.py /tmp/havana-v2-previous.apk "$APK"
-          previous_code="$("$SDK_BUILD_TOOLS/aapt" dump badging /tmp/havana-v2-previous.apk | sed -nE "s/.*versionCode='([0-9]+)'.*/\\1/p" | head -n 1)"
-          current_code="$("$SDK_BUILD_TOOLS/aapt" dump badging "$APK" | sed -nE "s/.*versionCode='([0-9]+)'.*/\\1/p" | head -n 1)"
+          previous_code="$("$SDK_BUILD_TOOLS/aapt" dump badging /tmp/havana-v2-previous.apk | sed -nE "s/.*versionCode='([0-9]+)'.*/\1/p" | head -n 1)"
+          current_code="$("$SDK_BUILD_TOOLS/aapt" dump badging "$APK" | sed -nE "s/.*versionCode='([0-9]+)'.*/\1/p" | head -n 1)"
           [[ "$previous_code" =~ ^[0-9]+$ ]]
           [[ "$current_code" =~ ^[0-9]+$ ]]
           test "$current_code" -gt "$previous_code"
@@ -115,7 +115,7 @@ jobs:
           cp /tmp/havana-v2-previous.apk HAVANA-NICE-V2-PREVIOUS.apk
           cp /tmp/havana-v2-latest.apk HAVANA-NICE-V2-LATEST.apk
           sha256sum HAVANA-NICE-V2-PREVIOUS.apk HAVANA-NICE-V2-LATEST.apk > SHA256SUMS.txt
-          printf 'HAVANA NICE V2: a single signed Android APK, updated in place.\\nPublished source: %s\\nLatest: HAVANA-NICE-V2-LATEST.apk\\nPrevious verified rollback: HAVANA-NICE-V2-PREVIOUS.apk\\n' "$GITHUB_SHA" > README.txt
+          printf 'HAVANA NICE V2: a single signed Android APK, updated in place.\nPublished source: %s\nLatest: HAVANA-NICE-V2-LATEST.apk\nPrevious verified rollback: HAVANA-NICE-V2-PREVIOUS.apk\n' "$GITHUB_SHA" > README.txt
           git add -A
           git diff --cached --check
           git commit -m "Publish single verified HAVANA NICE V2 Android update for $GITHUB_SHA"
