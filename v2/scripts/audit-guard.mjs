@@ -16,7 +16,6 @@ const pwaStyles = read('apps/pwa/src/styles.css');
 const serviceWorker = read('apps/pwa/public/sw.js');
 const workerConfig = read('cloudflare/wrangler.jsonc');
 const androidWorkflow = read('../.github/workflows/v2-android-apk.yml');
-const distributor = read('../.github/workflows/v2-apk-direct-download.yml');
 const readme = read('README.md');
 
 function absent(content,pattern,label) {
@@ -98,8 +97,9 @@ absent(workerConfig,/"V2_MEDIA_UPLOADS"\s*:\s*"enabled"/,
 present(readme,/R2 pendiente de activación/i,'README must accurately state R2 is not configured');
 present(androidWorkflow,/retention-days:\s*1\b/,'Keep Android build artifacts for one day');
 absent(androidWorkflow,/retention-days:\s*30\b/,'No 30-day APK artifacts');
-absent(distributor,/RUN_ID=\d{8,}/,'Distributor must not publish a pinned stale APK');
-present(distributor,/--commit "\$SHA"/,'Distributor must match exact Android source commit');
+absent(androidWorkflow,/gh run list|RUN_ID=/,'Single Android release must not poll another workflow');
+present(androidWorkflow,/DEST_BRANCH=havana-nice-v2-apk-downloads/,'Single release flow must publish only to V2 binaries');
+present(androidWorkflow,/HAVANA-NICE-V2-LATEST\.apk/,'One stable APK download filename');
 const androidConfig=JSON.parse(read('apps/android/app.json'));
 assert.equal(androidConfig.expo.android.package,'com.havananice.v2',
   'H01: never change Android package ID');
@@ -107,15 +107,15 @@ assert.ok(Number.isInteger(androidConfig.expo.android.versionCode) && androidCon
   'H01: release APK needs explicit Android versionCode');
 present(androidWorkflow,/EXPECTED_CODE/,'H01: verify actual APK versionCode matches app config');
 const apkSignerGate=read('scripts/apk-signature-gate.py');
-present(distributor,/python3 v2\/scripts\/apk-signature-gate\.py/,
+present(androidWorkflow,/python3 v2\/scripts\/apk-signature-gate\.py/,
   'H01: compare verified v2 signing certificates directly');
 present(apkSignerGate,/previous != current/,
   'H01: block release when public X.509 signing hashes differ');
 present(apkSignerGate,/APK Signature Scheme v2 not found/,
   'H01: refuse missing Android signing scheme');
-assert.ok(distributor.includes('test "$current_code" -gt "$previous_code"'),
+assert.ok(androidWorkflow.includes('test "$current_code" -gt "$previous_code"'),
   'H01: block non-monotonic Android versionCode');
-present(distributor,/sha256sum -c -/,'H01: verify hash of preceding released APK');
+present(androidWorkflow,/sha256sum -c -/,'H01: verify hash of preceding released APK');
 
 // C01: both interfaces anchor the long-press menu to a real bubble; do not
 // allow the old centered overlay or inert '+' to regress on Android/iPhone.
