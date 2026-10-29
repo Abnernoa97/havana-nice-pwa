@@ -10,7 +10,6 @@ import { loadLocalChat, saveLocalChat } from './local';
 import SwipeMessage, {type MessageAnchor} from './SwipeMessage';
 import ComposerIcon from './ChatComposerIcon';
 import ChatMediaView from './ChatMediaView';
-import {uploadOriginalMedia} from './media-upload';
 
 type PwaQueuedMedia={id:string;file:File;selection:ChatMediaSelection;batchIndex?:number};
 
@@ -113,52 +112,9 @@ export default function App() {
     }).catch(()=>{if(live)setMediaReady(false);});
     return()=>{live=false;};
   },[session?.token]);
-  async function sendSelectedMedia(){
-    if(!session||!mediaQueue.current.length||mediaUploading)return;
-    if(!mediaReady){setMediaError('El almacenamiento de archivos todavía no está configurado.');return;}
-    const batch=mediaBatchId.current||crypto.randomUUID();
-    mediaBatchId.current=batch;
-    const items=mediaQueue.current.map((item,index)=>({
-      ...item,batchIndex:item.batchIndex??index
-    }));
-    mediaQueue.current=items;setSelectedMedia([...items]);
-    const total=items.reduce((n,item)=>n+item.selection.sizeBytes,0);
-    const confirmed=new Map<string,number>();
-    let next=0;
-    const failures:string[]=[];
-    const report=()=>{
-      const sent=items.reduce((n,item)=>n+(confirmed.get(item.id)||0),0);
-      setMediaProgress(Math.min(100,Math.floor(sent/total*100)));
-    };
-    setMediaUploading(true);setMediaProgress(0);setMediaError('');
-    // Two independent originals at once, while each file keeps its own ordered
-    // 4 MiB resumable chunks. Never overlap chunks from the SAME Drive session.
-    try{
-      const worker=async()=>{
-        while(next<items.length){
-          const item=items[next++];
-          if(!item)break;
-          try{
-            await uploadOriginalMedia(session,item.selection,item.file,item.id,batch,
-              item.batchIndex!,({sent})=>{
-                confirmed.set(item.id,sent);report();
-              });
-            confirmed.set(item.id,item.selection.sizeBytes);report();
-            URL.revokeObjectURL(item.selection.uri);
-            mediaQueue.current=mediaQueue.current.filter(x=>x.id!==item.id);
-            setSelectedMedia([...mediaQueue.current]);
-            refreshLatest.current();
-          }catch(reason){
-            failures.push(reason instanceof Error?reason.message:'No se pudo subir');
-            // Keep this item and its stable id for an exact resumable retry.
-          }
-        }
-      };
-      await Promise.all(Array.from({length:Math.min(2,items.length)},()=>worker()));
-      if(!mediaQueue.current.length)mediaBatchId.current=null;
-      if(failures.length)setMediaError(failures[0]+
-        '. Los archivos pendientes siguen seleccionados para reintentar.');
-    }finally{setMediaUploading(false);}
+  function sendSelectedMedia(){
+    if(!selectedMedia.length)return;
+    setMediaError('Almacenamiento multimedia no configurado.');
   }
   const insertEmoji=(emoji:string)=>{
     if(editing&&savingEdit)return;
