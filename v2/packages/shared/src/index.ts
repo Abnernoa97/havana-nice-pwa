@@ -262,7 +262,7 @@ export function validateChatMediaSelection(
  if(typeof item.name!=='string'||!item.name.trim()||item.name.length>180||
     /[\\/\x00-\x1f\x7f]/.test(item.name))return 'Nombre de archivo no válido.';
  if(typeof item.mimeType!=='string'||!(rule.mimes as readonly string[]).includes(item.mimeType.toLowerCase()))
-  return 'Formato no admitido por HAVANA CLOUD.';
+  return 'Formato de archivo no admitido.';
  if(!Number.isSafeInteger(item.sizeBytes)||item.sizeBytes<=0||item.sizeBytes>rule.maxBytes)
   return 'El archivo está vacío o supera el límite permitido.';
  return null;
