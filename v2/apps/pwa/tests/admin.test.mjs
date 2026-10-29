@@ -44,7 +44,7 @@ test('new musician endpoint requires a separate verified Administrator token',()
  assert.match(backend,/url\.pathname === '\/api\/chat\/admin\/members'/);
  assert.match(backend,/if \(!await verifyAdminSession\(request,env\)\)/);
  assert.match(backend,/request\.method === 'POST'/);
- assert.match(backend,/INSERT OR IGNORE INTO chat_members\(username,actor_id,display_name,active,single_device_mode\)/);
+ assert.match(backend,/INSERT OR IGNORE INTO chat_members\(username,actor_id,display_name,active\)/);
  assert.match(backend,/created\.meta\?\.changes/);
  assert.match(backend,/Este nombre ya existe en el Administrador/);
  assert.match(backend,/notifyAdminClients\(env,'members'\)/);
