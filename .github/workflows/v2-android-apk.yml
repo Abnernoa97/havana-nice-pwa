@@ -106,21 +106,27 @@ jobs:
         run: |
           set -euo pipefail
           DEST_BRANCH=havana-nice-v2-apk-downloads
-          git config user.name havana-nice-v2-automation
-          git config user.email actions@users.noreply.github.com
+          # Expo prebuild updates the Android package manifest in the source checkout.
+          # Never switch branches in that dirty checkout. Publish from an isolated
+          # Git worktree so generated files cannot leak into the binary branch.
           git fetch origin "$DEST_BRANCH"
-          git switch -C "$DEST_BRANCH" FETCH_HEAD
-          # Do not keep 24 obsolete binary variants in the live branch.
-          find . -maxdepth 1 -name '*.apk' -type f -delete
-          cp /tmp/havana-v2-previous.apk HAVANA-NICE-V2-PREVIOUS.apk
-          cp /tmp/havana-v2-latest.apk HAVANA-NICE-V2-LATEST.apk
-          sha256sum HAVANA-NICE-V2-PREVIOUS.apk HAVANA-NICE-V2-LATEST.apk > SHA256SUMS.txt
-          printf 'HAVANA NICE V2: a single signed Android APK, updated in place.\nPublished source: %s\nLatest: HAVANA-NICE-V2-LATEST.apk\nPrevious verified rollback: HAVANA-NICE-V2-PREVIOUS.apk\n' "$GITHUB_SHA" > README.txt
-          git add -A
-          git diff --cached --check
-          git commit -m "Publish single verified HAVANA NICE V2 Android update for $GITHUB_SHA"
-          git -c http.postBuffer=524288000 push origin "HEAD:refs/heads/$DEST_BRANCH"
-          cp /tmp/havana-v2-latest.apk HAVANA-NICE-V2-FOUNDATION-STANDALONE.apk
+          RELEASE_DIR="$RUNNER_TEMP/havana-v2-publish"
+          git worktree add --detach "$RELEASE_DIR" FETCH_HEAD
+          (
+            cd "$RELEASE_DIR"
+            git config user.name havana-nice-v2-automation
+            git config user.email actions@users.noreply.github.com
+            # Keep just the current and verified previous installer at branch HEAD.
+            find . -maxdepth 1 -name '*.apk' -type f -delete
+            cp /tmp/havana-v2-previous.apk HAVANA-NICE-V2-PREVIOUS.apk
+            cp /tmp/havana-v2-latest.apk HAVANA-NICE-V2-LATEST.apk
+            sha256sum HAVANA-NICE-V2-PREVIOUS.apk HAVANA-NICE-V2-LATEST.apk > SHA256SUMS.txt
+            printf 'HAVANA NICE V2: a single signed Android APK, updated in place.\nPublished source: %s\nLatest: HAVANA-NICE-V2-LATEST.apk\nPrevious verified rollback: HAVANA-NICE-V2-PREVIOUS.apk\n' "$GITHUB_SHA" > README.txt
+            git add -A
+            git diff --cached --check
+            git commit -m "Publish single verified HAVANA NICE V2 Android update for $GITHUB_SHA"
+            git -c http.postBuffer=524288000 push origin "HEAD:refs/heads/$DEST_BRANCH"
+          )
 
       - name: Verify stable direct download
         shell: bash
