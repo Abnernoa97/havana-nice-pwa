@@ -80,7 +80,7 @@ const musicianRouteMethods=[...worker.matchAll(/url\.pathname === '\/api\/chat\/
   .map(match=>match[1]).sort();
 assert.deepEqual(musicianRouteMethods,['GET','POST'],
   'Musician Chat must expose only enrollment POST and restoration GET');
-assert.equal((worker.match(/INSERT OR IGNORE INTO chat_members\(username,actor_id,display_name,active,single_device_mode\)/g)||[]).length,1,
+assert.equal((worker.match(/INSERT OR IGNORE INTO chat_members\(username,actor_id,display_name,active\)/g)||[]).length,1,
   'Only one Administrator-created musician account INSERT is allowed');
 present(worker,/if \(!await verifyAdminSession\(request,env\)\)/,
   'Only authenticated Administrator may create a musician');
@@ -90,7 +90,7 @@ present(worker,/const claimed=await claimFirstInstallation/,
   'Every musician must pass the single-installation guard');
 absent(worker,/single_device_mode|closeUnboundChatSession/,
   'No legacy multi-device bypasses permitted');
-present(worker,/INSERT OR IGNORE INTO chat_members\(username,actor_id,display_name,active,single_device_mode\) VALUES\(\?,\?,\?,1,1\)/,
+present(worker,/INSERT OR IGNORE INTO chat_members\(username,actor_id,display_name,active\) VALUES\(\?,\?,\?,1\)/,
   'New musician records must use one Administrator-only enrollment path; every login claims its sole owner');
 present(android,/restoreNamedChatSession/,'Android must restore only authorized remembered sessions');
 present(pwa,/restoreNamedChatSession/,'PWA must restore only authorized remembered sessions');
