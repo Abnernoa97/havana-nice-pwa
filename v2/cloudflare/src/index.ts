@@ -412,20 +412,20 @@ export default {
         },400,origin);
         const actorId='member:'+crypto.randomUUID();
         const created=await env.DB.prepare(
-          'INSERT OR IGNORE INTO chat_members(username,actor_id,display_name,active,single_device_mode) VALUES(?,?,?,1,1)'
+          'INSERT OR IGNORE INTO chat_members(username,actor_id,display_name,active) VALUES(?,?,?,1)'
         ).bind(username,actorId,displayName).run();
         if(Number(created.meta?.changes)!==1)return respond({error:'Este nombre ya existe en el Administrador.'},409,origin);
         await notifyAdminClients(env,'members');
-        return respond({member:{actor_id:actorId,username,display_name:displayName,active:1,session_count:0,single_device_mode:1,installation_bound:0}},201,origin);
+        return respond({member:{actor_id:actorId,username,display_name:displayName,active:1,session_count:0,installation_bound:0}},201,origin);
       }
       // No bearer tokens, device secrets or private message history are returned.
       const members = await env.DB.prepare(
-        'SELECT m.actor_id,m.display_name,m.username,m.active,m.single_device_mode,'+
+        'SELECT m.actor_id,m.display_name,m.username,m.active,'+
         'MAX(CASE WHEN owner.actor_id IS NOT NULL THEN 1 ELSE 0 END) AS installation_bound,'+
         'COUNT(s.token_hash) AS session_count '+
         'FROM chat_members m LEFT JOIN chat_sessions s ON s.actor_id=m.actor_id AND s.expires_at>? '+
         'LEFT JOIN chat_single_device_owners owner ON owner.actor_id=m.actor_id '+
-        'GROUP BY m.actor_id,m.display_name,m.username,m.active,m.single_device_mode ORDER BY m.display_name'
+        'GROUP BY m.actor_id,m.display_name,m.username,m.active ORDER BY m.display_name'
       ).bind(Date.now()).all();
       return respond({members:members.results||[]},200,origin);
     }
@@ -438,7 +438,7 @@ export default {
       const username = normalizeMusicianName(payload?.displayName);
       if (!username) return respond({ error: 'Escribe tu nombre para entrar' }, 400, origin);
       const member = await env.DB.prepare(
-        'SELECT username,actor_id,display_name,single_device_mode FROM chat_members WHERE username=? AND active=1'
+        'SELECT username,actor_id,display_name FROM chat_members WHERE username=? AND active=1'
       ).bind(username).first();
       if (!member) return respond({ error: 'Tu nombre todavía no está autorizado. Solicita acceso al administrador.' }, 403, origin);
       const session=await createSession(env,member,request);
