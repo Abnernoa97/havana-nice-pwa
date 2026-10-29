@@ -1,6 +1,4 @@
 // @ts-nocheck
-import {handleUnifiedChatMedia,attachChatMedia,mediaConfigured,verifyMediaGrant} from './unified-media.js';
-import {handleCloudLinkAdmin} from './cloud-link.js';
 import { handleAdminSessionApi, verifyAdminSession } from './admin-auth.js';
 import { adminSocketToken, adminTokenRequest, notifyAdminClients } from './admin-realtime.js';
 import {handleAdminMemberManagement,recordMemberEvent,readMemberDevice} from './member-admin.js';
@@ -134,17 +132,6 @@ export class ChatRoom {
         this.sockets.delete(socket);this.members.delete(socket);this.typingSent.delete(socket);
       }
       this.broadcast({type:'chat.presence',users:this.onlineUsers()});
-      return respond({ok:true});
-    }
-    if (new URL(request.url).pathname === '/media-message-posted' && request.method === 'POST') {
-      const data=await request.json().catch(()=>null);
-      if(!Number.isSafeInteger(data?.seq)||data.seq<1)return respond({error:'Invalid message'},400);
-      const row=await this.env.DB.prepare(
-        'SELECT seq,client_message_id,sender_id,sender_name,body,created_at,reply_to_seq,edited_at,deleted_at FROM chat_messages WHERE seq=? AND deleted_at IS NULL'
-      ).bind(data.seq).first();
-      if(!row)return respond({error:'Message not found'},404);
-      const hydrated=await attachChatMedia(this.env,[mapMessage(row)]);
-      this.broadcast({type:'chat.message',message:hydrated[0]});
       return respond({ok:true});
     }
     if (new URL(request.url).pathname === '/admin-chat-message-deleted' && request.method === 'POST') {
@@ -392,25 +379,16 @@ export default {
     if (url.pathname === '/health') {
       let row = null, database = 'error';
       try { row = await env.DB.prepare('SELECT value FROM system_meta WHERE key = ?').bind('schema_version').first(); database = 'ok'; } catch {}
-      return respond({ ok: database === 'ok', app: 'havana-nice-v2', environment: env.HAVANA_ENV || 'development', database, schemaVersion: row?.value ?? null, realtime: 'configured', media: mediaConfigured(env)?'havana-cloud-google-drive':'havana-cloud-private-bridge-pending', chat: 'authorized-members-persistent-device-sessions-realtime' }, database === 'ok' ? 200 : 503, origin);
+      return respond({ ok: database === 'ok', app: 'havana-nice-v2', environment: env.HAVANA_ENV || 'development', database, schemaVersion: row?.value ?? null, realtime: 'configured', media: 'not-configured', chat: 'authorized-members-persistent-device-sessions-realtime' }, database === 'ok' ? 200 : 503, origin);
     }
-    // One authenticated photo/video gateway; a private Worker binding is required.
-    if(url.pathname.startsWith('/api/chat/media/')){
+    // No multimedia backend is configured. Only authenticated clients may read availability.
+    if (url.pathname.startsWith('/api/chat/media/')) {
       const token=(request.headers.get('authorization')||'').replace(/^Bearer\s+/i,'');
       const session=await verifySession(env,token);
-      // Administrator can view confirmed media, but cannot impersonate musicians
-      // or create uploads.
-      const delegated=request.method==='GET'&&/\/file$/.test(url.pathname)&&
-        await verifyMediaGrant(env,url);
-      const viewing=request.method==='GET'&&
-        (/\/(file|grant)$/.test(url.pathname))&&await verifyAdminSession(request,env);
-      if(!session&&!delegated&&!viewing)
-        return respond({error:'No autorizado'},401,origin);
-      const caller=session||{actorId:'admin',displayName:'Administrador'};
-      return handleUnifiedChatMedia(request,env,caller,url,origin,respond,
-        async seq=>{await env.CHAT_ROOMS.get(env.CHAT_ROOMS.idFromName(ROOM))
-          .fetch('https://internal/media-message-posted',
-            {method:'POST',body:JSON.stringify({seq})});});
+      if(!session)return respond({error:'No autorizado'},401,origin);
+      if(url.pathname==='/api/chat/media/status'&&request.method==='GET')
+        return respond({enabled:false,maxFilesPerSend:5},200,origin);
+      return respond({error:'Almacenamiento multimedia no configurado'},503,origin);
     }
     if (url.pathname === '/realtime/health') return env.CHAT_ROOMS.get(env.CHAT_ROOMS.idFromName('foundation-health')).fetch('https://internal/health');
     if (url.pathname === '/api/chat/admin/member-history' || url.pathname === '/api/chat/admin/member-delete-preview' || url.pathname === '/api/chat/admin/remove-member') {
@@ -453,9 +431,6 @@ export default {
         'GROUP BY m.actor_id,m.display_name,m.username,m.active,m.single_device_mode ORDER BY m.display_name'
       ).bind(Date.now()).all();
       return respond({members:members.results||[]},200,origin);
-    }
-    if (url.pathname.startsWith('/api/chat/admin/cloud/')) {
-      return handleCloudLinkAdmin(request,env,url,origin,respond);
     }
     if (url.pathname.startsWith('/api/chat/admin/auth/')) {
       return handleAdminSessionApi(request,env,url,origin,respond);
@@ -506,7 +481,7 @@ export default {
         const result = await env.DB.prepare(
           "SELECT seq,client_message_id,sender_id,sender_name,body,created_at,reply_to_seq,edited_at,deleted_at FROM chat_messages WHERE deleted_at IS NULL AND body LIKE ? ESCAPE '\\' ORDER BY seq DESC LIMIT 60"
         ).bind(needle).all();
-        return respond({messages:await attachChatMedia(env,(result.results||[]).map(mapMessage).reverse()),hasMore:false,reactions:[]},200,origin);
+        return respond({messages:(result.results||[]).map(mapMessage).reverse(),hasMore:false,reactions:[]},200,origin);
       }
       const after = url.searchParams.get('afterSeq');
       const seq = after === null ? null : Number(after);
@@ -529,7 +504,7 @@ export default {
       }
       const receipts = await env.DB.prepare('SELECT actor_id,display_name,last_read_seq FROM chat_read_receipts WHERE updated_at > ? LIMIT 100')
         .bind(new Date(Date.now()-7*86400000).toISOString()).all();
-      return respond({ messages: await attachChatMedia(env,rows.map(mapMessage)), reactions: reactions.map(r => ({messageSeq:r.message_seq,actorId:r.actor_id,emoji:r.emoji})),
+      return respond({ messages: rows.map(mapMessage), reactions: reactions.map(r => ({messageSeq:r.message_seq,actorId:r.actor_id,emoji:r.emoji})),
         receipts: (receipts.results||[]).map(r => ({actorId:r.actor_id,displayName:r.display_name,seq:r.last_read_seq})),
         hasMore: rows.length === MAX_HISTORY }, 200, origin);
     }
