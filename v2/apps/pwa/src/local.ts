@@ -8,6 +8,8 @@ export interface LocalChatState {
   editing?: ChatMessage | null;
   beforeEdit?: { draft:string; replyTo:ChatMessage|null } | null;
 }
+// Existing IndexedDB name intentionally retained for already-installed PWAs.
+// Renaming it without a tested data migration would strand sessions/drafts.
 const DB = 'havana-nice-v2-lab';
 const STORE = 'chat';
 const KEY = 'offline-outbox-v1';
