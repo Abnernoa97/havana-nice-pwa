@@ -180,6 +180,6 @@ export default function AdminChatGeneral({token,connected,liveEvent,onExpired}:P
     })}
   </div>
   {typing&&<p className="a-chat-typing">{typing.name} está escribiendo…</p>}
-  <p className="a-chat-viewer-note">Administrador: mensajes, fotografías y videos de los músicos. Los originales se guardan en HAVANA CLOUD.</p>
+  <p className="a-chat-viewer-note">Administrador: historial del Chat de los músicos. El almacenamiento de archivos todavía no está configurado.</p>
  </section>;
 }
