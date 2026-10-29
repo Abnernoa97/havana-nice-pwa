@@ -3,7 +3,7 @@
 **Auditoría cruzada y consolidación: 29 de octubre de 2026.**  
 **Fuente de desarrollo única:** repositorio `Abnernoa97/havana-nice-pwa`, rama `havana-nice-v2-foundation`.  
 **Tablero inalterado:** **12/27 hitos cerrados (44,4 %) · 15 abiertos**.  
-**Estado:** Chat/Administrador base conservados; seis tareas de saneamiento ya ejecutadas y publicación Android aún pendiente de verificar antes de R2.  
+**Estado:** Chat/Administrador base conservados; ocho tareas de saneamiento ejecutadas. Android 0.0.10 firmado, publicado y disponible; QA físico y contrato R2 todavía pendientes.  
 **Documento auxiliar:** [CONTINUIDAD-EXACTA.md](./CONTINUIDAD-EXACTA.md) es únicamente una bitácora de estado y relevo; **este archivo es el único plan de decisiones, hitos y prioridades**.
 
 ## 1. Objetivo y arquitectura que no se negocian
@@ -59,7 +59,7 @@ Actualmente el **único código fuente V2** se desarrolla en `havana-nice-v2-fou
 
 ### Android y seguridad: 3 cerrados, 3 abiertos
 
-- [x] **H01** — Base nativa firmada con actualización sobre la anterior. **Auditoría:** el principio y la firma se preservan; **distribución concreta de 0.0.10 pendiente**, cubierta por S-B/Q01, sin reabrir la base ya aprobada.
+- [x] **H01** — Base nativa firmada con actualización sobre la anterior. **Auditoría:** el principio y la firma se preservan; **distribución 0.0.10 publicada y comprobada: versionCode 9→10, firma igual**, cubierta por S-B/Q01, sin reabrir la base ya aprobada.
 - [ ] **H02** — Módulos no-Chat con PWA solo como capa visual Android. **Auditoría:** `visual.html` es una maqueta sin datos reales.
 - [ ] **H03** — Navegación, sesión y persistencia entre módulos. **Auditoría:** implementación completa pendiente.
 - [ ] **H04** — Actualización del aspecto visual PWA sin reinstalar Android. **Auditoría:** validación de actualización y caché pendiente.
@@ -84,15 +84,15 @@ Actualmente el **único código fuente V2** se desarrolla en `havana-nice-v2-fou
 - [ ] **Q01** — QA integral Android/PWA/Admin: firma, actualización sobre instalada, sesión, reconexión, caché, privacidad y reproducción. **Debe absorber las pruebas del saneamiento y de M01/M02.**
 - [ ] **Q02** — Paso a producción después de autorización y QA completos.
 
-**TOTAL INALTERADO: 12/27.** Saneamiento transversal: **6/10 tareas ejecutadas**; entrega Android, poda de APK, contrato R2 y QA pendientes. Ninguna tarea de limpieza siguiente es un hito 28 ni reemplaza el tablero original.
+**TOTAL INALTERADO: 12/27.** Saneamiento transversal: **8/10 tareas ejecutadas**; contrato R2 y QA físico pendientes. Ninguna tarea de limpieza siguiente es un hito 28 ni reemplaza el tablero original.
 
 ## 4. Fase prioritaria: SANEAMIENTO TRANSVERSAL DE V2
 
 **Objetivo:** resolver la auditoría ANTES de integrar R2. Esta es una lista operativa dentro de B01/B04/H01/S01/S02/Q01, **no una nueva versión ni un plan paralelo**. Cada casilla solo se marca con evidencia, nunca por intención.
 
 - [x] **S-A — Una sola línea de fuente:** formalizar `havana-nice-v2-foundation` como **única fuente V2**; mantener aislada la rama histórica `main`. No crear más ramas de trabajo ni migrar/reposicionar V1. Revisar configuración y documentación que aún confunde `main` con la fuente actual.
-- [ ] **S-B — Una cadena Android:** los dos workflows anteriores se unificaron en `v2-android-apk.yml`, con `build → firma/compatibilidad → publicación`. **Pendiente confirmar la ejecución completa y la entrega de APK 0.0.10** con certificado igual, `com.havananice.v2`, `versionCode=10`; una única URL estable `HAVANA-NICE-V2-LATEST.apk`.
-- [ ] **S-B2 — Depuración de binarios:** la rama `havana-nice-v2-apk-downloads` aún tiene **24 APK históricas (≈1,78 GB)**. El pipeline nuevo las sustituirá **solo tras firmar/verificar la actualización**, dejando `LATEST` y `PREVIOUS`. No confundir el borrado de archivos del HEAD con la eliminación de objetos Git históricos.
+- [x] **S-B — Una cadena Android:** workflow único `v2-android-apk.yml` **exitoso**, ejecución [40963966950](https://github.com/Abnernoa97/havana-nice-pwa/actions/runs/40963966950). APK 0.0.10 `com.havananice.v2` firmada; el control comparó certificados y confirmó `versionCode 9 → 10`. La URL estable `HAVANA-NICE-V2-LATEST.apk` respondió HTTP 200. **La instalación real sobre 0.0.9 se valida en S-I/Q01.**
+- [x] **S-B2 — Depuración de binarios:** la rama `havana-nice-v2-apk-downloads` pasó de **24 APK (≈1,78 GB) a exactamente 2 APK (≈154 MB)**: `HAVANA-NICE-V2-LATEST.apk` y `HAVANA-NICE-V2-PREVIOUS.apk`, verificado en el árbol Git. La limpieza se hizo únicamente en el HEAD de la rama de distribución; los objetos de commits históricos pueden seguir existiendo.
 - [x] **S-C — Configuración reproducible del Worker:** `wrangler.jsonc` ya declara `V2_ADMIN_LOGIN_MODE=enabled` y el secreto sigue exclusivamente en Cloudflare; las pruebas de fuente impiden divergencias. Verificar nuevamente al desplegar R2.
 - [x] **S-D — Autenticación sin reglas históricas paralelas:** se retiró la excepción `single_device_mode=0`, el inicio de sesión sin dueño y la ruta de salida heredada de músicos. El Worker final está desplegado con un único control de instalación. **No se eliminaron sesiones de músico.**
 - [x] **S-E — Retirar automatizaciones de una sola ejecución:** `expo-video@58.0.12` y el lock están fijados. Eliminado físicamente `.github/workflows/v2-media-deps-once.yml`; las pruebas prohíben su reaparición.
@@ -104,7 +104,7 @@ Actualmente el **único código fuente V2** se desarrolla en `havana-nice-v2-fou
 ### Orden obligatorio y dependencias
 
 **Primero:** S-A, S-C, S-E, S-F — ya ejecutadas y validadas en la fuente.  
-**Segundo:** S-B y S-B2 (unificar publicación antes de depurar APK).  
+**Segundo:** S-B y S-B2 — ejecutadas, publicación y dos binarios verificados.  
 **Tercero:** S-D y S-G — ejecutadas; S-I permanece abierto hasta QA y distribución comprobada.  
 **Cuarto:** cuando todo lo anterior esté confirmado, el propietario habilita R2 y comenzamos M01 → M02 → M04 de forma simultánea en Android nativo/PWA/Admin. M03/M05 permanecen aplazados según el plan.
 
@@ -119,6 +119,6 @@ Actualmente el **único código fuente V2** se desarrolla en `havana-nice-v2-fou
 
 ## 6. Próxima decisión operacional
 
-**Bloque actual: terminar S-B, S-B2 y S-I; S-H está ligado a R2.** El primer entregable debe ser **un flujo Android único con APK 0.0.10 verificable, configuración Worker sin divergencias y documentación sin afirmaciones falsas**, preservando los 12 hitos cerrados.
+**Bloque actual: S-I (prueba física de actualización Android, Chat/Admin/sesiones) y S-H (contrato R2).** El flujo Android ya tiene un único instalador vigente con firma comprobada. Mantener 12 hitos cerrados hasta QA real.
 
 Tras ello: activar R2 Standard privado dentro de la misma cuenta Cloudflare y desarrollar M01/M02/M04 sin migrar archivos de prueba.
