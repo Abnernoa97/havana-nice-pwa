@@ -84,7 +84,7 @@ Actualmente el **único código fuente V2** se desarrolla en `havana-nice-v2-fou
 - [ ] **Q01** — QA integral Android/PWA/Admin: firma, actualización sobre instalada, sesión, reconexión, caché, privacidad y reproducción. **Debe absorber las pruebas del saneamiento y de M01/M02.**
 - [ ] **Q02** — Paso a producción después de autorización y QA completos.
 
-**TOTAL INALTERADO: 12/27.** Saneamiento transversal: **9/10 tareas completadas**, incluida la definición del contrato R2. **S-I / QA físico pendiente**; M01/M02/M04 todavía no implementados. Ninguna tarea de limpieza siguiente es un hito 28 ni reemplaza el tablero original.
+**TOTAL INALTERADO: 12/27.** Saneamiento transversal: **10/10 tareas cerradas**, tras la confirmación de instalación Android 0.0.10 del propietario. **Q01** sigue abierto para QA integral; M01/M02/M04 todavía no implementados. Ninguna tarea de limpieza siguiente es un hito 28 ni reemplaza el tablero original.
 
 ## 4. Fase prioritaria: SANEAMIENTO TRANSVERSAL DE V2
 
@@ -146,6 +146,6 @@ Actualmente el **único código fuente V2** se desarrolla en `havana-nice-v2-fou
 
 ## 6. Próxima decisión operacional
 
-**Bloque actual: S-I (prueba física de actualización Android, Chat/Admin/sesiones). S-H quedó definido en este plan; R2 aún deshabilitado.** El flujo Android ya tiene un único instalador vigente con firma comprobada. Mantener 12 hitos cerrados hasta QA real.
+**Saneamiento 10/10 cerrado en la fuente; próximo bloque R2, aún deshabilitado por Cloudflare. QA integral Q01 sigue pendiente.** El flujo Android ya tiene un único instalador vigente con firma comprobada. Mantener 12 hitos cerrados hasta QA real.
 
 Tras ello: activar R2 Standard privado dentro de la misma cuenta Cloudflare y desarrollar M01/M02/M04 sin migrar archivos de prueba.
