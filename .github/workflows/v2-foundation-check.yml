@@ -47,6 +47,31 @@ jobs:
       - name: Install exact dependencies
         run: npm ci
 
+      # Temporary read-only dependency report; never changes lockfile or installed packages.
+      - name: Diagnose V2 dependency advisories without updates
+        shell: bash
+        run: |
+          set +e
+          npm audit --json > /tmp/havana-v2-dependency-audit.json
+          audit_code=$?
+          set -e
+          echo "Audit exit code: $audit_code (advisories reported do not fail this diagnostic step)"
+          node --input-type=commonjs - <<'NODE'
+          const fs=require('node:fs');
+          const d=JSON.parse(fs.readFileSync('/tmp/havana-v2-dependency-audit.json','utf8'));
+          console.log('V2_AUDIT_TOTALS',JSON.stringify(d.metadata?.vulnerabilities||{}));
+          for(const [name,v] of Object.entries(d.vulnerabilities||{}).sort((a,b)=>a[0].localeCompare(b[0]))){
+            const issues=(v.via||[]).filter(x=>typeof x==='object').map(x=>({
+              title:x.title,severity:x.severity,range:x.range,url:x.url
+            }));
+            console.log('V2_AUDIT_PACKAGE',JSON.stringify({
+              name,severity:v.severity,isDirect:v.isDirect,range:v.range,
+              effects:v.effects,fixAvailable:v.fixAvailable,issues,
+              viaPackages:(v.via||[]).filter(x=>typeof x==='string')
+            }));
+          }
+          NODE
+
       - name: Typecheck all workspaces
         run: npm run typecheck
 
