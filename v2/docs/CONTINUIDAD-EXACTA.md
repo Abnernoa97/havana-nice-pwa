@@ -48,6 +48,16 @@
 - CI final [41011185017](https://github.com/Abnernoa97/havana-nice-pwa/actions/runs/41011185017) **SUCCESS** en TypeScript, pruebas nuevas de calendario, reglas de acceso, seguridad del Chat, build PWA y export Android.
 - **P02/H02/H03 permanecen abiertos:** hace falta conectar pantallas, desplegar el Worker tras migración segura, validar la experiencia real en Admin/PWA/Android. No instalar otra APK mientras solo exista backend preparatorio.
 
+## HOME conectada a autorización original — 30 octubre 2026
+
+- El acceso autorizado dejó de ser la puerta exclusiva al Chat: en la fuente V2, la sesión válida existente abre HOME y desde HOME entra al Chat. Ninguna función de emisión/restauración de credenciales, registro de músico, token, base D1, DO ni caché local ha sido reemplazada.
+- Android: `NativeMemberHome.tsx` es por ahora la capa de navegación funcional; el Chat React Native sigue montado en `App.tsx`, incluso al ver HOME, mediante ocultación de vista. No hay WebView ni segundo Chat. El trabajo PWA visual dentro de Android es parte de H02 y aún no está cerrado.
+- PWA: una sola HOME reutiliza `VisualApp.tsx` dentro de la aplicación autenticada y mantiene el Chat existente en el DOM. `visual.html` sigue siendo presentación sin sesión.
+- Módulos compartidos: `packages/shared/src/memberModules.ts` provee las seis entradas, sin datos inventados. Los pendientes no se deben marcar como implementados.
+- Prueba [41012373606](https://github.com/Abnernoa97/havana-nice-pwa/actions/runs/41012373606) **SUCCESS**; PWA Pages publicó el commit de HOME y se disparó compilación oficial 0.0.11 (aún verificar salida e instalación).
+- **Seguridad:** no volver a introducir ingreso independiente en HOME, ni liberar sesiones, ni reinstalar/resetear aplicaciones. Próximo QA manual: al actualizar, HOME debe abrir conservando la identidad, Chat debe continuar donde estaba, volver a Inicio no debe cortar WebSocket ni perder borradores.
+- H02/H03/P01 **parciales; 12/27**, no cerrar hasta validar físicas y visual final.
+
 ## Próximo trabajo de desarrollo
 
 1. **H02 → H03:** integración segura de los módulos no-Chat en Android. Mantener Chat 100 % React Native, aprovechar PWA solo para presentación y utilizar contratos/backend V2 únicos. Prioridad funcional, no colores/interfaz.
