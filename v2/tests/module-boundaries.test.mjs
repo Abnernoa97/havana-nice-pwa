@@ -8,7 +8,9 @@ const screens=[
   ['HOME PWA','apps/pwa/src/VisualApp.tsx'],
   ['Calendario Android','apps/android/NativeCalendar.tsx'],
   ['Calendario PWA','apps/pwa/src/CalendarAccordion.tsx'],
-  ['Calendario Administrador','apps/pwa/src/AdminCalendar.tsx']
+  ['Calendario Administrador','apps/pwa/src/AdminCalendar.tsx'],
+  ['Repertorio del músico','apps/pwa/src/MemberRepertoire.tsx'],
+  ['Repertorio de Administración','apps/pwa/src/AdminRepertoire.tsx']
 ];
 
 test('A01: HOME lists the same modules from a single shared contract',()=>{
@@ -76,4 +78,24 @@ test('A09: independent module tests must not modify legacy or introduce a second
   assert.match(guard,/V2 development branch must not include unused main-era root files/);
   assert.doesNotMatch(workerConfig,/"services"\s*:/);
   assert.match(read('../.github/workflows/v2-foundation-check.yml'),/Test isolated V2 Calendar without changing live D1/);
+});
+
+test('A04: Repertoire cannot create parallel sessions or mutate Chat/Calendar content',()=>{
+ for(const file of ['apps/pwa/src/MemberRepertoire.tsx','apps/pwa/src/AdminRepertoire.tsx',
+  'packages/shared/src/repertoire.ts','cloudflare/src/repertoire.js']){
+  const source=read(file);
+  assert.doesNotMatch(source,/startNamedChatSession|restoreNamedChatSession|chat_messages|CHAT_ROOMS|chat_single_device_owners|localStorage|AsyncStorage|WebSocket/);
+ }
+ const api=read('cloudflare/src/repertoire.js');
+ assert.match(api,/verifyAdminSession/);
+ assert.match(api,/verifyMusicianSession/);
+ assert.match(api,/calendar_event_recipients/);
+ assert.doesNotMatch(api,/\b(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+chat_/i);
+ assert.doesNotMatch(api,/\b(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+calendar_/i);
+ const handler=read('cloudflare/src/index.ts');
+ assert.match(handler,/handleRepertoireApi\(request,env,url,origin,respond,verifySession\)/);
+ const ui=read('apps/pwa/src/MemberRepertoire.tsx');
+ assert.match(ui,/getEventRepertoire/);
+ assert.doesNotMatch(ui,/adminCreateSong|adminDeleteSong|adminAddEventSongs/);
+ assert.match(read('cloudflare/migrations/0020_repertoire.sql'),/REFERENCES calendar_events/);
 });
