@@ -17,7 +17,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: havana-nice-v2-foundation-check
@@ -323,21 +323,20 @@ jobs:
             grep -q '"error"' /tmp/hnv2-cal-private.json
           done
 
-      # ONE-TIME bundle handoff for a controlled Repertoire Worker canary.
-      - name: Stage signed-off V2 Repertoire Worker candidate
+      - name: Canary-test private Repertoire without moving any Chat traffic
         shell: bash
         run: |
           set -euo pipefail
-          SOURCE="$(find /tmp/havana-v2-worker-preview -maxdepth 1 -type f \( -name '*.js' -o -name '*.mjs' \) | head -n 1)"
-          test -n "$SOURCE"
-          test -s "$SOURCE"
-          mkdir -p cloudflare/.worker-release-staging
-          cp "$SOURCE" cloudflare/.worker-release-staging/worker.mjs
-          node --check cloudflare/.worker-release-staging/worker.mjs
-          git config user.name 'HAVANA V2 CI'
-          git config user.email 'actions@users.noreply.github.com'
-          git add cloudflare/.worker-release-staging/worker.mjs
-          if ! git diff --cached --quiet; then
-            git commit -m 'chore(v2): one-time verified Repertoire Worker bundle'
-            git push origin HEAD:havana-nice-v2-foundation
-          fi
+          BASE="https://havana-nice-v2-dev.soloaplicaciones97.workers.dev"
+          VERSION='havana-nice-v2-dev="4a1cbda7-5365-4746-b679-08a28646d590"'
+          HTTP="$(curl -sS -o /tmp/hnv2-rep-health.json -w '%{http_code}' \
+            -H "Cloudflare-Workers-Version-Overrides: $VERSION" "$BASE/health")"
+          test "$HTTP" = "200"
+          grep -q '"app":"havana-nice-v2"' /tmp/hnv2-rep-health.json
+          for ENDPOINT in /api/repertoire/songs /api/repertoire/admin/songs /api/calendar/events /api/chat/messages; do
+            HTTP="$(curl -sS -o /tmp/hnv2-rep-unauth.json -w '%{http_code}' \
+              -H "Cloudflare-Workers-Version-Overrides: $VERSION" "$BASE$ENDPOINT")"
+            echo "$ENDPOINT => $HTTP"
+            test "$HTTP" = "401"
+            grep -q '"error"' /tmp/hnv2-rep-unauth.json
+          done
