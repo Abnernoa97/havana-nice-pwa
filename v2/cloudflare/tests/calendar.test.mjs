@@ -119,7 +119,7 @@ test('freeform date, punctuation, custom status and non-URL map text are preserv
  const result=await request(e,'/api/calendar/admin/events',{method:'POST',body:flexible});
  assert.equal(result.status,201,JSON.stringify(result.data));
  const stored=e.DB.raw.prepare('SELECT event_date,date_sort,status_text,map_url FROM calendar_events').get();
- assert.deepEqual(stored,{event_date:'14/11/2026',date_sort:'2026-11-14',
+ assert.deepEqual({...stored},{event_date:'14/11/2026',date_sort:'2026-11-14',
   status_text:'¡CONFIRMADO! #2026',map_url:'Mapa: calle 20 #35'});
  const read=await request(e,'/api/calendar/events',{token:'musician'});
  assert.equal(read.data.events[0].statusText,flexible.statusText);
