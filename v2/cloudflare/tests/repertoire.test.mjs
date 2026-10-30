@@ -106,6 +106,15 @@ test('Special, completion, reorder and removal are Admin only',async()=>{
  assert.equal((await api(env,'/api/repertoire/admin/items/'+ids[1],{method:'DELETE'})).status,200);
  assert.equal((await api(env,items)).data.items.length,1);
 });
+test('Malformed special payload returns a client error without modifying event list',async()=>{
+ const env=await setup();
+ for(const payload of [{special:'bad'}, {special:42}, {special:[]}, {special:null}]){
+  const res=await api(env,items,{method:'POST',payload});
+  assert.equal(res.status,400,JSON.stringify({payload,response:res.data}));
+ }
+ assert.equal((await api(env,items)).data.items.length,0);
+});
+
 test('Unassigned events remain private without affecting Chat or Calendar tables',async()=>{
  const env=await setup();
  assert.equal((await api(env,'/api/repertoire/events/'+EVENT+'/items',

@@ -114,7 +114,8 @@ export async function handleRepertoireApi(request,env,url,origin,respond,verifyM
      if(!masterIds.length||masterIds.length>100||new Set(masterIds).size!==masterIds.length||!masterIds.every(id=>typeof id==='string'&&UUID.test(id)))
       return reply({error:'Selecciona canciones válidas'},400);
     }
-    if(!isMaster&&!data?.special)return reply({error:'Canciones inválidas'},400);
+    if(!isMaster&&(!data?.special||typeof data.special!=='object'||Array.isArray(data.special)))
+     return reply({error:'Canción especial inválida'},400);
     const custom=isMaster?null:{title:text(data.special.title??'',180,'Título',true),
      artist:text(data.special.artist??'',180,'Artista'),referenceUrl:safeLink(data.special.referenceUrl)};
     const event=await env.DB.prepare('SELECT id FROM calendar_events WHERE id=?').bind(eventId).first();

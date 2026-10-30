@@ -4,16 +4,10 @@ import {verifyAdminSession} from './admin-auth.js';
 const ID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // The canonical musician actor IDs are member:<opaque-id>, NOT event UUIDs.
 const ACTOR_ID=/^member:[a-z0-9_-]{1,64}$/i;
-const DATE=/^\d{4}-\d{2}-\d{2}$/;
 const STATUSES=new Set(['tentative','confirmed','cancelled']);
 const COLUMNS='e.id,e.event_date,e.time_zone,e.title,e.venue,e.city,e.call_time,e.soundcheck_time,e.arrival_time,e.show_time,e.end_time,e.wardrobe,e.details,e.contact_name,e.contact_phone,e.notes,e.map_url,e.status,e.status_text,e.version,e.updated_at';
 const PAGE_SIZE=100;
-const ERR={401:'No autorizado',400:'Solicitud inválida',409:'La fecha cambió. Actualiza antes de editar.'};
-function dateValid(value){
- if(typeof value!=='string'||!DATE.test(value))return false;
- const parsed=new Date(value+'T00:00:00Z');
- return Number.isFinite(parsed.getTime())&&parsed.toISOString().slice(0,10)===value;
-}
+const ERR={401:'No autorizado',409:'La fecha cambió. Actualiza antes de editar.'};
 function string(value,max,label,required=false){
  if(typeof value!=='string')throw Error(label+' debe ser texto');
  const text=value.normalize('NFC').trim();

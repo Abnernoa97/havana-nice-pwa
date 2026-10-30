@@ -1,4 +1,4 @@
-import {useCallback,useEffect,useState,type FormEvent} from 'react';
+import {useCallback,useEffect,useRef,useState,type FormEvent} from 'react';
 import {getCalendarEvents,calendarDate,HAVANA_V2_DEV_API_BASE_URL,getRepertoireSongs,
  getEventRepertoire,safeRepertoireLink,type RepertoireSong,type RepertoireSongInput,
  type RepertoireEventItem,type CalendarEvent} from '@havana/shared';
@@ -13,6 +13,9 @@ export default function AdminRepertoire({token,onExpired}:{token:string;onExpire
  const [songs,setSongs]=useState<RepertoireSong[]>([]);
  const [events,setEvents]=useState<CalendarEvent[]>([]);
  const [eventId,setEventId]=useState('');
+ const eventIdRef=useRef(eventId);
+ eventIdRef.current=eventId;
+ const itemsRequest=useRef(0);
  const [items,setItems]=useState<RepertoireEventItem[]>([]);
  const [editing,setEditing]=useState<RepertoireSong|null>(null);
  const [form,setForm]=useState<RepertoireSongInput>(empty);
@@ -23,7 +26,7 @@ export default function AdminRepertoire({token,onExpired}:{token:string;onExpire
  const [loading,setLoading]=useState(true);
  const [error,setError]=useState('');
  const [notice,setNotice]=useState('');
- const [open,setOpen]=useState<'event'|'general'>('event');
+ const [open,setOpen]=useState<'event'|'general'|null>('event');
  const capture=(e:unknown)=>{if(isAdminUnauthorized(e))onExpired();
   setError(e instanceof Error?e.message:'No se pudo guardar Repertorio.');};
  const refresh=useCallback(async()=>{
@@ -38,20 +41,36 @@ export default function AdminRepertoire({token,onExpired}:{token:string;onExpire
   finally{setLoading(false);}
  },[token,onExpired]);
  const refreshItems=useCallback(async(id:string)=>{
+  // Ignore stale responses when the Admin switches events while a request is in flight.
+  const request=++itemsRequest.current;
   if(!id){setItems([]);return;}
-  try{setItems(await getEventRepertoire(token,id,true));setError('');}
-  catch(e){if(isAdminUnauthorized(e))onExpired();else setError(e instanceof Error?e.message:'No se pudo cargar la lista del evento.');}
+  try{
+   const next=await getEventRepertoire(token,id,true);
+   if(request===itemsRequest.current&&eventIdRef.current===id){
+    setItems(next);setError('');
+   }
+  }catch(e){
+   if(request===itemsRequest.current&&eventIdRef.current===id){
+    if(isAdminUnauthorized(e))onExpired();
+    else setError(e instanceof Error?e.message:'No se pudo cargar la lista del evento.');
+   }
+  }
  },[token,onExpired]);
  useEffect(()=>{
   void refresh();
-  const onResume=()=>{if(!document.hidden)void refresh();};
+  const onResume=()=>{
+   if(document.hidden)return;
+   void refresh();
+   if(eventIdRef.current)void refreshItems(eventIdRef.current);
+  };
   const timer=window.setInterval(onResume,30000);
   window.addEventListener('online',onResume);
   document.addEventListener('visibilitychange',onResume);
   return()=>{window.clearInterval(timer);window.removeEventListener('online',onResume);
    document.removeEventListener('visibilitychange',onResume);};
- },[refresh]);
+ },[refresh,refreshItems]);
  useEffect(()=>{void refreshItems(eventId);setChecked([]);},[eventId,refreshItems]);
+ useEffect(()=>()=>{itemsRequest.current+=1;},[]);
  const wrap=async(action:()=>Promise<unknown>,message:string)=>{
   if(busy)return;
   setBusy(true);setError('');setNotice('');
@@ -117,13 +136,13 @@ export default function AdminRepertoire({token,onExpired}:{token:string;onExpire
   {loading?<p>Cargando repertorio…</p>:<>
    <article className="a-rep-section">
     <button type="button" className="a-cal-summary" aria-expanded={open==='event'}
-     onClick={()=>setOpen('event')}>
+     onClick={()=>setOpen(v=>v==='event'?null:'event')}>
      <span><strong>Repertorio del evento</strong><small>Lista del día · canciones y especiales</small></span>
      <b>{open==='event'?'−':'+'}</b>
     </button>
     {open==='event'&&<div className="a-rep-body">
      <label className="a-cal-field"><span>Evento del Calendario</span>
-      <select value={eventId} onChange={e=>setEventId(e.target.value)}>
+      <select value={eventId} disabled={busy} onChange={e=>{setItems([]);setEventId(e.target.value);}}>
        {events.length===0?<option value="">No hay eventos</option>:
         events.map(e=><option key={e.id} value={e.id}>{calendarDate(e.date)} · {e.title}</option>)}
       </select>
@@ -172,7 +191,7 @@ export default function AdminRepertoire({token,onExpired}:{token:string;onExpire
    </article>
    <article className="a-rep-section">
     <button type="button" className="a-cal-summary" aria-expanded={open==='general'}
-     onClick={()=>setOpen('general')}>
+     onClick={()=>setOpen(v=>v==='general'?null:'general')}>
      <span><strong>Repertorio general</strong><small>{songs.length} canciones · ENGLISH / ESPAÑOL y más categorías</small></span>
      <b>{open==='general'?'−':'+'}</b>
     </button>
