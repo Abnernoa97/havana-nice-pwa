@@ -136,6 +136,23 @@ export async function handleRepertoireApi(request,env,url,origin,respond,verifyM
     return reply({added:statements.length,items:await loadItems(env.DB,eventId)},201);
    }
   }
+  const orderPath=/^\/api\/repertoire\/admin\/events\/([0-9a-f-]+)\/order$/.exec(path);
+  if(orderPath&&UUID.test(orderPath[1])&&request.method==='POST'){
+   const eventId=orderPath[1],data=await body(request);
+   const ids=data?.itemIds;
+   if(!Array.isArray(ids)||ids.length>250||!ids.every(id=>typeof id==='string'&&UUID.test(id))||
+      new Set(ids).size!==ids.length)return reply({error:'Orden inválido'},400);
+   const stored=await env.DB.prepare('SELECT id FROM repertoire_event_items WHERE event_id=?').bind(eventId).all();
+   const existing=(stored.results||[]).map(x=>x.id);
+   if(existing.length!==ids.length||!existing.every(id=>ids.includes(id)))return reply({error:'La lista cambió; actualiza antes de ordenarla.'},409);
+   if(ids.length){
+    const now=new Date().toISOString();
+    await env.DB.batch(ids.map((id,i)=>env.DB.prepare(
+     'UPDATE repertoire_event_items SET position=?,updated_at=? WHERE event_id=? AND id=?')
+      .bind(i,now,eventId,id)));
+   }
+   return reply({items:await loadItems(env.DB,eventId)});
+  }
   const itemPath=/^\/api\/repertoire\/admin\/items\/([0-9a-f-]+)$/.exec(path);
   if(itemPath&&UUID.test(itemPath[1])){
    if(request.method==='DELETE'){
