@@ -88,7 +88,7 @@
 - La fecha del evento real en D1 es texto libre `14dic26`. El código compartido actual de `calendarDate` la devuelve tal cual; PWA del músico mostró `Invalid Date` antes de cargar la compilación reciente. Se debe comprobar con apertura/recarga normal en línea **sin borrar datos de la PWA ni tocar Chat**.
 - Se añadió `tests/calendar-free-text-ui.test.mjs` (ejecuta el módulo TS real compilado en memoria y exige ausencia de `Invalid Date`, mapas HTTPS seguros y uso compartido en Android/PWA/Admin). Añadido paso permanente al CI, sin cambios en interfaces ni sesión.
 - `cloudflare/tests/calendar.test.mjs` extendido con ciclo completo **crear para 3 músicos → lectura autorizada por cada uno → editar/reasignar a uno → rechazar DELETE obsoleto → eliminar y confirmar que no quedan destinatarios**, todo en SQLite `:memory:`; no se realiza ninguna mutación de eventos de producción.
-- **No cerrar P02/A03** hasta ver la fecha sin `Invalid Date` en PWA del músico, probar 0.0.13 nativo y editar/eliminar desde el panel real de Administrador. `12/36` hitos cerrados. Nuevos tests en workflow [41104356896](https://github.com/Abnernoa97/havana-nice-pwa/actions/runs/41104356896), cuyo resultado debe confirmarse antes de citarlo como aprobado.
+- **No cerrar P02/A03** hasta ver la fecha sin `Invalid Date` en PWA del músico, probar 0.0.13 nativo y editar/eliminar desde el panel real de Administrador. `12/36` hitos cerrados. Nuevos tests en workflow [41104356896](https://github.com/Abnernoa97/havana-nice-pwa/actions/runs/41104356896) **SUCCESS**, commit `a92fc54d0889580fb567aa54d93331232a9bd1bd`. No implica aprobación física de `14dic26` en PWA o Android.
 
 ## Próximo trabajo de desarrollo
 
