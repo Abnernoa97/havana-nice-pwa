@@ -17,7 +17,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: havana-nice-v2-foundation-check
@@ -295,3 +295,21 @@ jobs:
             https://havana-nice-v2-dev.pages.dev/manifest.webmanifest \
             | tee /tmp/havana-manifest.json
           grep -q 'HAVANA NICE V2' /tmp/havana-manifest.json
+
+
+      # One-time validated bundle handoff; remove this step and staging file after deployment.
+      - name: Stage verified Worker bundle for controlled Cloudflare version upload
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE="$(find /tmp/havana-v2-worker-preview -maxdepth 1 -type f \( -name '*.js' -o -name '*.mjs' \) | head -n 1)"
+          test -n "$SOURCE"
+          test -s "$SOURCE"
+          mkdir -p cloudflare/.worker-release-staging
+          cp "$SOURCE" cloudflare/.worker-release-staging/worker.mjs
+          node --check cloudflare/.worker-release-staging/worker.mjs
+          git config user.name 'HAVANA V2 CI'
+          git config user.email 'actions@users.noreply.github.com'
+          git add cloudflare/.worker-release-staging/worker.mjs
+          git commit -m 'chore(v2): one-time verified Worker release bundle' 
+          git push origin HEAD:havana-nice-v2-foundation
