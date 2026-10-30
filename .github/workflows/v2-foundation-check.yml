@@ -296,16 +296,17 @@ jobs:
             | tee /tmp/havana-manifest.json
           grep -q 'HAVANA NICE V2' /tmp/havana-manifest.json
 
-      - name: Smoke-test new Worker version at 0 percent without moving Chat traffic
+      - name: Verify live V2 Calendar and Chat boundaries after deployment
         shell: bash
         run: |
           set -euo pipefail
           BASE="https://havana-nice-v2-dev.soloaplicaciones97.workers.dev"
-          VERSION='havana-nice-v2-dev="40f8eec3-cf4f-471c-a53c-bd9c381ed10f"'
-          for ENDPOINT in /health /api/calendar/events /api/calendar/admin/events /api/chat/messages; do
-            STATUS="$(curl --silent --show-error -o /tmp/hnv2-calendar-canary.json -w '%{http_code}' \
-              -H "Cloudflare-Workers-Version-Overrides: $VERSION" "$BASE$ENDPOINT")"
-            echo "$ENDPOINT override result: $STATUS"
-            test "$STATUS" = "$([ "$ENDPOINT" = "/health" ] && echo 200 || echo 401)"
-            grep -Eq '"app":"havana-nice-v2"|"error"' /tmp/hnv2-calendar-canary.json
+          STATUS="$(curl --silent --show-error -o /tmp/hnv2-cal-health.json -w '%{http_code}' "$BASE/health")"
+          test "$STATUS" = "200"
+          grep -q '"app":"havana-nice-v2"' /tmp/hnv2-cal-health.json
+          for ENDPOINT in /api/calendar/events /api/calendar/admin/events /api/chat/messages; do
+            STATUS="$(curl --silent --show-error -o /tmp/hnv2-cal-private.json -w '%{http_code}' "$BASE$ENDPOINT")"
+            echo "$ENDPOINT -> $STATUS"
+            test "$STATUS" = "401"
+            grep -q '"error"' /tmp/hnv2-cal-private.json
           done
