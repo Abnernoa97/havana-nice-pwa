@@ -1,10 +1,28 @@
-// @ts-nocheck
 import { handleAdminSessionApi, verifyAdminSession } from './admin-auth.js';
 import { adminSocketToken, adminTokenRequest, notifyAdminClients } from './admin-realtime.js';
 import {handleAdminMemberManagement,recordMemberEvent,readMemberDevice} from './member-admin.js';
 import {handleAdminChat} from './admin-chat.js';
 import {deleteChatMessageRecord} from './message-removal.js';
 import {claimFirstInstallation,auditDuplicateInstallation,handleSingleInstallationAdmin} from './single-installation.js';
+// Compile-time contracts only. These definitions do not change runtime behavior.
+interface V2Env {
+  DB: D1Database;
+  CHAT_ROOMS: DurableObjectNamespace;
+  HAVANA_ENV?: string;
+  V2_ADMIN_LOGIN_MODE?: string;
+  V2_ADMIN_LOGIN_SECRET?: string;
+}
+interface MusicianRow { actor_id: string; display_name: string; username?: string }
+interface ChatMessageRow {
+  seq: number; client_message_id: string; sender_id: string; sender_name: string;
+  body: string; created_at: string; reply_to_seq: number|null;
+  edited_at: string|null; deleted_at: string|null;
+}
+interface ReactionRow {message_seq:number;actor_id:string;emoji:string}
+interface ReceiptRow {actor_id:string;display_name:string;last_read_seq:number}
+interface MemberPresence { actorId:string; name:string; enrollmentToken:string }
+type ChatEvent = {type:string;[key:string]:unknown};
+
 // HAVANA NICE V2 isolated Worker. Only D1-authorized musician names may enroll.
 // Random durable device credentials are issued once and validated against D1 on every request.
 const encoder = new TextEncoder();
@@ -14,7 +32,7 @@ const MAX_TEXT = 2000;
 const MAX_HISTORY = 100;
 const CHAT_EDIT_WINDOW_MS = 15 * 60 * 1000;
 
-function respond(data, status = 200, origin = '') {
+function respond(data: unknown, status = 200, origin = '') {
   return new Response(JSON.stringify(data), { status, headers: {
     'content-type': 'application/json; charset=utf-8',
     'cache-control': 'no-store',
@@ -22,7 +40,7 @@ function respond(data, status = 200, origin = '') {
     'vary': 'Origin',
   } });
 }
-function trustedOrigin(origin) {
+function trustedOrigin(origin: string | null) {
   if (!origin) return '';
   try {
     const url = new URL(origin);
@@ -33,21 +51,21 @@ function trustedOrigin(origin) {
   } catch {}
   return '';
 }
-function b64(bytes) {
+function b64(bytes: Uint8Array) {
   return btoa(String.fromCharCode(...bytes)).split('+').join('-').split('/').join('_').replace(/=+$/, '');
 }
-async function sha256(value) {
+async function sha256(value: string) {
   return [...new Uint8Array(await crypto.subtle.digest('SHA-256', encoder.encode(value)))].map(x => x.toString(16).padStart(2, '0')).join('');
 }
 // A musician enters their own name once. A server-side allowlist, not a
 // password, controls whether that name has access. Store only token hashes.
 const MEMBER_SESSION_EXPIRY = Date.UTC(2100, 0, 1);
-function normalizeMusicianName(value) {
+function normalizeMusicianName(value: unknown) {
   if (typeof value !== 'string') return '';
   const name = value.trim().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ');
   return /^[a-z][a-z0-9 _-]{0,27}$/.test(name) ? name : '';
 }
-async function createSession(env, member, request) {
+async function createSession(env: V2Env, member: MusicianRow, request: Request) {
   const token = b64(crypto.getRandomValues(new Uint8Array(32)));
   const tokenHash=await sha256(token);
   // Every Admin-authorized musician name belongs to one installation.
@@ -59,7 +77,7 @@ async function createSession(env, member, request) {
   await recordMemberEvent(env,member.actor_id,'login',request).catch(()=>{});
   return { token, actorId: member.actor_id, displayName: member.display_name, expiresAt: new Date(MEMBER_SESSION_EXPIRY).toISOString() };
 }
-async function verifySession(env, token) {
+async function verifySession(env: V2Env, token: unknown) {
   if (typeof token !== 'string' || !/^[A-Za-z0-9_-]{40,100}$/.test(token)) return null;
   try {
     const row = await env.DB.prepare(
@@ -67,13 +85,13 @@ async function verifySession(env, token) {
       'FROM chat_sessions s JOIN chat_members m ON m.actor_id=s.actor_id AND m.active=1 WHERE s.token_hash=? ' +
       'AND EXISTS (SELECT 1 FROM chat_single_device_owners owner '+
       'WHERE owner.actor_id=m.actor_id AND owner.token_hash=s.token_hash)'
-    ).bind(await sha256(token)).first();
+    ).bind(await sha256(token)).first<{actor_id:string;display_name:string;expires_at:number}>();
     if (!row || !Number.isFinite(row.expires_at) || row.expires_at <= Date.now()) return null;
     return { actorId: row.actor_id, displayName: row.display_name, exp: row.expires_at };
   } catch { return null; }
 }
 // Never accept the session from an URL query string (would leak into access logs).
-function websocketSessionToken(request) {
+function websocketSessionToken(request: Request) {
   const protocols = request.headers.get('sec-websocket-protocol') || '';
   const offered = protocols.split(',').map(s => s.trim());
   const browserToken = offered.find(s => s.startsWith('session.'));
@@ -85,20 +103,26 @@ function websocketSessionToken(request) {
   return match ? match[1] : '';
 }
 
-function mapMessage(row) {
+function mapMessage(row: ChatMessageRow) {
   return {seq:row.seq,clientMessageId:row.client_message_id,senderId:row.sender_id,senderName:row.sender_name,text:row.deleted_at?'':row.body,sentAt:row.created_at,replyToSeq:row.reply_to_seq??null,editedAt:row.edited_at??null,deletedAt:row.deleted_at??null};
 }
 
 export class ChatRoom {
-  constructor(state, env) {
+  declare state: DurableObjectState;
+  declare env: V2Env;
+  declare sockets: Set<WebSocket>;
+  declare members: Map<WebSocket, MemberPresence>;
+  declare typingSent: Map<WebSocket, number>;
+  declare adminSockets: Map<WebSocket, string>;
+  constructor(state: DurableObjectState, env: V2Env) {
     this.state = state;
     this.env = env;
-    this.sockets = new Set();
-    this.members = new Map();
-    this.typingSent = new Map();
-    this.adminSockets = new Map(); // independent of musician chat sockets
+    this.sockets = new Set<WebSocket>();
+    this.members = new Map<WebSocket, MemberPresence>();
+    this.typingSent = new Map<WebSocket,number>();
+    this.adminSockets = new Map<WebSocket,string>(); // independent of musician chat sockets
   }
-  async fetch(request) {
+  async fetch(request: Request) {
     if (new URL(request.url).pathname === '/health') return Response.json({ ok: true, durableObject: 'ChatRoom', environment: this.env.HAVANA_ENV || 'development' });
     if (new URL(request.url).pathname === '/member-removed' && request.method === 'POST') {
       let data=null;
@@ -215,20 +239,20 @@ export class ChatRoom {
       headers: { 'Sec-WebSocket-Protocol': 'havana-v2' },
     });
   }
-  send(socket, data) {
+  send(socket: WebSocket, data: object) {
     try { if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(data)); } catch {}
   }
-  broadcast(data) {
+  broadcast(data: ChatEvent) {
     for (const socket of this.sockets) this.send(socket, data);
     this.broadcastToAdmins(data);
   }
-  broadcastToAdmins(data){
+  broadcastToAdmins(data: ChatEvent){
     const types={
       'chat.message':'admin.chat.message','chat.updated':'admin.chat.updated','chat.deleted':'admin.chat.deleted',
       'chat.reaction':'admin.chat.reaction','chat.presence':'admin.chat.presence',
       'chat.typing':'admin.chat.typing','chat.read':'admin.chat.read'
     };
-    const type=types[data?.type];
+    const type=(types as Record<string,string>)[data.type];
     if(!type)return;
     // Only the separately authenticated administrator can receive Chat content.
     // Re-check for revoked/expired sessions on each event.
@@ -243,7 +267,7 @@ export class ChatRoom {
       }
     })().catch(()=>{}));
   }
-  async invalidateAdmins(topic){
+  async invalidateAdmins(topic: string){
     for(const [socket,token] of this.adminSockets){
       if(!await verifyAdminSession(adminTokenRequest(token),this.env)){
         try{socket.close(4003,'Admin session ended');}catch{}
@@ -254,13 +278,13 @@ export class ChatRoom {
     }
   }
   onlineUsers() {
-    const users = new Map();
+    const users = new Map<string,string>();
     for (const member of this.members.values()) users.set(member.actorId, member.name);
     return [...users.entries()].map(([actorId, displayName]) => ({actorId, displayName}));
   }
-  async onMessage(socket, senderId, senderName, raw) {
+  async onMessage(socket:WebSocket,senderId:string,senderName:string,raw:unknown) {
     if (typeof raw !== 'string' || raw.length > 10000) return this.send(socket, { type: 'chat.error', error: 'Invalid message' });
-    let input;
+    let input: Record<string,any>;
     try { input = JSON.parse(raw); } catch { return this.send(socket, { type: 'chat.error', error: 'Invalid JSON' }); }
     if (input.type === 'chat.typing') {
       const now = Date.now();
@@ -275,7 +299,7 @@ export class ChatRoom {
     if (input.type === 'chat.read') {
       if (!Number.isSafeInteger(input.seq) || input.seq < 1) return;
       // Never claim a receipt ahead of the persisted server history.
-      const cap = await this.env.DB.prepare('SELECT MAX(seq) AS newest FROM chat_messages').first();
+      const cap = await this.env.DB.prepare('SELECT MAX(seq) AS newest FROM chat_messages').first<{newest:number|null}>();
       const upto = Math.min(input.seq, Number(cap?.newest || 0));
       if (!upto) return;
       await this.env.DB.prepare(
@@ -291,7 +315,7 @@ export class ChatRoom {
       }
       const own = await this.env.DB.prepare(
         'SELECT seq,sender_id,created_at,deleted_at FROM chat_messages WHERE seq=?'
-      ).bind(input.seq).first();
+      ).bind(input.seq).first<{seq:number;sender_id:string;created_at:string;deleted_at:string|null}>();
       if (!own || own.sender_id !== senderId || own.deleted_at ||
           Date.now() - Date.parse(own.created_at) > (input.type === 'chat.delete' ? 48 * 60 * 60 * 1000 : CHAT_EDIT_WINDOW_MS) ||
           !Number.isFinite(Date.parse(own.created_at))) {
@@ -312,7 +336,7 @@ export class ChatRoom {
       }
       const current = await this.env.DB.prepare(
         'SELECT seq,client_message_id,sender_id,sender_name,body,created_at,reply_to_seq,edited_at,deleted_at FROM chat_messages WHERE seq=?'
-      ).bind(input.seq).first();
+      ).bind(input.seq).first<ChatMessageRow>();
       if (current) this.broadcast({type:'chat.updated',message:mapMessage(current)});
       return;
     }
@@ -350,7 +374,7 @@ export class ChatRoom {
     ).bind(input.clientMessageId, senderId, senderName, text, new Date().toISOString(), reply).run();
     const row = await this.env.DB.prepare(
       'SELECT seq, client_message_id, sender_id, sender_name, body, created_at, reply_to_seq, edited_at, deleted_at FROM chat_messages WHERE sender_id = ? AND client_message_id = ?'
-    ).bind(senderId, input.clientMessageId).first();
+    ).bind(senderId, input.clientMessageId).first<ChatMessageRow>();
     if (!row) throw new Error('Persistence failure');
     const event = { type: 'chat.message', message: mapMessage(row) };
     if (result.meta?.changes > 0) this.broadcast(event);
@@ -359,7 +383,7 @@ export class ChatRoom {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request: Request, env: V2Env) {
     const url = new URL(request.url);
     const origin = trustedOrigin(request.headers.get('origin'));
     // One CORS policy for all Chat/Admin endpoints, including moderator DELETE.
@@ -371,8 +395,8 @@ export default {
         'access-control-max-age': '3600', 'vary': 'Origin' },
     });
     if (url.pathname === '/health') {
-      let row = null, database = 'error';
-      try { row = await env.DB.prepare('SELECT value FROM system_meta WHERE key = ?').bind('schema_version').first(); database = 'ok'; } catch {}
+      let row: {value:string}|null = null, database = 'error';
+      try { row = await env.DB.prepare('SELECT value FROM system_meta WHERE key = ?').bind('schema_version').first<{value:string}>(); database = 'ok'; } catch {}
       return respond({ ok: database === 'ok', app: 'havana-nice-v2', environment: env.HAVANA_ENV || 'development', database, schemaVersion: row?.value ?? null, realtime: 'configured', media: 'not-configured', chat: 'authorized-members-persistent-device-sessions-realtime' }, database === 'ok' ? 200 : 503, origin);
     }
     // No multimedia backend is configured. Only authenticated clients may read availability.
@@ -439,7 +463,7 @@ export default {
       if (!username) return respond({ error: 'Escribe tu nombre para entrar' }, 400, origin);
       const member = await env.DB.prepare(
         'SELECT username,actor_id,display_name FROM chat_members WHERE username=? AND active=1'
-      ).bind(username).first();
+      ).bind(username).first<MusicianRow>();
       if (!member) return respond({ error: 'Tu nombre todavía no está autorizado. Solicita acceso al administrador.' }, 403, origin);
       const session=await createSession(env,member,request);
       if(!session)return respond({code:'name_already_bound',
@@ -465,7 +489,7 @@ export default {
         const needle = '%'+search.trim().replace(/[\\%_]/g,x=>'\\'+x)+'%';
         const result = await env.DB.prepare(
           "SELECT seq,client_message_id,sender_id,sender_name,body,created_at,reply_to_seq,edited_at,deleted_at FROM chat_messages WHERE deleted_at IS NULL AND body LIKE ? ESCAPE '\\' ORDER BY seq DESC LIMIT 60"
-        ).bind(needle).all();
+        ).bind(needle).all<ChatMessageRow>();
         return respond({messages:(result.results||[]).map(mapMessage).reverse(),hasMore:false,reactions:[]},200,origin);
       }
       const after = url.searchParams.get('afterSeq');
@@ -477,18 +501,18 @@ export default {
         : seq === null
         ? env.DB.prepare('SELECT seq,client_message_id,sender_id,sender_name,body,created_at,reply_to_seq,edited_at,deleted_at FROM chat_messages WHERE deleted_at IS NULL ORDER BY seq DESC LIMIT ?').bind(MAX_HISTORY)
         : env.DB.prepare('SELECT seq,client_message_id,sender_id,sender_name,body,created_at,reply_to_seq,edited_at,deleted_at FROM chat_messages WHERE seq > ? AND deleted_at IS NULL ORDER BY seq ASC LIMIT ?').bind(seq,MAX_HISTORY);
-      const rows = (await query.all()).results || [];
+      const rows = (await query.all<ChatMessageRow>()).results || [];
       if (seq === null || earlier !== null) rows.reverse();
       const messageSeqs = rows.map(row => row.seq);
-      let reactions = [];
+      let reactions: ReactionRow[] = [];
       if (messageSeqs.length) {
         const placeholders = messageSeqs.map(() => '?').join(',');
         const query = await env.DB.prepare('SELECT message_seq, actor_id, emoji FROM chat_reactions WHERE message_seq IN ('+placeholders+')')
-          .bind(...messageSeqs).all();
+          .bind(...messageSeqs).all<ReactionRow>();
         reactions = query.results || [];
       }
       const receipts = await env.DB.prepare('SELECT actor_id,display_name,last_read_seq FROM chat_read_receipts WHERE updated_at > ? LIMIT 100')
-        .bind(new Date(Date.now()-7*86400000).toISOString()).all();
+        .bind(new Date(Date.now()-7*86400000).toISOString()).all<ReceiptRow>();
       return respond({ messages: rows.map(mapMessage), reactions: reactions.map(r => ({messageSeq:r.message_seq,actorId:r.actor_id,emoji:r.emoji})),
         receipts: (receipts.results||[]).map(r => ({actorId:r.actor_id,displayName:r.display_name,seq:r.last_read_seq})),
         hasMore: rows.length === MAX_HISTORY }, 200, origin);
