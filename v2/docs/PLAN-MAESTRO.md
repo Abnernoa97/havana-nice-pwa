@@ -232,7 +232,7 @@ Actualmente el **único código fuente V2** se desarrolla en `havana-nice-v2-fou
 - **Nueva regresión ejecutable:** `v2/tests/calendar-free-text-ui.test.mjs` compila y ejecuta el módulo compartido real en memoria, verificando `14dic26`, texto arbitrario, ISO inválido, URL segura y uso del mismo formateador por Android/PWA/Admin. Incorporado a la cadena de CI; sin segunda implementación, sin alterar Chat, accesos o UI ya aprobada.
 - **Nueva prueba de ciclo completo en D1 aislada:** `cloudflare/tests/calendar.test.mjs` ahora cubre crear evento para 3 músicos, consultar sus vistas privadas, editar y reasignar a 1 músico, rechazar eliminación con versión obsoleta, eliminar con versión actual y limpiar destinatarios sin borrar músicos. **No ejecuta DELETE en D1 de producción.**
 - **APK 0.0.13** verificada como firmada/publicada por [41101348020](https://github.com/Abnernoa97/havana-nice-pwa/actions/runs/41101348020) `success`; conserva `com.havananice.v2`. Falta confirmación física en Android nativo. Los hitos P02/A03 y el total **12/36** siguen pendientes hasta completar la QA de fecha y edición/borrado.
-- **Estado CI adicional:** suite de regresión nueva [41104356896](https://github.com/Abnernoa97/havana-nice-pwa/actions/runs/41104356896) disparada; confirmar su resultado antes de afirmar aprobadas estas pruebas nuevas.
+- **Estado CI adicional:** suite nueva [41104356896](https://github.com/Abnernoa97/havana-nice-pwa/actions/runs/41104356896) **SUCCESS** en commit `a92fc54d0889580fb567aa54d93331232a9bd1bd`; pruebas automáticas de presentación de fecha libre y ciclo completo de 3 destinatarios aprobadas. P02/A03 siguen abiertos solo por QA física de clientes y panel Admin real.
 
 ## 6. Próxima decisión operacional
 
