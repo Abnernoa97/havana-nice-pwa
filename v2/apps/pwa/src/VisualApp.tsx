@@ -77,7 +77,7 @@ export default function VisualApp({displayName,active,onNavigate,preview=false}:
           <div className="visual-empty">
             <span className="visual-empty-icon" aria-hidden="true">◇</span>
             <h3>Módulo en preparación</h3>
-            <p>{screen!=='chat'&&screen!=='home'?notes[screen]:''}</p>
+            <p>{screen!=='chat'?notes[screen]:''}</p>
           </div>
         </>}
       </main>
