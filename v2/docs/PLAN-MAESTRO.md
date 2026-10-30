@@ -3,7 +3,7 @@
 **Auditoría cruzada: 29 de octubre de 2026. QA funcional del Chat confirmado por el propietario el 29 de octubre de 2026 (hora de México).**  
 **Fuente de desarrollo única:** repositorio `Abnernoa97/havana-nice-pwa`, rama `havana-nice-v2-foundation`.  
 **Tablero inalterado:** **12/27 hitos cerrados (44,4 %) · 15 abiertos**.  
-**Estado:** Chat Android/PWA/Administrador probado físicamente en texto, sincronización, reconexión, cola offline y bloqueo duplicado. Saneamiento 10/10 cerrado; Android 0.0.10 firmado e instalado. QA integral Q01 permanece abierto para módulos todavía no implementados, pruebas físicas adicionales y multimedia. R2 todavía no habilitado.  
+**Estado:** Chat Android/PWA/Administrador probado físicamente en texto, sincronización, reconexión, cola offline y bloqueo duplicado. Saneamiento 10/10 cerrado; Android 0.0.10 firmado e instalado. QA integral Q01 permanece abierto para módulos todavía no implementados, pruebas físicas adicionales y multimedia. R2 todavía no habilitado. **Protección de tipos del Worker V2 completada:** se retiró `@ts-nocheck`, se tiparon las interfaces y el CI ahora impide recuperar la supresión, con suite [41010325277](https://github.com/Abnernoa97/havana-nice-pwa/actions/runs/41010325277) aprobada; no se desplegó Worker ni nueva APK.  
 **Documento auxiliar:** [CONTINUIDAD-EXACTA.md](./CONTINUIDAD-EXACTA.md) es únicamente una bitácora de estado y relevo; **este archivo es el único plan de decisiones, hitos y prioridades**.
 
 ## 1. Objetivo y arquitectura que no se negocian
@@ -143,6 +143,13 @@ Actualmente el **único código fuente V2** se desarrolla en `havana-nice-v2-fou
 - No renumerar ni editar migraciones aplicadas de D1 por estética. Los huecos históricos no son por sí solos código duplicado.
 - No confundir `/visual.html` y `/admin.html` con otra API o backend. Pueden tener varias entradas visuales y seguir siendo **un solo sistema**.
 - No reactivar Supabase ni conexión alguna con el almacenamiento externo anterior. No inventar una R2 activada antes de comprobarlo.
+
+### Protección de tipos V2 — 29 de octubre de 2026 (México)
+
+- **Corregido en la fuente:** `v2/cloudflare/src/index.ts` ya no lleva `@ts-nocheck`. Añadidos contratos TS para D1, solicitudes, WebSockets, mensajes, respuestas y sesiones; `member-admin.js` declara por JSDoc los metadatos de dispositivo. `cloudflare/tsconfig.json` incluye los módulos JS con `allowJs: true`, pero `checkJs: false`: el compilador verifica la interfaz TS principal y resuelve esos imports; la validación estricta del código JS interno sería un trabajo distinto.
+- **CI limpio y estable:** prueba final [41010325277](https://github.com/Abnernoa97/havana-nice-pwa/actions/runs/41010325277) `success`, con `npm run typecheck`, seguridad, Admin, PWA y export Android. Se retiró la prueba diagnóstica temporal y quedó una comprobación permanente contra `@ts-nocheck`. No se modificó la firma ni publicó otra APK; el Worker remoto conserva la versión anterior.
+- **Aviso pendiente de dependencias:** `npm ci` notificó 12 incidencias de seguridad en el árbol instalado (5 bajas, 2 medias y 5 altas); falta revisar su procedencia y alcance. No ejecutar `npm audit fix --force` de forma indiscriminada. No equivale a 12 vulnerabilidades explotables en el Worker público.
+- **Prioridad posterior:** revisar dependencias antes de producción y avanzar con H02/H03, manteniendo el Chat nativo intacto. Esta mejora no cambia el total oficial de hitos.
 
 ## 6. Próxima decisión operacional
 
