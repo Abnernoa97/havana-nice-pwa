@@ -41,9 +41,9 @@ class DB{
  }
 }
 async function env(){
- const DB=new DB();
- DB.raw.prepare('INSERT INTO chat_admin_sessions VALUES (?,?,NULL)').run(await hash(TOKEN),Date.now()+60_000);
- return {DB,V2_ADMIN_LOGIN_MODE:'enabled',V2_ADMIN_LOGIN_SECRET:'S'.repeat(48)};
+ const database=new DB();
+ database.raw.prepare('INSERT INTO chat_admin_sessions VALUES (?,?,NULL)').run(await hash(TOKEN),Date.now()+60_000);
+ return {DB:database,V2_ADMIN_LOGIN_MODE:'enabled',V2_ADMIN_LOGIN_SECRET:'S'.repeat(48)};
 }
 const sample={date:'2026-11-28',timeZone:'America/Mexico_City',title:'Boda de prueba',venue:'Lugar',
  city:'Ciudad',callTime:'1:00 p.m.',soundcheckTime:'Por definir',arrivalTime:'',showTime:'7:00 p.m.',
