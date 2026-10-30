@@ -323,20 +323,14 @@ jobs:
             grep -q '"error"' /tmp/hnv2-cal-private.json
           done
 
-      - name: Canary-test private Repertoire without moving any Chat traffic
+      - name: Verify live Repertoire, Calendar and Chat all require authorization
         shell: bash
         run: |
           set -euo pipefail
           BASE="https://havana-nice-v2-dev.soloaplicaciones97.workers.dev"
-          VERSION='havana-nice-v2-dev="4a1cbda7-5365-4746-b679-08a28646d590"'
-          HTTP="$(curl -sS -o /tmp/hnv2-rep-health.json -w '%{http_code}' \
-            -H "Cloudflare-Workers-Version-Overrides: $VERSION" "$BASE/health")"
-          test "$HTTP" = "200"
-          grep -q '"app":"havana-nice-v2"' /tmp/hnv2-rep-health.json
           for ENDPOINT in /api/repertoire/songs /api/repertoire/admin/songs /api/calendar/events /api/chat/messages; do
-            HTTP="$(curl -sS -o /tmp/hnv2-rep-unauth.json -w '%{http_code}' \
-              -H "Cloudflare-Workers-Version-Overrides: $VERSION" "$BASE$ENDPOINT")"
+            HTTP="$(curl -sS -o /tmp/hn-v2-module-auth.json -w '%{http_code}' "$BASE$ENDPOINT")"
             echo "$ENDPOINT => $HTTP"
             test "$HTTP" = "401"
-            grep -q '"error"' /tmp/hnv2-rep-unauth.json
+            grep -q '"error"' /tmp/hn-v2-module-auth.json
           done
