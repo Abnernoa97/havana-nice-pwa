@@ -99,7 +99,7 @@ export default function AdminRepertoire({token,onExpired}:{token:string;onExpire
  async function move(index:number,step:number){
   const copy=[...items],other=index+step;
   if(other<0||other>=copy.length)return;
-  [copy[index],copy[other]]=[copy[other],copy[index]];
+  const current=copy[index]!;copy[index]=copy[other]!;copy[other]=current;
   await wrap(async()=>{
    const result=await adminReorderEventItems(token,eventId,copy.map(x=>x.id));
    setItems(result.items);
