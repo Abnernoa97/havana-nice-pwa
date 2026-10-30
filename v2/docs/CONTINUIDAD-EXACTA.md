@@ -67,6 +67,14 @@
 - **APK:** Android 0.0.11 está instalado con HOME y Chat aprobados por el propietario. La APK **0.0.12**, con Calendario, fue firmada y publicada: [workflow 41096311572](https://github.com/Abnernoa97/havana-nice-pwa/actions/runs/41096311572) `success`, `LATEST.apk` checksum SHA256 `277587336cf7d478b41100b705105e7f6f0b67ec5ac94d5829c501d461bf7137`, 0.0.11 en `PREVIOUS.apk`. **Instalación física 0.0.12 y QA Admin↔músico pendientes.** Instalar encima, sin borrar sesión.
 - **Hitos próximos:** P02/A03 prueba real Admin → músico; A01/A02/A09 comprobar aislamiento, caída de Calendario sin perder HOME/Chat; después Repertorio P03/A04. PWA dentro de Android se mantiene como meta de H02, sin sustituir Chat nativo.
 
+## Calendario libre y destinatarios reales — 30/10/2026
+
+- Las capturas reales del Administrador mostraron `Destinatarios inválidos`. Causa: la API de Calendario validaba `recipientIds` como UUID, pero Andy, Fer y Noa tienen `actor_id` de formato `member:<id>`. Validación corregida; comprobar existencia y actividad en D1 para evitar destinatarios falsos.
+- Todos los campos editables de contenido de Calendario son ahora texto libre, sin selector de fecha, `select` para Estado ni formato obligatorio de Maps. El título sigue siendo necesario para identificar la ficha; la selección de músicos sigue con casillas por autorización.
+- Migración V2 `0019_calendar_free_text.sql` aplicada. Se guarda texto literal en fecha, estado y Maps; `date_sort` opcional permite orden cronológico cuando el texto es fecha reconocible. Google Maps no abre protocolos no seguros.
+- Worker V2 publicado con versión `1df3def4-5b3e-4438-86b4-e2b3b16e4abd` al 100 %, con los cinco bindings existentes heredados. El archivo temporal de bundle y el paso de export CI se retiraron físicamente al terminar.
+- Pruebas automáticas SQLite con `member:` y símbolos aprobadas; actualización del cliente Android a fuente `0.0.13` iniciada. Pendiente: verificación final de la nueva APK, envío real de una fecha Admin→músico y confirmación física del propietario. El tablero permanece **12/36**.
+
 ## Próximo trabajo de desarrollo
 
 1. **H02 → H03:** integración segura de los módulos no-Chat en Android. Mantener Chat 100 % React Native, aprovechar PWA solo para presentación y utilizar contratos/backend V2 únicos. Prioridad funcional, no colores/interfaz.
