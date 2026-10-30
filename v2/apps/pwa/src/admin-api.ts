@@ -1,4 +1,4 @@
-import {HAVANA_V2_DEV_API_BASE_URL as API,type CalendarEvent,type CalendarEventInput} from '@havana/shared';
+import {HAVANA_V2_DEV_API_BASE_URL as API,type CalendarEvent,type CalendarEventInput,type RepertoireSong,type RepertoireSongInput,type RepertoireEventItem} from '@havana/shared';
 
 // Do not save administrative bearer tokens in localStorage, IndexedDB or cookies.
 export type AdminSession={token:string;expiresAt:string;role:'chat-admin'};
@@ -149,4 +149,33 @@ export function adminUpdateCalendarEvent(token:string,id:string,body:CalendarEve
 export function adminDeleteCalendarEvent(token:string,id:string,version:number){
  return api<{ok:boolean}>('/api/calendar/admin/events/'+encodeURIComponent(id),
   authenticated(token,{method:'DELETE',body:JSON.stringify({version})}));
+}
+
+export function adminCreateSong(token:string,data:RepertoireSongInput){
+ return api<{song:RepertoireSong}>('/api/repertoire/admin/songs',authenticated(token,{method:'POST',body:JSON.stringify(data)}));
+}
+export function adminEditSong(token:string,id:string,data:RepertoireSongInput&{version:number}){
+ return api<{song:RepertoireSong}>('/api/repertoire/admin/songs/'+encodeURIComponent(id),authenticated(token,{method:'POST',body:JSON.stringify(data)}));
+}
+export function adminDeleteSong(token:string,id:string,version:number){
+ return api<{ok:boolean}>('/api/repertoire/admin/songs/'+encodeURIComponent(id),authenticated(token,{method:'DELETE',body:JSON.stringify({version})}));
+}
+export function adminAddEventSongs(token:string,eventId:string,songIds:string[]){
+ return api<{added:number;items:RepertoireEventItem[]}>('/api/repertoire/admin/events/'+encodeURIComponent(eventId)+'/items',
+  authenticated(token,{method:'POST',body:JSON.stringify({songIds})}));
+}
+export function adminAddEventSpecial(token:string,eventId:string,special:{title:string;artist:string;referenceUrl:string}){
+ return api<{added:number;items:RepertoireEventItem[]}>('/api/repertoire/admin/events/'+encodeURIComponent(eventId)+'/items',
+  authenticated(token,{method:'POST',body:JSON.stringify({special})}));
+}
+export function adminCompleteEventItem(token:string,id:string,completed:boolean){
+ return api<{ok:boolean}>('/api/repertoire/admin/items/'+encodeURIComponent(id),
+  authenticated(token,{method:'POST',body:JSON.stringify({completed})}));
+}
+export function adminRemoveEventItem(token:string,id:string){
+ return api<{ok:boolean}>('/api/repertoire/admin/items/'+encodeURIComponent(id),authenticated(token,{method:'DELETE'}));
+}
+export function adminReorderEventItems(token:string,eventId:string,itemIds:string[]){
+ return api<{items:RepertoireEventItem[]}>('/api/repertoire/admin/events/'+encodeURIComponent(eventId)+'/order',
+  authenticated(token,{method:'POST',body:JSON.stringify({itemIds})}));
 }

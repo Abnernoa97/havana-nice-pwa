@@ -6,7 +6,7 @@ type Tab='access'|'chat'|'repertoire'|'calendar'|'more';
 const tabs:{id:Tab;name:string;icon:string;description:string}[]=[
  {id:'access',name:'Acceso a músicos',icon:'♙',description:'Crea y autoriza los nombres con los que entrará cada integrante'},
  {id:'chat',name:'Chat',icon:'◉',description:'Chat general en vivo de todos los músicos, con moderación administrativa'},
- {id:'repertoire',name:'Repertorio',icon:'♫',description:'Canciones y repertorios del equipo'},
+ {id:'repertoire',name:'Repertorio',icon:'♫',description:'Gestiona el repertorio general y las listas de cada evento'},
  {id:'calendar',name:'Calendario',icon:'▦',description:'Crea, edita y asigna fechas a los músicos'},
  {id:'more',name:'Más',icon:'◇',description:'Aquí incorporaremos las siguientes funciones de la app'},
 ];
@@ -76,7 +76,7 @@ export default function AdminApp(){
          Hay una actualización preparada. Se aplicará cuando cierres sesión, sin interrumpir tu trabajo.
        </div>}
        <AdminChatAccess section={tab}/>
-       {tab!=='access'&&tab!=='chat'&&tab!=='calendar'&&<section className="a-panel a-module-next">
+       {tab!=='access'&&tab!=='chat'&&tab!=='calendar'&&tab!=='repertoire'&&<section className="a-panel a-module-next">
          <h2>{current.name}</h2>
          <p>Este módulo se desarrollará conforme al Plan Maestro. Por ahora no hay funciones activas.</p>
          <button type="button" onClick={()=>setTab('access')}>Volver a Acceso a músicos</button>

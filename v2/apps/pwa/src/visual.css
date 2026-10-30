@@ -53,3 +53,14 @@
 .hn-cal-hours{display:grid;grid-template-columns:repeat(auto-fit,minmax(95px,1fr));gap:7px}.hn-cal-hours>div{padding:10px;border:1px solid #e1d3c1}
 .hn-cal-hours small,.hn-cal-hours strong{display:block}.hn-cal-hours small{font-size:10px;color:#867968}.hn-cal-hours strong{margin-top:6px}
 .hn-cal-error{color:#9d3d2c}.hn-cal-empty{padding:26px;text-align:center;color:#786c61}
+
+/* PWA Repertoire — shared HOME only, no Chat style changes. */
+.hn-repertoire{display:grid;gap:14px;padding-bottom:40px}
+.hn-rep-toolbar{display:flex;justify-content:space-between;gap:12px;align-items:center;font-size:12px}
+.hn-rep-toolbar button{border:1px solid #d7c8b7;background:#fffaf2;border-radius:9px;padding:9px 12px;color:#806342}
+.hn-repertoire h2{font-size:20px;margin:18px 0 5px;color:#292923}
+.hn-rep-group{padding:0 3px}.hn-rep-group h3{font-size:12px;letter-spacing:.12em;color:#8a6743;border-bottom:1px solid #d9cabb;padding:8px 0}
+.hn-rep-row{display:flex;justify-content:space-between;gap:15px;align-items:center;border-bottom:1px solid #e3d6c7;padding:13px 5px}
+.hn-rep-row>div{min-width:0;display:grid;gap:5px}.hn-rep-row strong{font-size:13px;color:#35332e}
+.hn-rep-row small{display:block;font-size:11px;color:#857769}.hn-rep-row a{font-size:11px;color:#85623d;font-weight:700;flex-shrink:0}
+@media(max-width:390px){.hn-rep-row{gap:8px}.hn-rep-row a{font-size:10px}}

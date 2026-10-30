@@ -1,6 +1,7 @@
 import {useState} from 'react';
 import {MEMBER_MODULES,type MemberScreen} from '@havana/shared';
 import CalendarAccordion from './CalendarAccordion';
+import MemberRepertoire from './MemberRepertoire';
 
 type Props={
   displayName?:string;
@@ -77,6 +78,7 @@ export default function VisualApp({displayName,active,onNavigate,preview=false,t
             <p className="visual-intro">{selected?.description}</p>
           </div>
           {screen==='calendar'&&token?<CalendarAccordion token={token}/>:
+           screen==='repertoire'&&token?<MemberRepertoire token={token}/>:
            <div className="visual-empty">
             <span className="visual-empty-icon" aria-hidden="true">◇</span>
             <h3>Módulo en preparación</h3>

@@ -5,6 +5,7 @@ import {handleAdminChat} from './admin-chat.js';
 import {deleteChatMessageRecord} from './message-removal.js';
 import {claimFirstInstallation,auditDuplicateInstallation,handleSingleInstallationAdmin} from './single-installation.js';
 import {handleCalendarApi} from './calendar.js';
+import {handleRepertoireApi} from './repertoire.js';
 // Compile-time contracts only. These definitions do not change runtime behavior.
 interface V2Env {
   DB: D1Database;
@@ -404,6 +405,9 @@ export default {
     // D1 migration 0018 must be applied before publishing this route.
     if(url.pathname.startsWith('/api/calendar/'))
       return handleCalendarApi(request,env,url,origin,respond,verifySession);
+    // Repertoire is separately routed with the existing session and D1 grants.
+    if(url.pathname.startsWith('/api/repertoire/'))
+      return handleRepertoireApi(request,env,url,origin,respond,verifySession);
     // No multimedia backend is configured. Only authenticated clients may read availability.
     if (url.pathname.startsWith('/api/chat/media/')) {
       // A future private R2 object is readable by an authorized musician OR

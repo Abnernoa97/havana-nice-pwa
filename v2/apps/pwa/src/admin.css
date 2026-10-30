@@ -157,3 +157,16 @@
 .a-cal-summary span:first-child{display:grid;gap:5px}.a-cal-summary strong{font-size:17px}.a-cal-summary small{font-size:11px;color:#827463}
 .a-cal-event-body{border-top:1px solid #e1d4c3;padding:15px;font-size:12px;color:#62584f}.a-cal-actions .a-cal-danger{background:#762e2e}
 @media(max-width:650px){.a-cal-fields,.a-cal-recipients-grid{grid-template-columns:1fr}.a-cal-form{padding:12px}}
+
+/* Independent Admin Repertoire / event and general accordions. */
+.a-repertoire{display:grid;gap:15px}.a-repertoire button{cursor:pointer}
+.a-rep-section{border:1px solid #d6c7b5;border-radius:12px;overflow:hidden}
+.a-rep-body{padding:15px;display:grid;gap:12px;background:#faf5ed}
+.a-rep-body h3{font-size:16px;margin:12px 0 2px}.a-rep-body>input,.a-rep-fields input{border:1px solid #ccbdab;border-radius:8px;background:#fffdf8;padding:12px;width:100%;min-width:0}
+.a-rep-body>button,.a-rep-fields button,.a-rep-item button{border:1px solid #b9a890;border-radius:8px;background:#292a24;color:#fffaf0;padding:9px 12px}
+.a-rep-fields{display:grid;gap:10px}.a-rep-fields label{display:flex;gap:9px;align-items:center}
+.a-rep-choices{display:grid;gap:8px;max-height:240px;overflow:auto}
+.a-rep-item{display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid #e3d7c8}
+.a-rep-item>div{flex:1;min-width:0;display:grid;gap:5px}.a-rep-item strong{font-size:13px}
+.a-rep-item small{font-size:11px;color:#776958}.a-rep-item a{font-size:11px}.a-rep-item button{padding:7px 9px;font-size:12px}
+.a-rep-items{display:grid;gap:2px}@media(max-width:420px){.a-rep-item{flex-wrap:wrap}.a-rep-item>div{flex-basis:55%}}

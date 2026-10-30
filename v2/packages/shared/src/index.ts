@@ -219,3 +219,6 @@ export type {CalendarEvent,CalendarEventInput,CalendarEventList,CalendarEventSta
 
 export {MEMBER_MODULES} from './memberModules';
 export type {MemberModule,MemberScreen} from './memberModules';
+
+export {getRepertoireSongs,getEventRepertoire,safeRepertoireLink} from './repertoire';
+export type {RepertoireSong,RepertoireSongInput,RepertoireEventItem} from './repertoire';
