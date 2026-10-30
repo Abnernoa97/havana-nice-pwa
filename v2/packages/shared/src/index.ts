@@ -214,7 +214,7 @@ export function validateChatMediaSelection(
  return null;
 }
 
-export {getCalendarEvents} from './calendar';
+export {getCalendarEvents,calendarDate} from './calendar';
 export type {CalendarEvent,CalendarEventInput,CalendarEventList,CalendarEventStatus} from './calendar';
 
 export {MEMBER_MODULES} from './memberModules';
