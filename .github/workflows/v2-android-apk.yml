@@ -1,13 +1,14 @@
 name: HAVANA NICE V2 Android APK
 
-# Only distribute a new APK when explicitly requested, never while pruning
-# rejected legacy login paths or changing the shared authentication contract.
+# Android is a deliberate batch release, NEVER triggered by ordinary development.
+# Every module accumulates in V2 PWA/Admin first. The ONLY release push trigger is
+# a separately approved batch-release manifest; not app.json, module code or CI.
+# workflow_dispatch is an alternative manual entry point and uses the same manifest.
 on:
   push:
     branches: [havana-nice-v2-foundation]
     paths:
-      - 'v2/apps/android/app.json'
-      - '.github/workflows/v2-android-apk.yml'
+      - 'v2/releases/android-batch.json'
   workflow_dispatch:
 
 permissions:
@@ -33,6 +34,27 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+
+      - name: Require explicit batch-release approval and matching native version
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs=require('node:fs');
+          const manifestPath='v2/releases/android-batch.json';
+          if(!fs.existsSync(manifestPath)){
+            throw Error('No approved Android batch manifest. This is NOT an automatic APK release.');
+          }
+          const m=JSON.parse(fs.readFileSync(manifestPath,'utf8'));
+          const app=JSON.parse(fs.readFileSync('v2/apps/android/app.json','utf8')).expo;
+          if(m.approved!==true || m.releaseMode!=='explicit-batch' ||
+              m.version!==app.version || m.versionCode!==app.android.versionCode ||
+              app.android.package!=='com.havananice.v2' ||
+              typeof m.notes!=='string' || m.notes.trim().length<10){
+            throw Error('Android batch publication rejected: explicit approval, version or release notes invalid.');
+          }
+          console.log('APPROVED explicit batch',m.version,'code',m.versionCode);
+          NODE
 
       - name: Install exact dependencies
         working-directory: v2
