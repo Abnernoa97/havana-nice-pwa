@@ -17,7 +17,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: havana-nice-v2-foundation-check
@@ -313,3 +313,22 @@ jobs:
             test "$STATUS" = "401"
             grep -q '"error"' /tmp/hnv2-cal-private.json
           done
+
+      # TEMPORARY, one time only: release handshake for the isolated Calendar correction.
+      - name: Stage the verified one-time Worker candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE="$(find /tmp/havana-v2-worker-preview -maxdepth 1 -type f \( -name '*.js' -o -name '*.mjs' \) | head -n 1)"
+          test -n "$SOURCE"
+          test -s "$SOURCE"
+          mkdir -p cloudflare/.worker-release-staging
+          cp "$SOURCE" cloudflare/.worker-release-staging/worker.mjs
+          node --check cloudflare/.worker-release-staging/worker.mjs
+          git config user.name 'HAVANA V2 CI'
+          git config user.email 'actions@users.noreply.github.com'
+          git add cloudflare/.worker-release-staging/worker.mjs
+          if ! git diff --cached --quiet; then
+            git commit -m 'chore(v2): staged Calendar free-text Worker candidate'
+            git push origin HEAD:havana-nice-v2-foundation
+          fi
