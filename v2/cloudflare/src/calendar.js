@@ -1,124 +1,167 @@
-// HAVANA NICE V2 — one calendar API, one D1 table, shared by musician clients and Admin.
-// This module never reads or changes Chat records, musician tokens or installations.
+// HAVANA NICE V2 — one private D1 calendar; legacy original never accessed.
+// Admin writes event + selected recipients atomically. Member reads only assigned dates.
 import {verifyAdminSession} from './admin-auth.js';
-
-const DATE=/^\d{4}-\d{2}-\d{2}$/;
-const TIME=/^(?:[01]\d|2[0-3]):[0-5]\d$/;
 const ID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const STATUS=new Set(['tentative','confirmed','cancelled']);
-const COLS='id,event_date,time_zone,title,venue,city,call_time,arrival_time,show_time,end_time,wardrobe,notes,status,version,created_at,updated_at';
-const MAX_PER_RANGE=250;
-const DAY=86400000;
-
-function validDate(value){
+const DATE=/^\d{4}-\d{2}-\d{2}$/;
+const STATUSES=new Set(['tentative','confirmed','cancelled']);
+const COLUMNS='e.id,e.event_date,e.time_zone,e.title,e.venue,e.city,e.call_time,e.soundcheck_time,e.arrival_time,e.show_time,e.end_time,e.wardrobe,e.details,e.contact_name,e.contact_phone,e.notes,e.map_url,e.status,e.version,e.updated_at';
+const PAGE_SIZE=100;
+const ERR={401:'No autorizado',400:'Solicitud inválida',409:'La fecha cambió. Actualiza antes de editar.'};
+function dateValid(value){
  if(typeof value!=='string'||!DATE.test(value))return false;
- const parsed=new Date(value+'T00:00:00.000Z');
+ const parsed=new Date(value+'T00:00:00Z');
  return Number.isFinite(parsed.getTime())&&parsed.toISOString().slice(0,10)===value;
 }
-function dateRange(from,to){
- if(!validDate(from)||!validDate(to))return false;
- const days=(Date.parse(to+'T00:00:00Z')-Date.parse(from+'T00:00:00Z'))/DAY;
- return days>=0&&days<=366;
-}
-function optionalTime(value){
- if(value===null||value===undefined||value==='')return null;
- if(typeof value!=='string'||!TIME.test(value))throw new Error('Hora inválida; utiliza HH:MM');
- return value;
-}
-function bounded(value,max,label,required=false){
- if(typeof value!=='string')throw new Error(label+' debe ser texto');
+function string(value,max,label,required=false){
+ if(typeof value!=='string')throw Error(label+' debe ser texto');
  const text=value.normalize('NFC').trim();
- if(text.length>max||(required&&!text))throw new Error(label+' excede los límites permitidos');
+ if(text.length>max||(required&&!text))throw Error(label+' inválido o demasiado largo');
  return text;
 }
-function validateFields(input){
- if(!input||typeof input!=='object'||Array.isArray(input))throw new Error('Evento inválido');
- if(!validDate(input.date))throw new Error('Fecha inválida');
- const zone=bounded(input.timeZone,64,'Zona horaria',true);
- try{new Intl.DateTimeFormat('en-US',{timeZone:zone});}catch{throw new Error('Zona horaria inválida');}
- if(!STATUS.has(input.status))throw new Error('Estado inválido');
+function time(value){
+ return string(value??'',60,'Hora'); // The original accepts "1:00 p.m." or "Por definir".
+}
+function fields(input){
+ if(!input||typeof input!=='object'||Array.isArray(input))throw Error('Evento inválido');
+ if(!dateValid(input.date))throw Error('Fecha inválida');
+ const timeZone=string(input.timeZone??'America/Mexico_City',64,'Zona horaria',true);
+ try{new Intl.DateTimeFormat('en',{timeZone});}catch{throw Error('Zona horaria inválida');}
+ const status=input.status??'confirmed';
+ if(!STATUSES.has(status))throw Error('Estado inválido');
+ const mapUrl=string(input.mapUrl??'',1500,'Google Maps');
+ if(mapUrl){
+  let parsed;
+  try{parsed=new URL(mapUrl);}catch{throw Error('Enlace de Maps inválido');}
+  if(parsed.protocol!=='https:')throw Error('Google Maps requiere enlace https');
+ }
+ const recipients=input.recipientIds;
+ if(!Array.isArray(recipients)||recipients.length===0||recipients.length>100)
+  throw Error('Selecciona al menos un músico destinatario');
+ if(!recipients.every(id=>typeof id==='string'&&ID.test(id))||
+  new Set(recipients).size!==recipients.length)throw Error('Destinatarios inválidos');
  return {
-  date:input.date, timeZone:zone,
-  title:bounded(input.title,160,'Título',true),
-  venue:bounded(input.venue??'',160,'Lugar'),
-  city:bounded(input.city??'',120,'Ciudad'),
-  callTime:optionalTime(input.callTime),
-  arrivalTime:optionalTime(input.arrivalTime),
-  showTime:optionalTime(input.showTime),
-  endTime:optionalTime(input.endTime),
-  wardrobe:bounded(input.wardrobe??'',500,'Vestuario'),
-  notes:bounded(input.notes??'',4000,'Notas'),
-  status:input.status
+  date:input.date,timeZone,title:string(input.title,160,'Evento',true),
+  venue:string(input.venue??'',160,'Lugar'),city:string(input.city??'',120,'Ciudad'),
+  callTime:time(input.callTime),soundcheckTime:time(input.soundcheckTime),
+  arrivalTime:time(input.arrivalTime),showTime:time(input.showTime),endTime:time(input.endTime),
+  wardrobe:string(input.wardrobe??'',500,'Vestuario'),details:string(input.details??'',4000,'Detalles'),
+  contactName:string(input.contactName??'',160,'Contacto'),
+  contactPhone:string(input.contactPhone??'',80,'Teléfono'),
+  notes:string(input.notes??'',4000,'Notas'),mapUrl,status,recipientIds:recipients
  };
 }
-const toEvent=row=>({
- id:row.id,date:row.event_date,timeZone:row.time_zone,title:row.title,
- venue:row.venue,city:row.city,callTime:row.call_time,arrivalTime:row.arrival_time,
- showTime:row.show_time,endTime:row.end_time,wardrobe:row.wardrobe,notes:row.notes,
- status:row.status,version:row.version,updatedAt:row.updated_at
-});
-const values=v=>[
- v.date,v.timeZone,v.title,v.venue,v.city,v.callTime,v.arrivalTime,v.showTime,
- v.endTime,v.wardrobe,v.notes,v.status
-];
-async function readBody(request){
- if((request.headers.get('content-type')||'').split(';')[0].trim()!=='application/json')
-  throw new Error('Se requiere JSON');
- const contentLength=Number(request.headers.get('content-length')||0);
- if(contentLength>16000)throw new Error('Solicitud demasiado grande');
- const raw=await request.text();
- if(raw.length>16000)throw new Error('Solicitud demasiado grande');
- try{return JSON.parse(raw);}catch{throw new Error('JSON inválido');}
+const valueList=x=>[x.date,x.timeZone,x.title,x.venue,x.city,x.callTime,x.soundcheckTime,
+ x.arrivalTime,x.showTime,x.endTime,x.wardrobe,x.details,x.contactName,x.contactPhone,x.notes,x.mapUrl,x.status];
+function event(row,admin=false){
+ const result={
+  id:row.id,date:row.event_date,timeZone:row.time_zone,title:row.title,
+  venue:row.venue,city:row.city,callTime:row.call_time,soundcheckTime:row.soundcheck_time,
+  arrivalTime:row.arrival_time,showTime:row.show_time,endTime:row.end_time,
+  wardrobe:row.wardrobe,details:row.details,contactName:row.contact_name,
+  contactPhone:row.contact_phone,notes:row.notes,mapUrl:row.map_url,
+  status:row.status,version:row.version,updatedAt:row.updated_at
+ };
+ if(admin)result.recipientIds=JSON.parse(row.recipients_json||'[]');
+ return result;
 }
-
+async function bodyOf(request){
+ if((request.headers.get('content-type')||'').split(';')[0].trim()!=='application/json')
+  throw Error('Se requiere JSON');
+ if(Number(request.headers.get('content-length')||0)>20000)throw Error('Solicitud demasiado grande');
+ const text=await request.text();
+ if(text.length>20000)throw Error('Solicitud demasiado grande');
+ try{return JSON.parse(text);}catch{throw Error('JSON inválido');}
+}
+async function authorizedRecipients(db,ids){
+ const placeholders=ids.map(()=>'?').join(',');
+ const data=await db.prepare('SELECT actor_id FROM chat_members WHERE active=1 AND actor_id IN ('+placeholders+')').bind(...ids).all();
+ if((data.results||[]).length!==ids.length)throw Error('Seleccionaste un músico que ya no está activo. Actualiza la lista.');
+}
+function invalid(error,reply){
+ return reply({error:error instanceof Error?error.message:'Solicitud inválida'},400);
+}
 export async function handleCalendarApi(request,env,url,origin,respond,verifyMusicianSession){
  const reply=(body,status=200)=>respond(body,status,origin);
- const administrative=url.pathname.startsWith('/api/calendar/admin/');
- if(administrative){
-  if(!await verifyAdminSession(request,env))return reply({error:'No autorizado'},401);
+ const path=url.pathname;
+ const admin=path.startsWith('/api/calendar/admin/');
+ let member=null;
+ if(admin){
+  if(!await verifyAdminSession(request,env))return reply({error:ERR[401]},401);
  }else{
   const token=(request.headers.get('authorization')||'').replace(/^Bearer\s+/i,'');
-  if(!await verifyMusicianSession(env,token)&&!await verifyAdminSession(request,env))
-   return reply({error:'No autorizado'},401);
+  member=await verifyMusicianSession(env,token);
+  if(!member)return reply({error:ERR[401]},401);
  }
- if(url.pathname==='/api/calendar/events'&&request.method==='GET'){
-  const from=url.searchParams.get('from'),to=url.searchParams.get('to');
-  if(!dateRange(from,to))return reply({error:'Rango de fechas inválido (máximo 366 días)'},400);
+ if((path==='/api/calendar/events'||path==='/api/calendar/admin/events')&&request.method==='GET'){
+  const offset=Number(url.searchParams.get('offset')||'0');
+  if(!Number.isSafeInteger(offset)||offset<0||offset>10000)return reply({error:'Paginación inválida'},400);
+  const assigned=admin?'':' WHERE EXISTS (SELECT 1 FROM calendar_event_recipients r WHERE r.event_id=e.id AND r.actor_id=?)';
+  const sql='SELECT '+COLUMNS+(admin?',(SELECT json_group_array(actor_id) FROM calendar_event_recipients r WHERE r.event_id=e.id) AS recipients_json':'')+
+   ' FROM calendar_events e'+assigned+' ORDER BY e.event_date ASC,e.id ASC LIMIT ? OFFSET ?';
   try{
-   const rows=await env.DB.prepare('SELECT '+COLS+' FROM calendar_events WHERE event_date BETWEEN ? AND ? ORDER BY event_date,COALESCE(call_time,arrival_time,show_time),id LIMIT ?')
-    .bind(from,to,MAX_PER_RANGE+1).all();
-   const items=rows.results||[];
-   return reply({events:items.slice(0,MAX_PER_RANGE).map(toEvent),hasMore:items.length>MAX_PER_RANGE});
+   const args=admin?[PAGE_SIZE+1,offset]:[member.actorId,PAGE_SIZE+1,offset];
+   const result=await env.DB.prepare(sql).bind(...args).all();
+   const rows=result.results||[];
+   return reply({events:rows.slice(0,PAGE_SIZE).map(x=>event(x,admin)),hasMore:rows.length>PAGE_SIZE});
   }catch{return reply({error:'Calendario no disponible'},503);}
  }
- if(!administrative)return reply({error:'Ruta no válida'},404);
- if(url.pathname==='/api/calendar/admin/events'&&request.method==='POST'){
-  let data;
-  try{data=validateFields(await readBody(request));}
-  catch(e){return reply({error:e instanceof Error?e.message:'Evento inválido'},400);}
-  const id=crypto.randomUUID(),now=new Date().toISOString();
+ if(!admin)return reply({error:'Ruta no encontrada'},404);
+ if(path==='/api/calendar/admin/events'&&request.method==='POST'){
+  let payload;
+  try{payload=fields(await bodyOf(request));await authorizedRecipients(env.DB,payload.recipientIds);}
+  catch(e){return invalid(e,reply);}
+  const id=crypto.randomUUID(),revision=crypto.randomUUID(),now=new Date().toISOString();
   try{
-   await env.DB.prepare('INSERT INTO calendar_events(id,event_date,time_zone,title,venue,city,call_time,arrival_time,show_time,end_time,wardrobe,notes,status,version,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)')
-    .bind(id,...values(data),now,now).run();
-   return reply({event:{id,...data,version:1,updatedAt:now}},201);
-  }catch{return reply({error:'No se pudo guardar el evento'},503);}
+   const statements=[
+    env.DB.prepare('INSERT INTO calendar_events(id,event_date,time_zone,title,venue,city,call_time,soundcheck_time,arrival_time,show_time,end_time,wardrobe,details,contact_name,contact_phone,notes,map_url,status,version,revision_token,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,?)')
+     .bind(id,...valueList(payload),revision,now,now),
+    ...payload.recipientIds.map(actorId=>env.DB.prepare(
+     'INSERT INTO calendar_event_recipients(event_id,actor_id) VALUES (?,?)').bind(id,actorId))
+   ];
+   await env.DB.batch(statements);
+   return reply({event:{id,...payload,version:1,updatedAt:now}},201);
+  }catch{return reply({error:'No se pudo crear la fecha'},503);}
  }
- const match=/^\/api\/calendar\/admin\/events\/([0-9a-f-]+)$/.exec(url.pathname);
- if(match&&ID.test(match[1])&&request.method==='POST'){
-  let input,data;
+ const match=/^\/api\/calendar\/admin\/events\/([0-9a-f-]+)$/.exec(path);
+ if(!match||!ID.test(match[1]))return reply({error:'Ruta no encontrada'},404);
+ const id=match[1];
+ if(request.method==='POST'){
+  let raw,payload;
   try{
-   input=await readBody(request);
-   if(!Number.isSafeInteger(input?.version)||input.version<1)throw new Error('Versión inválida');
-   data=validateFields(input);
-  }catch(e){return reply({error:e instanceof Error?e.message:'Evento inválido'},400);}
-  const now=new Date().toISOString();
+   raw=await bodyOf(request);
+   if(!Number.isSafeInteger(raw?.version)||raw.version<1)throw Error('Versión inválida');
+   payload=fields(raw);
+   await authorizedRecipients(env.DB,payload.recipientIds);
+  }catch(e){return invalid(e,reply);}
+  const revision=crypto.randomUUID(),now=new Date().toISOString();
   try{
-   const result=await env.DB.prepare('UPDATE calendar_events SET event_date=?,time_zone=?,title=?,venue=?,city=?,call_time=?,arrival_time=?,show_time=?,end_time=?,wardrobe=?,notes=?,status=?,version=version+1,updated_at=? WHERE id=? AND version=?')
-    .bind(...values(data),now,match[1],input.version).run();
-   if(Number(result.meta?.changes)!==1)return reply({error:'El evento cambió o ya no existe. Actualiza antes de guardar.'},409);
-   const row=await env.DB.prepare('SELECT '+COLS+' FROM calendar_events WHERE id=?').bind(match[1]).first();
-   return reply({event:toEvent(row)});
-  }catch{return reply({error:'No se pudo actualizar el evento'},503);}
+   const update=env.DB.prepare('UPDATE calendar_events SET event_date=?,time_zone=?,title=?,venue=?,city=?,call_time=?,soundcheck_time=?,arrival_time=?,show_time=?,end_time=?,wardrobe=?,details=?,contact_name=?,contact_phone=?,notes=?,map_url=?,status=?,version=version+1,revision_token=?,updated_at=? WHERE id=? AND version=?')
+    .bind(...valueList(payload),revision,now,id,raw.version);
+   // Revision marker makes recipient mutations conditional on THIS successful
+   // update, never on the previous version during concurrent edits.
+   const exists='EXISTS (SELECT 1 FROM calendar_events WHERE id=? AND revision_token=?)';
+   const replaceRecipients=[
+    env.DB.prepare('DELETE FROM calendar_event_recipients WHERE event_id=? AND '+exists).bind(id,id,revision),
+    ...payload.recipientIds.map(actorId=>env.DB.prepare(
+     'INSERT INTO calendar_event_recipients(event_id,actor_id) SELECT ?,? WHERE '+exists)
+     .bind(id,actorId,id,revision))
+   ];
+   const results=await env.DB.batch([update,...replaceRecipients]);
+   if(Number(results[0]?.meta?.changes)!==1)return reply({error:ERR[409]},409);
+   return reply({event:{id,...payload,version:raw.version+1,updatedAt:now}});
+  }catch{return reply({error:'No se pudo guardar la fecha'},503);}
  }
- return reply({error:'Ruta no válida'},404);
+ if(request.method==='DELETE'){
+  let raw;
+  try{
+   raw=await bodyOf(request);
+   if(!Number.isSafeInteger(raw?.version)||raw.version<1)throw Error('Versión inválida');
+  }catch(e){return invalid(e,reply);}
+  try{
+   const result=await env.DB.prepare('DELETE FROM calendar_events WHERE id=? AND version=?').bind(id,raw.version).run();
+   if(Number(result.meta?.changes)!==1)return reply({error:ERR[409]},409);
+   return reply({ok:true});
+  }catch{return reply({error:'No se pudo eliminar la fecha'},503);}
+ }
+ return reply({error:'Método no permitido'},405);
 }
