@@ -1,9 +1,9 @@
 # HAVANA NICE V2 — PLAN MAESTRO ÚNICO
 
-**Auditoría cruzada y consolidación: 29 de octubre de 2026.**  
+**Auditoría cruzada: 29 de octubre de 2026. QA funcional del Chat confirmado por el propietario el 29 de octubre de 2026 (hora de México).**  
 **Fuente de desarrollo única:** repositorio `Abnernoa97/havana-nice-pwa`, rama `havana-nice-v2-foundation`.  
 **Tablero inalterado:** **12/27 hitos cerrados (44,4 %) · 15 abiertos**.  
-**Estado:** Chat/Administrador base conservados; saneamiento 10/10 cerrado. Android 0.0.10 firmado y publicado, con instalación confirmada por el propietario. Contrato R2 diseñado, no implementado; Q01 pendiente.  
+**Estado:** Chat Android/PWA/Administrador probado físicamente en texto, sincronización, reconexión, cola offline y bloqueo duplicado. Saneamiento 10/10 cerrado; Android 0.0.10 firmado e instalado. QA integral Q01 permanece abierto para módulos todavía no implementados, pruebas físicas adicionales y multimedia. R2 todavía no habilitado.  
 **Documento auxiliar:** [CONTINUIDAD-EXACTA.md](./CONTINUIDAD-EXACTA.md) es únicamente una bitácora de estado y relevo; **este archivo es el único plan de decisiones, hitos y prioridades**.
 
 ## 1. Objetivo y arquitectura que no se negocian
@@ -28,15 +28,15 @@ Actualmente el **único código fuente V2** se desarrolla en `havana-nice-v2-fou
 
 | Sistema | Hecho verificado | Estado |
 |---|---|---|
-| Código de V2 | 82 archivos bajo la rama canónica; pruebas generales del commit `177ac4eb23ed` aprobadas | **En orden** |
+| Código de V2 | Rama canónica `havana-nice-v2-foundation`; último commit comprobado `bf0b268`; suite GitHub [40975170083](https://github.com/Abnernoa97/havana-nice-pwa/actions/runs/40975170083) aprobada | **En orden** |
 | Cloudflare Worker | `havana-nice-v2-dev`, sin Service Binding externo | **En orden** |
 | Configuración runtime Worker | Cinco bindings: `CHAT_ROOMS`, `DB`, `HAVANA_ENV`, `V2_ADMIN_LOGIN_MODE`, `V2_ADMIN_LOGIN_SECRET` | **Publicado; fuente sincronizada** |
-| D1 | 11 tablas actuales, sin `chat_cloud_*` ni tablas multimedia antiguas | **En orden** |
-| Datos Chat | 44 mensajes, 3 músicos con modo de dispositivo único, 3 sesiones, 12 reacciones | **Conservados** |
-| Administrador | 28 filas históricas de sesión, 21 revocadas; ninguna vigente según el reloj servidor en la consulta | **Depuración completada: 0 sesiones antiguas** |
-| PWA de V2 | Despliegue confirmado del commit `177ac4eb23ed` | **Publicado** |
-| Android 0.0.10 | Compilación APK y prueba general GitHub **exitosas**; mismo paquete/versionCode 10 | **Compilado** |
-| Entrega 0.0.10 | Workflow de enlace directo **falló** al consultar GitHub con `unexpected EOF`; no se confirmó instalación en teléfono | **Pendiente** |
+| D1 | 11 tablas de aplicación, sin `chat_cloud_*` ni tablas multimedia antiguas; datos de texto y vínculos conservados | **En orden** |
+| Datos Chat | 47 mensajes, 3 músicos autorizados, 3 sesiones y 3 vínculos de instalación; 2 alertas duplicadas registradas en consulta posterior a QA | **Conservados** |
+| Administrador | 28 sesiones históricas vencidas/revocadas retiradas durante saneamiento; nueva sesión real autenticada y Chat general revisado visualmente | **Validado en Chat y acceso** |
+| PWA de V2 | Despliegue `success` de `bf0b268`; bloqueo de nuevo acceso duplicado probado físicamente en navegador | **Publicado y probado para acceso** |
+| Android 0.0.10 | APK firmada, `versionCode 10`, instalación sobre la anterior confirmada; Chat probado en red/offline/reconexión | **Instalado y probado para Chat** |
+| Entrega 0.0.10 | Workflow único de publicación [40963966950](https://github.com/Abnernoa97/havana-nice-pwa/actions/runs/40963966950) en `success`; instalación confirmada por el propietario | **Confirmada** |
 | R2 | API de cuenta devolvió `403/10042`: servicio sin activar | **No iniciado** |
 | Supabase | Sin implementación activa en V2 | **No incorporar** |
 | Conexión a HAVANA CLOUD | Código del puente y tablas V2 retirados; no figura en el Worker actual | **Cerrada la retirada** |
@@ -64,7 +64,7 @@ Actualmente el **único código fuente V2** se desarrolla en `havana-nice-v2-fou
 - [ ] **H03** — Navegación, sesión y persistencia entre módulos. **Auditoría:** implementación completa pendiente.
 - [ ] **H04** — Actualización del aspecto visual PWA sin reinstalar Android. **Auditoría:** validación de actualización y caché pendiente.
 - [x] **S01** — Altas y bajas de músicos desde Administrador. **Auditoría:** sesión administrativa separada; configuración no secreta de despliegue alineada en S-C.
-- [x] **S02** — Una instalación por músico, con alerta de acceso duplicado. **Auditoría:** los 3 músicos usan `single_device_mode=1`; la excepción de acceso heredado ya se eliminó y se publicó en el Worker.
+- [x] **S02** — Una instalación por músico, con alerta de acceso duplicado. **Auditoría:** 3 registros de `chat_single_device_owners` coinciden con las 3 sesiones válidas. La columna histórica `single_device_mode` fue eliminada de D1. El rechazo PWA de un nombre ya vinculado y la nueva alerta en Administrador se comprobaron en dispositivo real.
 
 ### Multimedia: 0 de 5 cerrados
 
@@ -81,10 +81,10 @@ Actualmente el **único código fuente V2** se desarrolla en `havana-nice-v2-fou
 - [ ] **P03** — Repertorio, canciones y versiones por evento.
 - [ ] **P04** — Administrador completo. **Parcial:** accesos, seguridad y Chat general sí existen; calendario/repertorio/más siguen pendientes.
 - [ ] **P05** — Avisos y perfiles reales.
-- [ ] **Q01** — QA integral Android/PWA/Admin: firma, actualización sobre instalada, sesión, reconexión, caché, privacidad y reproducción. **Debe absorber las pruebas del saneamiento y de M01/M02.**
+- [ ] **Q01** — QA integral Android/PWA/Admin: firma, actualización sobre instalada, sesión, reconexión, caché, privacidad y reproducción. **Pruebas reales ya superadas:** login Admin, Chat histórico, mensaje Android→Admin, red interrumpida/reconexión, envío offline único y PWA bloqueada por dispositivo duplicado con alerta Admin. **Abierto:** alcance integral incluye otras superficies, dos teléfonos independientes y multimedia M01/M02/M04 todavía inexistente; no cerrar antes.
 - [ ] **Q02** — Paso a producción después de autorización y QA completos.
 
-**TOTAL INALTERADO: 12/27.** Saneamiento transversal: **10/10 tareas cerradas**, tras la confirmación de instalación Android 0.0.10 del propietario. **Q01** sigue abierto para QA integral; M01/M02/M04 todavía no implementados. Ninguna tarea de limpieza siguiente es un hito 28 ni reemplaza el tablero original.
+**TOTAL INALTERADO: 12/27.** Saneamiento transversal: **10/10 tareas cerradas**. La parte de Chat de Q01 tiene evidencia real Android/PWA/Admin; **Q01 integral sigue abierto** hasta completar las funciones pendientes. M01/M02/M04 todavía no están implementados. No introducir más hitos ni tableros paralelos.
 
 ## 4. Fase prioritaria: SANEAMIENTO TRANSVERSAL DE V2
 
@@ -146,6 +146,6 @@ Actualmente el **único código fuente V2** se desarrolla en `havana-nice-v2-fou
 
 ## 6. Próxima decisión operacional
 
-**Saneamiento 10/10 cerrado en la fuente; próximo bloque R2, aún deshabilitado por Cloudflare. QA integral Q01 sigue pendiente.** El flujo Android ya tiene un único instalador vigente con firma comprobada. Mantener 12 hitos cerrados hasta QA real.
+**Saneamiento 10/10 cerrado; pruebas funcionales del Chat superadas.** No repetir QA de texto sin motivo; Q01 sigue abierto para funciones no implementadas. El siguiente trabajo técnico sin depender de servicios adicionales será **H02 → H03**: integración de navegación y módulos no-Chat en Android con PWA únicamente de presentación, manteniendo el Chat 100 % nativo y sesiones intactas. Priorizar estructura funcional y persistencia, no estética.
 
-Tras ello: activar R2 Standard privado dentro de la misma cuenta Cloudflare y desarrollar M01/M02/M04 sin migrar archivos de prueba.
+**R2 es otro frente pendiente, no un bloqueo a H02/H03:** cuando el propietario habilite R2 en la cuenta Cloudflare V2, retomar M01 → M02 → M04 usando únicamente el Worker/D1 existentes y el contrato aprobado. No crear una nube alternativa.
