@@ -258,6 +258,12 @@ Actualmente el **único código fuente V2** se desarrolla en `havana-nice-v2-fou
 - **Backend publicado:** suite de pruebas SQLite y aislamiento [41109290868](https://github.com/Abnernoa97/havana-nice-pwa/actions/runs/41109290868) `success`. Worker V2 versión `4a1cbda7-5365-4746-b679-08a28646d590` probado al 0 % y luego activado al **100 %** tras [41110029794](https://github.com/Abnernoa97/havana-nice-pwa/actions/runs/41110029794) `success`, preservando cinco bindings y el anterior para reversión. Eliminado el bundle de staging físico. El módulo **NO está cerrado** hasta prueba real PWA/Administrador de CRUD y lista visible desde músico.
 - **Regla de publicación invariable:** estas mejoras se acumulan en **PWA + Administración**; **no cambiar app.json, crear manifiesto de release, generar ni publicar APK** por Repertorio. Al decidir un lote nativo futuro se integra la vista Repertorio con la HOME y se valida Chat. Tablero oficial **12/36** hasta prueba real.
 
+### QA real Repertorio general — 30 octubre 2026
+
+- **Confirmado con capturas del propietario:** Administrador muestra 1 canción real (`All of my`, ENGLISH, artista `Hbvc`) y permite editar/eliminar; la misma canción se ve desde la PWA del músico con enlace «REVISAR LINK». Flujo **Administración → D1/Worker → PWA músico** verificado para el catálogo general, sin copiar canciones originales ni crear datos ficticios.
+- **Pendiente:** «Repertorio por evento» todavía no tiene canciones asignadas, tal como indica la PWA del músico. Próxima QA: seleccionar el evento de Calendario en Administración, añadir la canción ya registrada y verificar la lista del evento en el músico, después ordenar/completar/quitar, manteniendo Chat y las fechas intactos.
+- **Estado del tablero:** P03/A04 **parciales y abiertos**; la prueba del catálogo general no cierra el módulo completo. No se autoriza ni genera APK por esta fase; continuar acumulando la PWA, **12/36**.
+
 ## 6. Próxima decisión operacional
 
 **Saneamiento 10/10 cerrado; pruebas funcionales del Chat superadas.** No repetir QA de texto sin motivo; Q01 sigue abierto para funciones no implementadas. El siguiente trabajo es **QA del Calendario P02 + A03** en Administrador ↔ músico Android/PWA y pruebas de límites A09, conservando HOME↔Chat y la entrada única A01. H02 (capa visual PWA no-Chat en Android) sigue aparte, sin crear una segunda HOME ni reemplazar el Chat nativo. Priorizar estructura funcional y persistencia, no estética.
