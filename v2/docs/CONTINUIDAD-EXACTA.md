@@ -40,6 +40,14 @@
 - Sin despliegue del Worker: permanece la versión remota `4868029c-218d-43d8-92e3-664b9c19d133` al 100 % de tráfico al verificar; Android sigue en APK 0.0.10.
 - `npm ci` reportó 12 advisories (5 altas, 2 moderadas, 5 bajas) sin detalle de paquetes. Revisar posteriormente; no cambiar dependencias sin auditoría y comprobaciones.
 
+## Dependencias y Calendario, código sin activar — 29 de octubre de 2026 (México)
+
+- Auditoría npm de V2 en [41010648961](https://github.com/Abnernoa97/havana-nice-pwa/actions/runs/41010648961): 12 incidencias (5 altas, 2 moderadas, 5 bajas). Wrangler/Miniflare→undici; Expo CLI→zod y dependencias indirectas; node-forge/deepmerge. Sin cambios de versiones ni lock. La prueba temporal npm audit fue retirada.
+- Nueva migración `0018_calendar_events.sql` solo en GitHub, **NO aplicada a D1**. Nuevo archivo `cloudflare/src/calendar.js` unido al Worker V2 solamente en fuente y contrato `packages/shared/src/calendar.ts`, sin conexión paralela. La API no se desplegó; no hay datos reales de calendario creados.
+- El Admin vigente conserva su autenticación privada; el músico usa su token autorizado. API con lectura limitada por rango y escrituras admin únicamente, versiones optimistas para evitar sobrescribir modificaciones.
+- CI final [41011185017](https://github.com/Abnernoa97/havana-nice-pwa/actions/runs/41011185017) **SUCCESS** en TypeScript, pruebas nuevas de calendario, reglas de acceso, seguridad del Chat, build PWA y export Android.
+- **P02/H02/H03 permanecen abiertos:** hace falta conectar pantallas, desplegar el Worker tras migración segura, validar la experiencia real en Admin/PWA/Android. No instalar otra APK mientras solo exista backend preparatorio.
+
 ## Próximo trabajo de desarrollo
 
 1. **H02 → H03:** integración segura de los módulos no-Chat en Android. Mantener Chat 100 % React Native, aprovechar PWA solo para presentación y utilizar contratos/backend V2 únicos. Prioridad funcional, no colores/interfaz.
