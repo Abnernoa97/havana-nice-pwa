@@ -75,6 +75,13 @@
 - Worker V2 publicado con versión `1df3def4-5b3e-4438-86b4-e2b3b16e4abd` al 100 %, con los cinco bindings existentes heredados. El archivo temporal de bundle y el paso de export CI se retiraron físicamente al terminar.
 - Pruebas automáticas SQLite con `member:` y símbolos aprobadas; actualización del cliente Android a fuente `0.0.13` iniciada. Pendiente: verificación final de la nueva APK, envío real de una fecha Admin→músico y confirmación física del propietario. El tablero permanece **12/36**.
 
+## Calendario — validación física Administración/PWA del músico (30/10/2026)
+
+- Capturas reales muestran creación, listado y apertura del acordeón del evento del 14dic26 desde Administrador y consulta del mismo evento por Andy en la PWA, incluyendo campos y acceso a Google Maps que abrió el destino. Usuario confirma «Ya quedó».
+- D1 verificada en solo lectura: **1 evento real, 3 asignaciones a 3 músicos activos, 3 sesiones y 3 instalaciones vinculadas**. No se insertaron registros artificiales para la prueba ni se tocaron datos del Chat.
+- **Pendiente identificado:** en la captura de Andy la PWA escribió `Invalid Date` en vez de `14dic26`. El código más reciente de `calendarDate` ya devuelve fechas libres literalmente y el despliegue Pages correspondiente está aprobado, por lo que se sospecha bundle viejo cargado. Falta confirmación visual tras recargar la PWA en línea, **sin cerrar sesión, borrar caché local ni reinstalar**.
+- P02/A03 quedan **parciales** hasta corregir/verificar ese detalle, probar Android nativo 0.0.13, editar/borrar/asignar a destinatarios y observar aislamiento frente a un error de Calendario. Hitos oficiales **12/36**, sin cierre adelantado.
+
 ## Próximo trabajo de desarrollo
 
 1. **H02 → H03:** integración segura de los módulos no-Chat en Android. Mantener Chat 100 % React Native, aprovechar PWA solo para presentación y utilizar contratos/backend V2 únicos. Prioridad funcional, no colores/interfaz.
