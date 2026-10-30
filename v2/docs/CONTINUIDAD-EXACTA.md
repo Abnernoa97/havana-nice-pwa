@@ -82,6 +82,14 @@
 - **Pendiente identificado:** en la captura de Andy la PWA escribió `Invalid Date` en vez de `14dic26`. El código más reciente de `calendarDate` ya devuelve fechas libres literalmente y el despliegue Pages correspondiente está aprobado, por lo que se sospecha bundle viejo cargado. Falta confirmación visual tras recargar la PWA en línea, **sin cerrar sesión, borrar caché local ni reinstalar**.
 - P02/A03 quedan **parciales** hasta corregir/verificar ese detalle, probar Android nativo 0.0.13, editar/borrar/asignar a destinatarios y observar aislamiento frente a un error de Calendario. Hitos oficiales **12/36**, sin cierre adelantado.
 
+## Protección del formateo de fecha y CRUD de 3 músicos — 30/10/2026
+
+- Android **0.0.13** está compilado, firmado y publicado por el workflow [41101348020](https://github.com/Abnernoa97/havana-nice-pwa/actions/runs/41101348020) `success`, con su firma y paquete habituales. **No hay confirmación todavía de instalación física 0.0.13**.
+- La fecha del evento real en D1 es texto libre `14dic26`. El código compartido actual de `calendarDate` la devuelve tal cual; PWA del músico mostró `Invalid Date` antes de cargar la compilación reciente. Se debe comprobar con apertura/recarga normal en línea **sin borrar datos de la PWA ni tocar Chat**.
+- Se añadió `tests/calendar-free-text-ui.test.mjs` (ejecuta el módulo TS real compilado en memoria y exige ausencia de `Invalid Date`, mapas HTTPS seguros y uso compartido en Android/PWA/Admin). Añadido paso permanente al CI, sin cambios en interfaces ni sesión.
+- `cloudflare/tests/calendar.test.mjs` extendido con ciclo completo **crear para 3 músicos → lectura autorizada por cada uno → editar/reasignar a uno → rechazar DELETE obsoleto → eliminar y confirmar que no quedan destinatarios**, todo en SQLite `:memory:`; no se realiza ninguna mutación de eventos de producción.
+- **No cerrar P02/A03** hasta ver la fecha sin `Invalid Date` en PWA del músico, probar 0.0.13 nativo y editar/eliminar desde el panel real de Administrador. `12/36` hitos cerrados. Nuevos tests en workflow [41104356896](https://github.com/Abnernoa97/havana-nice-pwa/actions/runs/41104356896), cuyo resultado debe confirmarse antes de citarlo como aprobado.
+
 ## Próximo trabajo de desarrollo
 
 1. **H02 → H03:** integración segura de los módulos no-Chat en Android. Mantener Chat 100 % React Native, aprovechar PWA solo para presentación y utilizar contratos/backend V2 únicos. Prioridad funcional, no colores/interfaz.
