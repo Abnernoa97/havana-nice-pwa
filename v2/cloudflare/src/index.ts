@@ -100,7 +100,7 @@ function websocketSessionToken(request: Request) {
   // Browsers cannot set this header with the WebSocket API.
   const auth = request.headers.get('authorization') || '';
   const match = /^Bearer ([A-Za-z0-9_-]{40,100})$/i.exec(auth);
-  return match ? match[1] : '';
+  return match?.[1] || '';
 }
 
 function mapMessage(row: ChatMessageRow) {
@@ -125,8 +125,8 @@ export class ChatRoom {
   async fetch(request: Request) {
     if (new URL(request.url).pathname === '/health') return Response.json({ ok: true, durableObject: 'ChatRoom', environment: this.env.HAVANA_ENV || 'development' });
     if (new URL(request.url).pathname === '/member-removed' && request.method === 'POST') {
-      let data=null;
-      try{data=await request.json();}catch{}
+      let data: {actorId?:unknown}|null=null;
+      try{data=await request.json() as {actorId?:unknown};}catch{}
       if(typeof data?.actorId!=='string'||!/^member:[a-z0-9_-]{1,40}$/i.test(data.actorId))
         return respond({error:'Invalid member'},400);
       for(const [socket,member] of this.members.entries()){
@@ -140,7 +140,7 @@ export class ChatRoom {
       return respond({ok:true},200);
     }
     if (new URL(request.url).pathname === '/installation-released' && request.method === 'POST') {
-      let data=null;try{data=await request.json();}catch{}
+      let data: {actorId?:unknown}|null=null;try{data=await request.json() as {actorId?:unknown};}catch{}
       if(typeof data?.actorId!=='string'||!/^member:[a-z0-9_-]{1,40}$/i.test(data.actorId))
         return respond({error:'Invalid member'},400);
       for(const [socket,member] of this.members.entries()){
@@ -153,17 +153,17 @@ export class ChatRoom {
       return respond({ok:true});
     }
     if (new URL(request.url).pathname === '/admin-chat-message-deleted' && request.method === 'POST') {
-      let data=null;try{data=await request.json();}catch{}
-      if(!Number.isSafeInteger(data?.seq)||data.seq<=0)return respond({error:'Invalid message'},400);
+      let data: {seq?:unknown}|null=null;try{data=await request.json() as {seq?:unknown};}catch{}
+      if(typeof data?.seq!=='number'||!Number.isSafeInteger(data.seq)||data.seq<=0)return respond({error:'Invalid message'},400);
       const row=await this.env.DB.prepare('SELECT seq FROM chat_messages WHERE seq=?').bind(data.seq).first();
       if(row)return respond({error:'Message still exists'},409);
       this.broadcast({type:'chat.deleted',seq:data.seq});
       return respond({ok:true});
     }
     if (new URL(request.url).pathname === '/admin-invalidate' && request.method === 'POST') {
-      let event=null;
-      try{event=await request.json();}catch{}
-      if(!['requests','members'].includes(event?.topic))return respond({error:'Invalid topic'},400);
+      let event: {topic?:unknown}|null=null;
+      try{event=await request.json() as {topic?:unknown};}catch{}
+      if(typeof event?.topic!=='string'||!['requests','members'].includes(event.topic))return respond({error:'Invalid topic'},400);
       await this.invalidateAdmins(event.topic);
       return respond({ok:true},200);
     }
@@ -426,8 +426,8 @@ export default {
       if (request.method !== 'GET' && request.method !== 'POST') return respond({error:'Método no permitido'},405,origin);
       if (!await verifyAdminSession(request,env)) return respond({error:'No autorizado'},401,origin);
       if (request.method === 'POST') {
-        let payload;
-        try { payload=await request.json(); } catch {return respond({error:'Solicitud inválida'},400,origin);}
+        let payload: {displayName?:unknown};
+        try { payload=await request.json() as {displayName?:unknown}; } catch {return respond({error:'Solicitud inválida'},400,origin);}
         const displayName=typeof payload?.displayName==='string'?
           payload.displayName.normalize('NFC').trim().replace(/\s+/g,' '):'';
         const username=normalizeMusicianName(displayName);
@@ -457,8 +457,8 @@ export default {
       return handleAdminSessionApi(request,env,url,origin,respond);
     }
     if (url.pathname === '/api/chat/session' && request.method === 'POST') {
-      let payload;
-      try { payload = await request.json(); } catch { return respond({ error: 'Solicitud inválida' }, 400, origin); }
+      let payload: {displayName?:unknown};
+      try { payload = await request.json() as {displayName?:unknown}; } catch { return respond({ error: 'Solicitud inválida' }, 400, origin); }
       const username = normalizeMusicianName(payload?.displayName);
       if (!username) return respond({ error: 'Escribe tu nombre para entrar' }, 400, origin);
       const member = await env.DB.prepare(
