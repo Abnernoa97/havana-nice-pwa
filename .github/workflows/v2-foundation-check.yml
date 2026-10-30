@@ -302,10 +302,10 @@ jobs:
           set -euo pipefail
           BASE="https://havana-nice-v2-dev.soloaplicaciones97.workers.dev"
           VERSION='havana-nice-v2-dev="40f8eec3-cf4f-471c-a53c-bd9c381ed10f"'
-          for ENDPOINT in /api/health /api/calendar/events /api/calendar/admin/events /api/chat/messages; do
+          for ENDPOINT in /health /api/calendar/events /api/calendar/admin/events /api/chat/messages; do
             STATUS="$(curl --silent --show-error -o /tmp/hnv2-calendar-canary.json -w '%{http_code}' \
               -H "Cloudflare-Workers-Version-Overrides: $VERSION" "$BASE$ENDPOINT")"
             echo "$ENDPOINT override result: $STATUS"
-            test "$STATUS" = "$([ "$ENDPOINT" = "/api/health" ] && echo 200 || echo 401)"
+            test "$STATUS" = "$([ "$ENDPOINT" = "/health" ] && echo 200 || echo 401)"
             grep -Eq '"app":"havana-nice-v2"|"error"' /tmp/hnv2-calendar-canary.json
           done
