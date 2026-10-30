@@ -2,7 +2,7 @@
 
 **Auditoría cruzada: 29 de octubre de 2026. QA funcional del Chat confirmado por el propietario el 29 de octubre de 2026 (hora de México).**  
 **Fuente de desarrollo única:** repositorio `Abnernoa97/havana-nice-pwa`, rama `havana-nice-v2-foundation`.  
-**Tablero inalterado:** **12/27 hitos cerrados (44,4 %) · 15 abiertos**.  
+**Tablero único ampliado por decisión del propietario (30/10/2026):** **12/36 hitos cerrados (33,3 %) · 24 abiertos**. Nueve hitos A01–A09 nuevos para modularidad y aislamiento; los 27 anteriores conservan sus identificadores y estado.  
 **Estado:** Chat Android/PWA/Administrador probado físicamente en texto, sincronización, reconexión, cola offline y bloqueo duplicado. Saneamiento 10/10 cerrado; Android 0.0.11 firmado e instalado sobre 0.0.10; HOME y Chat reconocidos en capturas y confirmados por el propietario. QA integral Q01 permanece abierto para módulos todavía no implementados, pruebas físicas adicionales y multimedia. R2 todavía no habilitado. **Protección de tipos del Worker V2 completada:** se retiró `@ts-nocheck`, se tiparon las interfaces y el CI ahora impide recuperar la supresión, con suite [41010325277](https://github.com/Abnernoa97/havana-nice-pwa/actions/runs/41010325277) aprobada; no se desplegó Worker ni nueva APK.  
 **Documento auxiliar:** [CONTINUIDAD-EXACTA.md](./CONTINUIDAD-EXACTA.md) es únicamente una bitácora de estado y relevo; **este archivo es el único plan de decisiones, hitos y prioridades**.
 
@@ -17,6 +17,18 @@ Una sola línea de código y una sola infraestructura V2, sin variantes, copias 
 - **Archivos futuros:** R2 privado directamente, solo tras activación por el propietario. Nunca reutilizar el puente ya descartado ni migrar archivos multimedia de laboratorio.
 - **Límite estricto:** trabajar **solo en V2**. No modificar la aplicación original, su rama histórica `main`, el repositorio o Worker de HAVANA CLOUD, ni los demás proyectos de la cuenta. No desinstalar Android ni restablecer datos locales para limpiar código.
 - **Una sola verdad documental:** este Plan Maestro define dirección y prioridades; Continuidad registra evidencias y el estado de la última intervención; README apunta a ambos sin repetir instrucciones contradictorias.
+
+### REGLA PERMANENTE APROBADA · Módulos independientes reunidos en HOME (30/10/2026)
+
+- [x] **Decisión arquitectónica autorizada:** cada sección se desarrolla, se prueba, se documenta y se mantiene como **módulo funcional independiente** (Chat, Calendario, Repertorio, Músicos, Avisos, Ajustes y los siguientes que se autoricen). Una sola aplicación V2 los reúne mediante **HOME**, que únicamente coordina acceso y navegación; no debe contener la lógica interna de cada módulo.
+- **INDEPENDENCIA DE MÓDULOS, NO DE SESIONES DE LOGIN:** existe **una sola entrada de músico autorizada por Administrador**, un único token/restauración y un vínculo de dispositivo. No crear registros, claves, sesiones, servidores, bases ni APK independientes por pestaña. El Administrador conserva su autorización privilegiada ya implementada. La palabra «independiente» describe lógica, estado de pantalla, APIs y tests del módulo, no otra identidad.
+- **Límites técnicos obligatorios:** cada módulo tendrá su propio componente de interfaz y, cuando corresponda, adaptador de API, validadores, rutas del Worker, tablas/registros D1 y pruebas. Puede compartir contratos, autenticación, utilidades visuales y backend existentes, **pero no copiar ni modificar la lógica de otro módulo para funcionar**. El backend es uno y cada módulo se incorpora como ruta/handler aislado.
+- **HOME estable y pequeña:** listar y abrir módulos usando `packages/shared/src/memberModules.ts`; sin guardar eventos, mensajes, canciones o avisos dentro de HOME; sin duplicar menús, pantallas, secretos ni conexiones. El Chat Android permanece 100 % React Native nativo. La presentación PWA para los módulos no-Chat se unifica **después** de completar su funcionalidad, manteniendo la misma HOME lógica.
+- **Contención de errores:** al fallar un módulo, mostrar error y opción de reintento **en su sección**, permitir salir a HOME y seguir utilizando las demás. Un fallo de Calendario no debe cerrar sesión, limpiar caché del Chat, revocar el nombre o impedir el acceso a Repertorio. Los efectos/sondeos/solicitudes se limpian al desmontar cada módulo; evitar estados globales ajenos. Reconocer el límite: compartimos proceso/app/Worker/D1, por lo que **no existe garantía de aislamiento absoluto ante una caída de infraestructura común**.
+- **Control desde Administración:** cada módulo funcional tendrá su propia sección de gestión en el Administrador, con permisos adecuados. Los músicos nunca obtienen permisos Admin por abrir HOME. Administrador ↔ módulo de músico se verifica con el **mismo backend V2**.
+- **Criterio para tachar un hito:** funcionamiento y permisos reales, pruebas automáticas de regresión del módulo + Chat/acceso, integración HOME y Administrador cuando aplique, y prueba física donde sea necesaria. No considerar «terminado» un botón, maqueta, compilación o contrato aislado. El código provisional sustituido se **elimina físicamente** tras verificar su sustituto; conservar pruebas vigentes y migraciones históricas por seguridad.
+- **Orden de avance:** terminar **Calendario P02** y aislamiento A03, después Repertorio P03/A04 y cada módulo sucesivo; diseño final y capa visual compartida al final. Se permiten más de 36 hitos solo cuando aporten una función o protección concreta, **dentro de este mismo tablero**, sin abrir un plan paralelo.
+
 
 ### «Un solo main»: interpretación técnica correcta
 
@@ -43,7 +55,7 @@ Actualmente el **único código fuente V2** se desarrolla en `havana-nice-v2-fou
 
 **No confundir** una compilación correcta o un despliegue PWA exitoso con QA físico aprobado de Android, video o reproducción. El Chat de texto y el acceso de músicos deben conservarse.
 
-## 3. Auditoría contra los 27 hitos — tablero oficial
+## 3. Tablero único V2 — 36 hitos oficiales (27 originales + 9 de arquitectura modular)
 
 ### Fundación y Chat: 9 de 9 cerrados
 
@@ -84,7 +96,21 @@ Actualmente el **único código fuente V2** se desarrolla en `havana-nice-v2-fou
 - [ ] **Q01** — QA integral Android/PWA/Admin: firma, actualización sobre instalada, sesión, reconexión, caché, privacidad y reproducción. **Pruebas reales ya superadas:** login Admin, Chat histórico, mensaje Android→Admin, red interrumpida/reconexión, envío offline único y PWA bloqueada por dispositivo duplicado con alerta Admin. **Abierto:** alcance integral incluye otras superficies, dos teléfonos independientes y multimedia M01/M02/M04 todavía inexistente; no cerrar antes.
 - [ ] **Q02** — Paso a producción después de autorización y QA completos.
 
-**TOTAL INALTERADO: 12/27.** Saneamiento transversal: **10/10 tareas cerradas**. La parte de Chat de Q01 tiene evidencia real Android/PWA/Admin; **Q01 integral sigue abierto** hasta completar las funciones pendientes. M01/M02/M04 todavía no están implementados. No introducir más hitos ni tableros paralelos.
+**TOTAL VIGENTE: 12/36 cerrados, 24 abiertos.** Los 27 hitos originales permanecen; se añaden nueve hitos A01–A09 sin crear otro tablero. Saneamiento transversal: **10/10 tareas cerradas**. La parte de Chat de Q01 tiene evidencia real Android/PWA/Admin; **Q01 integral sigue abierto** hasta completar las funciones pendientes. M01/M02/M04 todavía no están implementados. No introducir más hitos ni tableros paralelos.
+
+### Aislamiento modular, navegación y prevención de fallos — 0 de 9 cerrados
+
+- [ ] **A01 — Entrada única + HOME orquestadora:** contrato explícito de módulos, HOME únicamente navegación, misma sesión de músico para todas las secciones, sin segundo login ni nueva sesión por módulo. **Parcial:** HOME/Chat ya probados en Android 0.0.11; faltan guardias automáticas integrales.
+- [ ] **A02 — Chat autónomo y protegido:** motor nativo Android, PWA y vista Administrador aislados del ciclo de vida de otros módulos; nunca desmontar Chat por entrar al Calendario ni restablecer borradores/cola/sesión. **Parcial:** Chat nativo y HOME funcionan; falta prueba de fallo provocado de otro módulo.
+- [ ] **A03 — Calendario aislado de Chat y otras secciones:** acordeón del músico + CRUD exclusivo de Administración + asignación privada por fecha, consultas y errores propios, sin tocar tablas/estado del Chat. **Parcial:** fuente, D1 y API ya implementadas; pendiente QA real Admin → móvil, navegación y error de red.
+- [ ] **A04 — Repertorio autónomo:** propio módulo, catálogo, listas por evento, edición Admin, API/contratos y permisos separados del Chat y Calendario; integración HOME al finalizar.
+- [ ] **A05 — Músicos autónomo:** ficha/lista del equipo y datos pertinentes, Administración como única autoridad; no duplicar el sistema existente de acceso/vínculo del nombre.
+- [ ] **A06 — Avisos autónomo:** creación y gestión desde Administración, destinatarios y consulta seguros, sin interferir con notificaciones/Chat.
+- [ ] **A07 — Ajustes autónomo:** preferencias y datos permitidos del músico con almacenamiento apropiado, sin pantalla alternativa de autenticación ni opción de liberar dispositivos.
+- [ ] **A08 — Contención de errores y ciclo de vida:** fallbacks por sección, reintento, navegación a HOME, aislamiento de errores de renderizado/carga y limpieza de suscripciones; pruebas de desconexión y errores sin perder Chat.
+- [ ] **A09 — Pruebas de arquitectura por módulo en CI:** tests de fronteras e importaciones, rechazo de login/servidor/copia del Chat en otros módulos, smoke de APIs independientes, verificación Admin↔músico y regresión automática de los módulos aprobados; mantener una sola cadena de APK.
+
+**Medición:** estos nueve hitos son adicionales y no equivalen a nueve aplicaciones o sesiones nuevas. Regla anterior marcada [x] como decisión aprobada; ninguno de los nueve se cierra sin cumplir los criterios de ejecución arriba.
 
 ## 4. Fase prioritaria: SANEAMIENTO TRANSVERSAL DE V2
 
@@ -183,6 +209,6 @@ Actualmente el **único código fuente V2** se desarrolla en `havana-nice-v2-fou
 
 ## 6. Próxima decisión operacional
 
-**Saneamiento 10/10 cerrado; pruebas funcionales del Chat superadas.** No repetir QA de texto sin motivo; Q01 sigue abierto para funciones no implementadas. El siguiente trabajo es **QA del Calendario P02** en Administrador ↔ músico Android/PWA, conservando la navegación HOME↔Chat. H02 (capa visual PWA no-Chat en Android) sigue aparte, sin crear una segunda HOME ni reemplazar el Chat nativo. Priorizar estructura funcional y persistencia, no estética.
+**Saneamiento 10/10 cerrado; pruebas funcionales del Chat superadas.** No repetir QA de texto sin motivo; Q01 sigue abierto para funciones no implementadas. El siguiente trabajo es **QA del Calendario P02 + A03** en Administrador ↔ músico Android/PWA y pruebas de límites A09, conservando HOME↔Chat y la entrada única A01. H02 (capa visual PWA no-Chat en Android) sigue aparte, sin crear una segunda HOME ni reemplazar el Chat nativo. Priorizar estructura funcional y persistencia, no estética.
 
 **R2 es otro frente pendiente, no un bloqueo a H02/H03:** cuando el propietario habilite R2 en la cuenta Cloudflare V2, retomar M01 → M02 → M04 usando únicamente el Worker/D1 existentes y el contrato aprobado. No crear una nube alternativa.
