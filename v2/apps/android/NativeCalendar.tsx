@@ -1,6 +1,6 @@
 import React,{useCallback,useEffect,useState} from 'react';
 import {AppState,Linking,Pressable,StyleSheet,Text,View} from 'react-native';
-import {getCalendarEvents,calendarDate,HAVANA_V2_DEV_API_BASE_URL,type CalendarEvent} from '@havana/shared';
+import {getCalendarEvents,calendarDate,safeCalendarMapUrl,HAVANA_V2_DEV_API_BASE_URL,type CalendarEvent} from '@havana/shared';
 // One authorized V2 session; no new identity, token persistence, WebView or Chat.
 export default function NativeCalendar({token}:{token:string}){
  const [events,setEvents]=useState<CalendarEvent[]>([]);
@@ -34,9 +34,10 @@ export default function NativeCalendar({token}:{token:string}){
       {!!item.venue&&<Text style={styles.venue}>{item.venue}</Text>}</View>
      <Text style={styles.expand}>{open===item.id?'−':'+'}</Text>
     </Pressable>
-    {!!item.mapUrl&&<Pressable accessibilityRole="link" style={styles.map}
-     onPress={()=>{void Linking.openURL(item.mapUrl);}}>
-     <Text style={styles.mapText}>Llegar al evento · Google Maps ↗</Text></Pressable>}
+    {!!item.mapUrl&&(safeCalendarMapUrl(item.mapUrl)?<Pressable accessibilityRole="link" style={styles.map}
+     onPress={()=>{const link=safeCalendarMapUrl(item.mapUrl);if(link)void Linking.openURL(link);}}>
+     <Text style={styles.mapText}>Llegar al evento · Google Maps ↗</Text></Pressable>:
+     <View style={styles.map}><Text style={styles.mapText}>Google Maps: {item.mapUrl}</Text></View>)}
     {open===item.id&&<View style={styles.details}>
      <View style={styles.hours}>
       {([['Llamada',item.callTime],['Sonido',item.soundcheckTime],['Llegada',item.arrivalTime],
@@ -49,7 +50,7 @@ export default function NativeCalendar({token}:{token:string}){
      {!!item.details&&<Text style={styles.info}>{item.details}</Text>}
      {!!item.contactName&&<Text style={styles.info}><Text style={styles.bold}>Contacto: </Text>{item.contactName}{item.contactPhone?' · '+item.contactPhone:''}</Text>}
      {!!item.notes&&<Text style={styles.info}><Text style={styles.bold}>Notas: </Text>{item.notes}</Text>}
-     {item.status!=='confirmed'&&<Text style={styles.info}>Estado: {item.status==='tentative'?'Tentativo':'Cancelado'}</Text>}
+     {(!!item.statusText||item.status!=='confirmed')&&<Text style={styles.info}>Estado: {item.statusText|| (item.status==='tentative'?'Tentativo':'Cancelado')}</Text>}
     </View>}
    </View>)}
  </View>;

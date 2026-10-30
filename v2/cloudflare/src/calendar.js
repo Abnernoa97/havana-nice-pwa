@@ -2,9 +2,11 @@
 // Admin writes event + selected recipients atomically. Member reads only assigned dates.
 import {verifyAdminSession} from './admin-auth.js';
 const ID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// The canonical musician actor IDs are member:<opaque-id>, NOT event UUIDs.
+const ACTOR_ID=/^member:[a-z0-9_-]{1,64}$/i;
 const DATE=/^\d{4}-\d{2}-\d{2}$/;
 const STATUSES=new Set(['tentative','confirmed','cancelled']);
-const COLUMNS='e.id,e.event_date,e.time_zone,e.title,e.venue,e.city,e.call_time,e.soundcheck_time,e.arrival_time,e.show_time,e.end_time,e.wardrobe,e.details,e.contact_name,e.contact_phone,e.notes,e.map_url,e.status,e.version,e.updated_at';
+const COLUMNS='e.id,e.event_date,e.time_zone,e.title,e.venue,e.city,e.call_time,e.soundcheck_time,e.arrival_time,e.show_time,e.end_time,e.wardrobe,e.details,e.contact_name,e.contact_phone,e.notes,e.map_url,e.status,e.status_text,e.version,e.updated_at';
 const PAGE_SIZE=100;
 const ERR={401:'No autorizado',400:'Solicitud inválida',409:'La fecha cambió. Actualiza antes de editar.'};
 function dateValid(value){
@@ -18,40 +20,50 @@ function string(value,max,label,required=false){
  if(text.length>max||(required&&!text))throw Error(label+' inválido o demasiado largo');
  return text;
 }
+// The user may enter any date text. Parse known formats for ordering only.
+function optionalSortDate(input){
+ const value=input.trim();
+ let y,m,d;
+ const iso=/^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(value);
+ const local=/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})$/.exec(value);
+ if(iso){y=Number(iso[1]);m=Number(iso[2]);d=Number(iso[3]);}
+ else if(local){y=Number(local[3]);m=Number(local[2]);d=Number(local[1]);}
+ else return null;
+ const date=new Date(Date.UTC(y,m-1,d));
+ if(date.getUTCFullYear()!==y||date.getUTCMonth()!==m-1||date.getUTCDate()!==d)return null;
+ return String(y).padStart(4,'0')+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+}
 function time(value){
- return string(value??'',60,'Hora'); // The original accepts "1:00 p.m." or "Por definir".
+ return string(value??'',60,'Hora'); // Full text flexibility.
 }
 function fields(input){
  if(!input||typeof input!=='object'||Array.isArray(input))throw Error('Evento inválido');
- if(!dateValid(input.date))throw Error('Fecha inválida');
+ const date=string(input.date??'',160,'Fecha');
  const timeZone=string(input.timeZone??'America/Mexico_City',64,'Zona horaria',true);
  try{new Intl.DateTimeFormat('en',{timeZone});}catch{throw Error('Zona horaria inválida');}
  const status=input.status??'confirmed';
  if(!STATUSES.has(status))throw Error('Estado inválido');
  const mapUrl=string(input.mapUrl??'',1500,'Google Maps');
- if(mapUrl){
-  let parsed;
-  try{parsed=new URL(mapUrl);}catch{throw Error('Enlace de Maps inválido');}
-  if(parsed.protocol!=='https:')throw Error('Google Maps requiere enlace https');
- }
+ // Arbitrary text is stored unchanged; clients only link real HTTPS URLs.
  const recipients=input.recipientIds;
  if(!Array.isArray(recipients)||recipients.length===0||recipients.length>100)
   throw Error('Selecciona al menos un músico destinatario');
- if(!recipients.every(id=>typeof id==='string'&&ID.test(id))||
+ if(!recipients.every(id=>typeof id==='string'&&ACTOR_ID.test(id))||
   new Set(recipients).size!==recipients.length)throw Error('Destinatarios inválidos');
  return {
-  date:input.date,timeZone,title:string(input.title,160,'Evento',true),
+  date,dateSort:optionalSortDate(date),timeZone,title:string(input.title,160,'Evento',true),
   venue:string(input.venue??'',160,'Lugar'),city:string(input.city??'',120,'Ciudad'),
   callTime:time(input.callTime),soundcheckTime:time(input.soundcheckTime),
   arrivalTime:time(input.arrivalTime),showTime:time(input.showTime),endTime:time(input.endTime),
   wardrobe:string(input.wardrobe??'',500,'Vestuario'),details:string(input.details??'',4000,'Detalles'),
   contactName:string(input.contactName??'',160,'Contacto'),
   contactPhone:string(input.contactPhone??'',80,'Teléfono'),
-  notes:string(input.notes??'',4000,'Notas'),mapUrl,status,recipientIds:recipients
+  notes:string(input.notes??'',4000,'Notas'),mapUrl,status,
+  statusText:string(input.statusText??'',160,'Estado'),recipientIds:recipients
  };
 }
 const valueList=x=>[x.date,x.timeZone,x.title,x.venue,x.city,x.callTime,x.soundcheckTime,
- x.arrivalTime,x.showTime,x.endTime,x.wardrobe,x.details,x.contactName,x.contactPhone,x.notes,x.mapUrl,x.status];
+ x.arrivalTime,x.showTime,x.endTime,x.wardrobe,x.details,x.contactName,x.contactPhone,x.notes,x.mapUrl,x.status,x.dateSort,x.statusText];
 function event(row,admin=false){
  const result={
   id:row.id,date:row.event_date,timeZone:row.time_zone,title:row.title,
@@ -59,7 +71,7 @@ function event(row,admin=false){
   arrivalTime:row.arrival_time,showTime:row.show_time,endTime:row.end_time,
   wardrobe:row.wardrobe,details:row.details,contactName:row.contact_name,
   contactPhone:row.contact_phone,notes:row.notes,mapUrl:row.map_url,
-  status:row.status,version:row.version,updatedAt:row.updated_at
+  status:row.status,statusText:row.status_text||'',version:row.version,updatedAt:row.updated_at
  };
  if(admin)result.recipientIds=JSON.parse(row.recipients_json||'[]');
  return result;
@@ -97,7 +109,7 @@ export async function handleCalendarApi(request,env,url,origin,respond,verifyMus
   if(!Number.isSafeInteger(offset)||offset<0||offset>10000)return reply({error:'Paginación inválida'},400);
   const assigned=admin?'':' WHERE EXISTS (SELECT 1 FROM calendar_event_recipients r WHERE r.event_id=e.id AND r.actor_id=?)';
   const sql='SELECT '+COLUMNS+(admin?',(SELECT json_group_array(actor_id) FROM calendar_event_recipients r WHERE r.event_id=e.id) AS recipients_json':'')+
-   ' FROM calendar_events e'+assigned+' ORDER BY e.event_date ASC,e.id ASC LIMIT ? OFFSET ?';
+   ' FROM calendar_events e'+assigned+' ORDER BY CASE WHEN e.date_sort IS NULL THEN 1 ELSE 0 END,e.date_sort ASC,e.event_date ASC,e.id ASC LIMIT ? OFFSET ?';
   try{
    const args=admin?[PAGE_SIZE+1,offset]:[member.actorId,PAGE_SIZE+1,offset];
    const result=await env.DB.prepare(sql).bind(...args).all();
@@ -113,7 +125,7 @@ export async function handleCalendarApi(request,env,url,origin,respond,verifyMus
   const id=crypto.randomUUID(),revision=crypto.randomUUID(),now=new Date().toISOString();
   try{
    const statements=[
-    env.DB.prepare('INSERT INTO calendar_events(id,event_date,time_zone,title,venue,city,call_time,soundcheck_time,arrival_time,show_time,end_time,wardrobe,details,contact_name,contact_phone,notes,map_url,status,version,revision_token,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,?)')
+    env.DB.prepare('INSERT INTO calendar_events(id,event_date,time_zone,title,venue,city,call_time,soundcheck_time,arrival_time,show_time,end_time,wardrobe,details,contact_name,contact_phone,notes,map_url,status,date_sort,status_text,version,revision_token,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,?)')
      .bind(id,...valueList(payload),revision,now,now),
     ...payload.recipientIds.map(actorId=>env.DB.prepare(
      'INSERT INTO calendar_event_recipients(event_id,actor_id) VALUES (?,?)').bind(id,actorId))
@@ -135,7 +147,7 @@ export async function handleCalendarApi(request,env,url,origin,respond,verifyMus
   }catch(e){return invalid(e,reply);}
   const revision=crypto.randomUUID(),now=new Date().toISOString();
   try{
-   const update=env.DB.prepare('UPDATE calendar_events SET event_date=?,time_zone=?,title=?,venue=?,city=?,call_time=?,soundcheck_time=?,arrival_time=?,show_time=?,end_time=?,wardrobe=?,details=?,contact_name=?,contact_phone=?,notes=?,map_url=?,status=?,version=version+1,revision_token=?,updated_at=? WHERE id=? AND version=?')
+   const update=env.DB.prepare('UPDATE calendar_events SET event_date=?,time_zone=?,title=?,venue=?,city=?,call_time=?,soundcheck_time=?,arrival_time=?,show_time=?,end_time=?,wardrobe=?,details=?,contact_name=?,contact_phone=?,notes=?,map_url=?,status=?,date_sort=?,status_text=?,version=version+1,revision_token=?,updated_at=? WHERE id=? AND version=?')
     .bind(...valueList(payload),revision,now,id,raw.version);
    // Revision marker makes recipient mutations conditional on THIS successful
    // update, never on the previous version during concurrent edits.

@@ -6,17 +6,15 @@ type Props={token:string;members:AdminMember[];onExpired:()=>void};
 const empty=():CalendarEventInput=>({
  date:'',timeZone:'America/Mexico_City',title:'',venue:'',city:'',callTime:'',soundcheckTime:'',
  arrivalTime:'',showTime:'',endTime:'',wardrobe:'',details:'',contactName:'',
- contactPhone:'',notes:'',mapUrl:'',status:'confirmed',recipientIds:[]
+ contactPhone:'',notes:'',mapUrl:'',status:'confirmed',statusText:'',recipientIds:[]
 });
-const fields:[keyof CalendarEventInput,string,string,string?][]=[
- ['title','Evento / nombre','Ej. Boda Kelly & Jericho'],['date','Fecha','','date'],
- ['venue','Lugar / venue','Lugar de trabajo'],['city','Ciudad',''],
- ['callTime','Hora de llamada','1:00 p.m. / Por definir'],
- ['soundcheckTime','Prueba de sonido','4:30 p.m. / Por definir'],
- ['arrivalTime','Hora de llegada',''],['showTime','Show','7:00 p.m. / Por definir'],
- ['endTime','Hora de fin',''],['wardrobe','Vestuario','Traje negro'],
- ['contactName','Contacto','Nombre del contacto'],['contactPhone','Teléfono','WhatsApp / teléfono'],
- ['mapUrl','Google Maps','https://maps.google.com/...','url'],
+// All user-editable fields are plain text; no pickers, masks, or suggestions.
+const fields:[keyof CalendarEventInput,string][]=[
+ ['title','Evento / nombre'],['date','Fecha'],['venue','Lugar / venue'],['city','Ciudad'],
+ ['callTime','Hora de llamada'],['soundcheckTime','Prueba de sonido'],
+ ['arrivalTime','Hora de llegada'],['showTime','Show'],['endTime','Hora de fin'],
+ ['wardrobe','Vestuario'],['contactName','Contacto'],['contactPhone','Teléfono'],
+ ['mapUrl','Google Maps'],['statusText','Estado']
 ];
 export default function AdminCalendar({token,members,onExpired}:Props){
  const [events,setEvents]=useState<CalendarEvent[]>([]);
@@ -93,14 +91,10 @@ export default function AdminCalendar({token,members,onExpired}:Props){
   {draftOpen&&<form className="a-cal-form" onSubmit={e=>void save(e)}>
    <h3>{editing?'Editar fecha':'Nueva fecha'}</h3>
    <div className="a-cal-fields">
-    {fields.map(([key,label,hint,type])=><label key={key} className="a-cal-field">
-     <span>{label}</span><input type={type||'text'} value={String(form[key]??'')} placeholder={hint}
-      required={key==='title'||key==='date'}
+    {fields.map(([key,label])=><label key={key} className="a-cal-field">
+     <span>{label}</span><input type="text" value={String(form[key]??'')}
+      required={key==='title'} autoComplete="off"
       onChange={e=>setForm(old=>({...old,[key]:e.target.value}))}/></label>)}
-    <label className="a-cal-field"><span>Estado</span>
-     <select value={form.status} onChange={e=>change('status',e.target.value as CalendarEventInput['status'])}>
-      <option value="confirmed">Confirmado</option><option value="tentative">Tentativo</option>
-      <option value="cancelled">Cancelado</option></select></label>
     <label className="a-cal-field a-cal-full"><span>Detalles</span>
      <textarea rows={3} value={form.details} onChange={e=>change('details',e.target.value)}/></label>
     <label className="a-cal-field a-cal-full"><span>Notas</span>
@@ -140,6 +134,7 @@ export default function AdminCalendar({token,members,onExpired}:Props){
       <p>{[item.callTime&&'Llamada: '+item.callTime,item.soundcheckTime&&'Sonido: '+item.soundcheckTime,
        item.showTime&&'Show: '+item.showTime].filter(Boolean).join(' · ')}</p>
       {item.wardrobe&&<p>Vestuario: {item.wardrobe}</p>}
+      {item.statusText&&<p>Estado: {item.statusText}</p>}
       <div className="a-cal-actions"><button type="button" onClick={()=>edit(item)}>Editar</button>
        <button type="button" className="a-cal-danger" onClick={()=>void remove(item)}>Borrar fecha</button></div>
      </div>}

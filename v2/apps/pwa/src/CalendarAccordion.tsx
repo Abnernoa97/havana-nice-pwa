@@ -1,5 +1,5 @@
 import {useCallback,useEffect,useState} from 'react';
-import {calendarDate,getCalendarEvents,HAVANA_V2_DEV_API_BASE_URL,type CalendarEvent} from '@havana/shared';
+import {calendarDate,getCalendarEvents,HAVANA_V2_DEV_API_BASE_URL,safeCalendarMapUrl,type CalendarEvent} from '@havana/shared';
 // Member token is provided by the existing V2 session. Never create another login.
 export default function CalendarAccordion({token}:{token:string}){
  const [events,setEvents]=useState<CalendarEvent[]>([]);
@@ -32,8 +32,9 @@ export default function CalendarAccordion({token}:{token:string}){
       {item.venue&&<span>{item.venue}</span>}</span>
      <b aria-hidden="true">{open===item.id?'−':'+'}</b>
     </button>
-    {item.mapUrl&&<a className="hn-cal-maps" href={item.mapUrl} target="_blank"
-     rel="noopener noreferrer">Llegar al evento · Google Maps ↗</a>}
+    {item.mapUrl&&(safeCalendarMapUrl(item.mapUrl)?<a className="hn-cal-maps" href={safeCalendarMapUrl(item.mapUrl)!} target="_blank"
+     rel="noopener noreferrer">Llegar al evento · Google Maps ↗</a>:
+     <p className="hn-cal-maps">Google Maps: {item.mapUrl}</p>)}
     {open===item.id&&<div className="hn-cal-details">
      <div className="hn-cal-hours">
       {([['Llamada',item.callTime],['Sonido',item.soundcheckTime],['Llegada',item.arrivalTime],
@@ -44,7 +45,7 @@ export default function CalendarAccordion({token}:{token:string}){
      {item.details&&<p>{item.details}</p>}
      {item.contactName&&<p><b>Contacto: </b>{item.contactName}{item.contactPhone&&' · '+item.contactPhone}</p>}
      {item.notes&&<p><b>Notas: </b>{item.notes}</p>}
-     {item.status!=='confirmed'&&<p><b>Estado: </b>{item.status==='tentative'?'Tentativo':'Cancelado'}</p>}
+     {(item.statusText||item.status!=='confirmed')&&<p><b>Estado: </b>{item.statusText|| (item.status==='tentative'?'Tentativo':'Cancelado')}</p>}
     </div>}
    </article>)}
  </section>;
