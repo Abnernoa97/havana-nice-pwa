@@ -18,9 +18,17 @@ test('APK creation occurs only through an explicitly approved batch marker',()=>
  assert.match(yaml,/m\.notes\.trim\(\)\.length<10/);
 });
 
-test('No unapproved Android release manifest exists on the development branch',()=>{
- // Deliberate release is created only on explicit owner approval.
- assert.equal(existsSync(new URL('../releases/android-batch.json',import.meta.url)),false);
+test('A future release marker is accepted only with explicit approval and matching version',()=>{
+ const marker=new URL('../releases/android-batch.json',import.meta.url);
+ if(!existsSync(marker))return; // No release requested: never build.
+ const m=JSON.parse(read('releases/android-batch.json'));
+ const app=JSON.parse(read('apps/android/app.json')).expo;
+ assert.equal(m.approved,true);
+ assert.equal(m.releaseMode,'explicit-batch');
+ assert.equal(m.version,app.version);
+ assert.equal(m.versionCode,app.android.versionCode);
+ assert.equal(app.android.package,'com.havananice.v2');
+ assert.ok(typeof m.notes==='string'&&m.notes.trim().length>=10);
 });
 
 test('Normal development CI validates Android code but does not assemble/publish APKs',()=>{
