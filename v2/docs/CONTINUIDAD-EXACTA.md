@@ -116,6 +116,14 @@
 - **Siguiente prueba:** expandir «Repertorio del evento» en Administrador, seleccionar la fecha ya creada, marcar `All of my` y pulsar «Añadir seleccionada(s)». Comprobar aparición en la PWA del músico asignado; luego verificar orden/progreso y cambios sin afectar Chat o Calendario.
 - **P03/A04 aún abiertos:** solo la parte *general* de Repertorio está probada físicamente; no se declara módulo completo sin QA de la lista por evento. Sin APK nueva, se acumula en PWA/Administrador. Tablero **12/36**.
 
+## Auditoría sin residuos destructivos — Calendario + Repertorio V2 (30/10/2026)
+
+- V2 GitHub revisado: **100 archivos**, sin bundles temporales de Worker, archivos de compilación o `.bak/.old` versionados. El antiguo `0017_remove_legacy_member_mode.sql` y las migraciones `0018–0020` son historial necesario, **no basura**.
+- D1 V2 de solo lectura: 1 fecha/3 destinatarios, 1 canción general/0 canciones asociadas a eventos, 3 músicos activos, 3 sesiones/3 dispositivos; **0 huérfanos, 0 destinatarios inactivos, 0 duplicados, 0 errores de foreign keys**. No se tocaron estos registros ni el Chat.
+- Limpieza fuente `98c5d63e20bce02319cc0b84532021326e8a997a`: eliminado `DATE/dateValid` inactivo y una clave de error nunca usada; endurecida la coherencia de listas Repertorio ante cambios rápidos de evento, añadido cierre de acordeones, recarga activa y rechazo correcto de especiales mal formados. Prueba SQLite ampliada.
+- El Worker activo permanece `4a1cbda7-5365-4746-b679-08a28646d590` hasta un futuro despliegue controlado; las mejoras recién auditadas están **en fuente**, no deben declararse en producción antes de verificación. Android 0.0.13 no se recompila por este saneamiento.
+- **Verificar CI** [41113403959](https://github.com/Abnernoa97/havana-nice-pwa/actions/runs/41113403959), completar pruebas físicas P02/A03 y P03/A04; revisión de posible import circular compartido y escala de HTTP sin perturbar el Chat. No crear otro tablero ni aumentar el 12/36 por limpieza.
+
 ## Próximo trabajo de desarrollo
 
 1. **H02 → H03:** integración segura de los módulos no-Chat en Android. Mantener Chat 100 % React Native, aprovechar PWA solo para presentación y utilizar contratos/backend V2 únicos. Prioridad funcional, no colores/interfaz.
