@@ -65,6 +65,9 @@ jobs:
       - name: Test isolated V2 Calendar without changing live D1
         run: node --test cloudflare/tests/calendar.test.mjs
 
+      - name: Regression-test calendar free-form date display across all clients
+        run: node --test tests/calendar-free-text-ui.test.mjs
+
       - name: Validate independent administrator authentication
         run: npm run test:admin-auth -w @havana/cloudflare
 
