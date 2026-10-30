@@ -645,7 +645,7 @@ export default function App() {
   return (
     <>
       {session&&activeScreen!=='chat'&&<VisualApp displayName={session.displayName}
-        active={activeScreen} onNavigate={setActiveScreen}/>}
+        active={activeScreen} token={session.token} onNavigate={setActiveScreen}/>}
       <div className={session&&activeScreen!=='chat'?'member-chat-hidden':'member-chat-visible'}>
     <main className="chat-app">
       <header className="chat-header">

@@ -1011,7 +1011,7 @@ export default function App() {
               }}><Text style={styles.emojiOptionText}>{emoji}</Text></Pressable>)}
         </View>}
       </KeyboardAvoidingView>
-      {session&&activeScreen!=='chat'&&<NativeMemberHome displayName={session.displayName}
+      {session&&activeScreen!=='chat'&&<NativeMemberHome token={session.token} displayName={session.displayName}
         active={activeScreen} onNavigate={setActiveScreen}/>}
     </SafeAreaView>
   );

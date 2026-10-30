@@ -1,4 +1,4 @@
-import {HAVANA_V2_DEV_API_BASE_URL as API} from '@havana/shared';
+import {HAVANA_V2_DEV_API_BASE_URL as API,type CalendarEvent,type CalendarEventInput} from '@havana/shared';
 
 // Do not save administrative bearer tokens in localStorage, IndexedDB or cookies.
 export type AdminSession={token:string;expiresAt:string;role:'chat-admin'};
@@ -136,4 +136,17 @@ export function openAdminRealtime(token:string,onEvent:(event:AdminRealtimeEvent
   }catch{/* Unrecognized server event: ignore; privileged API remains authoritative. */}
  });
  return socket;
+}
+
+export function adminCreateCalendarEvent(token:string,body:CalendarEventInput){
+ return api<{event:CalendarEvent}>('/api/calendar/admin/events',
+  authenticated(token,{method:'POST',body:JSON.stringify(body)}));
+}
+export function adminUpdateCalendarEvent(token:string,id:string,body:CalendarEventInput&{version:number}){
+ return api<{event:CalendarEvent}>('/api/calendar/admin/events/'+encodeURIComponent(id),
+  authenticated(token,{method:'POST',body:JSON.stringify(body)}));
+}
+export function adminDeleteCalendarEvent(token:string,id:string,version:number){
+ return api<{ok:boolean}>('/api/calendar/admin/events/'+encodeURIComponent(id),
+  authenticated(token,{method:'DELETE',body:JSON.stringify({version})}));
 }

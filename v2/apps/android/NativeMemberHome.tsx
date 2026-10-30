@@ -1,15 +1,17 @@
 import React from 'react';
 import {Pressable,ScrollView,StyleSheet,Text,View} from 'react-native';
 import {MEMBER_MODULES,type MemberScreen} from '@havana/shared';
+import NativeCalendar from './NativeCalendar';
 
 type Props={
   displayName:string;
+  token:string;
   active:Exclude<MemberScreen,'chat'>;
   onNavigate:(screen:MemberScreen)=>void;
 };
 // HOME is a navigation surface. Authentication and the native Chat remain
 // owned by App.tsx: mounting HOME never issues, copies or revokes a token.
-export default function NativeMemberHome({displayName,active,onNavigate}:Props){
+export default function NativeMemberHome({displayName,token,active,onNavigate}:Props){
   const selected=MEMBER_MODULES.find(module=>module.id===active);
   return <ScrollView style={styles.root} contentContainerStyle={styles.content}>
     <View style={styles.top}>
@@ -41,12 +43,12 @@ export default function NativeMemberHome({displayName,active,onNavigate}:Props){
       </Pressable>
       <Text style={styles.title}>{selected?.label||'Módulo'}</Text>
       <Text style={styles.lead}>{selected?.description}</Text>
-      <View style={styles.pending}>
+      {active==='calendar'?<NativeCalendar token={token}/>:<View style={styles.pending}>
         <Text style={styles.pendingTitle}>Módulo en preparación</Text>
         <Text style={styles.pendingDescription}>
           Aquí aparecerán datos reales cuando este módulo quede conectado al Administrador.
         </Text>
-      </View>
+      </View>}
     </>}
   </ScrollView>;
 }

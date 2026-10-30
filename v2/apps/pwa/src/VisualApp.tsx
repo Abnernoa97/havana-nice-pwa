@@ -1,11 +1,13 @@
 import {useState} from 'react';
 import {MEMBER_MODULES,type MemberScreen} from '@havana/shared';
+import CalendarAccordion from './CalendarAccordion';
 
 type Props={
   displayName?:string;
   active?:Exclude<MemberScreen,'chat'>;
   onNavigate?:(screen:MemberScreen)=>void;
   preview?:boolean;
+  token?:string;
 };
 const notes:Record<Exclude<MemberScreen,'chat'|'home'>,string>={
   calendar:'El Calendario mostrará los eventos reales y sus horarios al conectar el Administrador.',
@@ -16,7 +18,7 @@ const notes:Record<Exclude<MemberScreen,'chat'|'home'>,string>={
 };
 // Reuses the existing visual shell for the member HOME after successful login.
 // /visual.html remains presentation-only; it cannot open Chat or issue a session.
-export default function VisualApp({displayName,active,onNavigate,preview=false}:Props){
+export default function VisualApp({displayName,active,onNavigate,preview=false,token}:Props){
   const [previewScreen,setPreviewScreen]=useState<MemberScreen>('home');
   const screen=active??previewScreen;
   const navigate=(target:MemberScreen)=>{
@@ -74,11 +76,12 @@ export default function VisualApp({displayName,active,onNavigate,preview=false}:
             <h1>{selected?.label}</h1>
             <p className="visual-intro">{selected?.description}</p>
           </div>
-          <div className="visual-empty">
+          {screen==='calendar'&&token?<CalendarAccordion token={token}/>:
+           <div className="visual-empty">
             <span className="visual-empty-icon" aria-hidden="true">◇</span>
             <h3>Módulo en preparación</h3>
-            <p>{screen!=='chat'?notes[screen]:''}</p>
-          </div>
+            <p>{screen!=='chat'&&screen!=='calendar'?notes[screen]:'Vista privada: entra desde tu sesión autorizada.'}</p>
+           </div>}
         </>}
       </main>
     </div>

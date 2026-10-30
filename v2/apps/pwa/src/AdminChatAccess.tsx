@@ -1,5 +1,6 @@
 import {useCallback,useEffect,useState,type FormEvent} from 'react';
 import AdminChatGeneral from './AdminChatGeneral';
+import AdminCalendar from './AdminCalendar';
 import {adminAvailability,adminLogin,adminLogout,adminVerify,adminOtherSessions,adminRevokeOtherSessions,adminMembers,adminCreateMember,adminMemberHistory,adminDeletionPreview,adminRemoveMember,adminDuplicateLogins,adminReviewDuplicateLogin,adminReleaseInstallation,openAdminRealtime,
  type AdminSession,type AdminMember,type AdminMemberHistory,type AdminDeletionPreview,type AdminDuplicateLoginAlert,type AdminChatStreamEvent,isAdminUnauthorized} from './admin-api';
 
@@ -312,7 +313,7 @@ export default function AdminChatAccess({section}:{section:Section}){
    finally{setBusy(false);}
  }
  // Keep the Administrator's verified session when changing navigation sections.
- if(section!=='access'&&section!=='chat')return null;
+ if(section!=='access'&&section!=='chat'&&section!=='calendar')return null;
  if(readiness==='loading')return <section className="a-panel">Comprobando el acceso administrativo…</section>;
  if(readiness!=='enabled')return <section className="a-panel">
    <h2>Acceso de Administrador</h2>
@@ -329,6 +330,7 @@ export default function AdminChatAccess({section}:{section:Section}){
    </form>
    {error&&<p role="alert" className="a-admin-error">{error}</p>}
  </section>;
+ if(section==='calendar')return <AdminCalendar token={session.token} members={members} onExpired={onChatExpired}/>;
  if(section==='chat')return <>
   <AdminChatGeneral token={session.token} connected={realtime==='connected'} liveEvent={chatEvent} onExpired={onChatExpired}/>
  </>;
