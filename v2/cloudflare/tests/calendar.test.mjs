@@ -6,8 +6,8 @@ import {handleCalendarApi} from '../src/calendar.js';
 
 const BASE='https://havana-nice-v2-dev.soloaplicaciones97.workers.dev';
 const TOKEN='A'.repeat(43);
-const M1='123e4567-e89b-42d3-a456-426614174001';
-const M2='123e4567-e89b-42d3-a456-426614174002';
+const M1='member:123e4567-e89b-42d3-a456-426614174001';
+const M2='member:123e4567-e89b-42d3-a456-426614174002';
 async function hash(value){return [...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value)))].map(x=>x.toString(16).padStart(2,'0')).join('');}
 class DB{
  constructor(){
@@ -17,6 +17,7 @@ class DB{
   const migration=readFileSync(new URL('../migrations/0018_calendar_events.sql',import.meta.url),'utf8');
   assert.doesNotMatch(migration,/DROP TABLE|ALTER TABLE chat_|DELETE FROM chat_/i);
   this.raw.exec(migration);
+  this.raw.exec(readFileSync(new URL('../migrations/0019_calendar_free_text.sql',import.meta.url),'utf8'));
   for(const [id,name] of [[M1,'Noa'],[M2,'Fer']])this.raw.prepare('INSERT INTO chat_members VALUES (?,?,1)').run(id,name);
  }
  prepare(sql){
@@ -48,7 +49,7 @@ async function env(){
 const sample={date:'2026-11-28',timeZone:'America/Mexico_City',title:'Boda de prueba',venue:'Lugar',
  city:'Ciudad',callTime:'1:00 p.m.',soundcheckTime:'Por definir',arrivalTime:'',showTime:'7:00 p.m.',
  endTime:'',wardrobe:'Traje negro',details:'Prueba',contactName:'Planner',contactPhone:'+52 55 1111',
- notes:'Equipo',mapUrl:'https://maps.google.com/?q=Mexico',status:'confirmed',recipientIds:[M1]};
+ notes:'Equipo',mapUrl:'https://maps.google.com/?q=Mexico',status:'confirmed',statusText:'',recipientIds:[M1]};
 async function request(env,path,{method='GET',token=TOKEN,body,actorId=M1}={}){
  const req=new Request(BASE+path,{method,headers:{Authorization:'Bearer '+token,...(body?{'Content-Type':'application/json'}:{})},
  ...(body?{body:JSON.stringify(body)}:{})});
@@ -92,9 +93,9 @@ test('Admin changes recipients atomically, stale versions never overwrite',async
  assert.equal(fer.data.events.length,1);
  assert.equal(fer.data.events[0].title,'Cambio');
 });
-test('reject invalid/empty recipient lists, invalid dates, links and inactive members',async()=>{
+test('reject unassigned, spoofed or inactive recipients while allowing arbitrary text fields',async()=>{
  const e=await env();
- for(const change of [{recipientIds:[]},{date:'2026-02-30'},{mapUrl:'javascript:alert(1)'},{recipientIds:['123e4567-e89b-42d3-a456-426614174099']}]) {
+ for(const change of [{recipientIds:[]},{recipientIds:['123e4567-e89b-42d3-a456-426614174099']},{recipientIds:['member:123e4567-e89b-42d3-a456-426614174099']}]) {
   const res=await request(e,'/api/calendar/admin/events',{method:'POST',body:{...sample,...change}});
   assert.equal(res.status,400);
  }
@@ -108,4 +109,27 @@ test('Admin delete removes event and recipients, preserving Chat-related tables'
  assert.equal(e.DB.raw.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n,0);
  assert.equal(e.DB.raw.prepare('SELECT COUNT(*) AS n FROM calendar_event_recipients').get().n,0);
  assert.equal(e.DB.raw.prepare('SELECT COUNT(*) AS n FROM chat_members').get().n,2);
+});
+
+test('freeform date, punctuation, custom status and non-URL map text are preserved',async()=>{
+ const e=await env();
+ const flexible={...sample,date:'14/11/2026',statusText:'¡CONFIRMADO! #2026',
+  callTime:'12? ∞ @ 1:30 p. m.',venue:'CDMX / Piso #3 & Más',mapUrl:'Mapa: calle 20 #35',
+  contactPhone:'+52 (55) ## / extensión X',notes:'Se permiten símbolos: ! ? / # @ &'};
+ const result=await request(e,'/api/calendar/admin/events',{method:'POST',body:flexible});
+ assert.equal(result.status,201,JSON.stringify(result.data));
+ const stored=e.DB.raw.prepare('SELECT event_date,date_sort,status_text,map_url FROM calendar_events').get();
+ assert.deepEqual(stored,{event_date:'14/11/2026',date_sort:'2026-11-14',
+  status_text:'¡CONFIRMADO! #2026',map_url:'Mapa: calle 20 #35'});
+ const read=await request(e,'/api/calendar/events',{token:'musician'});
+ assert.equal(read.data.events[0].statusText,flexible.statusText);
+ assert.equal(read.data.events[0].contactPhone,flexible.contactPhone);
+});
+test('unrecognized dates remain valid free text and are displayed after dated events',async()=>{
+ const e=await env();
+ const created=await request(e,'/api/calendar/admin/events',{method:'POST',body:{...sample,date:'Por confirmar / ???'}});
+ assert.equal(created.status,201);
+ const row=e.DB.raw.prepare('SELECT event_date,date_sort FROM calendar_events').get();
+ assert.equal(row.event_date,'Por confirmar / ???');
+ assert.equal(row.date_sort,null);
 });
