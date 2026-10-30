@@ -92,6 +92,9 @@ jobs:
       - name: Enforce modular isolation and single shared access
         run: node --test tests/module-boundaries.test.mjs
 
+      - name: Prevent automatic APK builds during PWA-first development
+        run: node --test tests/android-batch-policy.test.mjs
+
       - name: Build iPhone PWA
         run: npm run build:pwa
 
