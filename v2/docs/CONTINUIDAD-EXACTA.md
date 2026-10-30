@@ -109,6 +109,13 @@
 - **Pendiente:** verificar la PWA con el despliegue web definitivo, crear/editar/borrar canción desde Admin, comprobar desde el músico el repertorio general y su lista de evento y verificar sincronización. **P03/A04 continúan abiertos; 12/36 hitos**.
 - **Regla Android:** no cambiar `app.json`, no crear `android-batch.json`, no generar APK. La publicación de PWA se acumula para la siguiente versión nativa aprobada; 0.0.13 es la última APK.
 
+## Prueba física: Repertorio general Administración → músico (30/10/2026)
+
+- Capturas del propietario: en Administrador V2, sección Repertorio general, existe **1 canción real**, `All of my`, categoría `ENGLISH`, artista `Hbvc`, visible. La PWA del músico muestra la misma canción y el enlace «REVISAR LINK». **Confirmado el flujo real de alta y lectura del repertorio general.**
+- En la PWA del músico aparece «Aún no tienes canciones asignadas por evento», lo que es coherente: todavía no se ha agregado una canción a la lista de la fecha del Calendario.
+- **Siguiente prueba:** expandir «Repertorio del evento» en Administrador, seleccionar la fecha ya creada, marcar `All of my` y pulsar «Añadir seleccionada(s)». Comprobar aparición en la PWA del músico asignado; luego verificar orden/progreso y cambios sin afectar Chat o Calendario.
+- **P03/A04 aún abiertos:** solo la parte *general* de Repertorio está probada físicamente; no se declara módulo completo sin QA de la lista por evento. Sin APK nueva, se acumula en PWA/Administrador. Tablero **12/36**.
+
 ## Próximo trabajo de desarrollo
 
 1. **H02 → H03:** integración segura de los módulos no-Chat en Android. Mantener Chat 100 % React Native, aprovechar PWA solo para presentación y utilizar contratos/backend V2 únicos. Prioridad funcional, no colores/interfaz.
