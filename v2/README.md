@@ -17,11 +17,11 @@
 1. El Administrador autenticado crea el nombre en `POST /api/chat/admin/members` (no existe autoservicio de registro).
 2. La entrada nueva de músico se realiza **solo** con `POST /api/chat/session`, nombre exacto normalizado y registro activo en D1. No contraseñas por músico, solicitudes de teléfonos, aprobaciones individuales ni otros formularios.
 3. `GET /api/chat/session` revalida el token persistente del mismo cliente. `DELETE /api/chat/session` no puede soltar la vinculación del único dispositivo nuevo; solo el Administrador puede liberar la instalación.
-4. Los músicos nuevos tienen `single_device_mode=1`: el primer cliente queda vinculado y un segundo recibe `409 name_already_bound`, con alerta para Administrador.
-5. **Estado comprobado 29/10/2026:** existen 3 músicos autorizados, 3 sesiones de músico y 3 vínculos individuales. El Chat conserva 44 mensajes de texto y 12 reacciones. Los siguientes músicos solo los incorpora el Administrador, con `single_device_mode=1`. No utilizar los recuentos de un reinicio de laboratorio anterior como descripción del estado vigente.
+4. Los músicos tienen un único vínculo en `chat_single_device_owners`: el primer cliente queda vinculado y un segundo recibe `409 name_already_bound`, con alerta para Administrador. La columna antigua `single_device_mode` ya fue eliminada.
+5. **Estado comprobado 29/10/2026:** 3 músicos, 3 sesiones, 3 vínculos, 47 mensajes y 2 alertas duplicadas en D1 al terminar el QA de Chat. Los siguientes músicos solo los incorpora el Administrador. Estos recuentos son una lectura puntual, no constantes de código.
 6. El login del Administrador, con un secreto servidor independiente y sesiones separadas, es intencionado y no constituye una segunda entrada de músicos.
 
-**S02 aceptado** por el propietario tras prueba física con `Prueba 2` (bloqueo en segundo teléfono, alerta Admin y vinculación verificadas); no repetir pruebas de seguridad sin motivo. **Estado: 12/27 hitos, M01 siguiente.**
+**S02 y QA funcional de Chat aceptados:** bloqueo duplicado desde PWA, alerta Admin, envío Android→Admin y cola offline/reconexión probados físicamente. **Estado: 12/27 hitos; siguiente trabajo H02/H03.** Q01 integral permanece abierto para funciones futuras.
 
 ## Limpieza y archivos históricos
 
@@ -30,4 +30,4 @@
 - **Rama V2 limpia:** se retiraron de `havana-nice-v2-foundation` 55 copias idénticas de los archivos históricos de la raíz (19 704 817 bytes), tras comprobar cada hash contra `main`. Se conservan intactas en `main` y en el historial Git. Esto reduce archivos en el checkout de V2, pero no elimina objetos históricos del repositorio. Cloudflare Pages de V2 compila únicamente `v2`.
 - No crear otra rama, otro backend, login paralelo, APK de prueba innecesaria ni cambios destructivos de datos.
 
-**Estado actual:** Chat de texto, Administrador, sesiones y control individual de dispositivos preservados. La integración externa antigua fue eliminada del código y del Worker V2; D1 no conserva sus tablas. La subida multimedia está deshabilitada hasta R2. Android **0.0.10** compiló con éxito, pero su publicación directa falló por una interrupción de API GitHub; la instalación física sigue sin validarse. **Se requiere saneamiento antes de R2: consultar exclusivamente el [Plan Maestro](docs/PLAN-MAESTRO.md).**
+**Estado actual:** saneamiento 10/10, Android **0.0.10** firmado e instalado, Chat de texto sincronizado y probado físicamente en Android/PWA/Admin. Sin reabrir lo que funciona. R2 sigue deshabilitado y la subida multimedia pendiente. Continuar H02/H03 según el [Plan Maestro](docs/PLAN-MAESTRO.md), sin modificar la aplicación original ni crear infraestructura paralela.
