@@ -49,7 +49,7 @@ class FakeDB {
     }
     throw Error('Unexpected write: '+sql);
    }
-  }};
+  };
   }};
  }
 }
