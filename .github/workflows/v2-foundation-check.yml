@@ -47,25 +47,6 @@ jobs:
       - name: Install exact dependencies
         run: npm ci
 
-      # Safe, temporary diagnostic: restore source before regular CI and packaging.
-      # The Worker deployed to Cloudflare is never modified by this diagnostic.
-      - name: Diagnose Worker TypeScript protection without changing runtime
-        shell: bash
-        run: |
-          set -euo pipefail
-          cp cloudflare/src/index.ts /tmp/havana-v2-worker-type-baseline.ts
-          trap 'cp /tmp/havana-v2-worker-type-baseline.ts cloudflare/src/index.ts' EXIT
-          sed -i '1{/^\/\/ @ts-nocheck$/d;}' cloudflare/src/index.ts
-          set +e
-          npx tsc --noEmit -p cloudflare/tsconfig.json --pretty false > /tmp/havana-v2-worker-type-report.txt 2>&1
-          result=$?
-          set -e
-          echo "Worker strict TS diagnostic exit: $result"
-          echo "Worker diagnostic lines: $(wc -l < /tmp/havana-v2-worker-type-report.txt)"
-          head -n 160 /tmp/havana-v2-worker-type-report.txt || true
-          cp /tmp/havana-v2-worker-type-baseline.ts cloudflare/src/index.ts
-          trap - EXIT
-
       - name: Typecheck all workspaces
         run: npm run typecheck
 
