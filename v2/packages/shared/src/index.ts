@@ -213,3 +213,6 @@ export function validateChatMediaSelection(
   return 'El archivo está vacío o supera el límite permitido.';
  return null;
 }
+
+export {getCalendarEvents} from './calendar';
+export type {CalendarEvent,CalendarEventInput,CalendarEventList,CalendarEventStatus} from './calendar';
