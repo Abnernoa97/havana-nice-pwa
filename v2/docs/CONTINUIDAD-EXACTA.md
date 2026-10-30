@@ -31,6 +31,15 @@
 - Lectura D1 posterior: 47 mensajes, 3 músicos, 3 sesiones, 3 propietarios de instalación y 2 alertas duplicadas; no se modificaron estos registros para el QA.
 - **No cerrar Q01 global:** pendiente por alcance futuro de multimedia y módulos restantes, no por fallos detectados del Chat.
 
+## Refuerzo técnico de TypeScript — 29 de octubre de 2026
+
+- Análisis real temporal de la entrada del Worker sin `@ts-nocheck`: 93 diagnósticos iniciales; se corrigieron tipos y validaciones de borde sin cambiar contratos de sesión, D1 o mensajes.
+- Fuente definitiva: `cloudflare/src/index.ts` con tipado activo; `tsconfig.json` resuelve módulos JavaScript auxiliares sin revisar todavía sus cuerpos (`checkJs:false`). Metadatos de dispositivos descritos mediante JSDoc en `member-admin.js`.
+- Auditoría preventiva impide reintroducir `@ts-nocheck` en el Worker. Diagnóstico temporal de CI eliminado físicamente.
+- Validación final GitHub Actions [41010325277](https://github.com/Abnernoa97/havana-nice-pwa/actions/runs/41010325277) `success`, incluyendo TypeScript, build sin despliegue, seguridad, WebSocket, Admin, PWA y exportación Android.
+- Sin despliegue del Worker: permanece la versión remota `4868029c-218d-43d8-92e3-664b9c19d133` al 100 % de tráfico al verificar; Android sigue en APK 0.0.10.
+- `npm ci` reportó 12 advisories (5 altas, 2 moderadas, 5 bajas) sin detalle de paquetes. Revisar posteriormente; no cambiar dependencias sin auditoría y comprobaciones.
+
 ## Próximo trabajo de desarrollo
 
 1. **H02 → H03:** integración segura de los módulos no-Chat en Android. Mantener Chat 100 % React Native, aprovechar PWA solo para presentación y utilizar contratos/backend V2 únicos. Prioridad funcional, no colores/interfaz.
