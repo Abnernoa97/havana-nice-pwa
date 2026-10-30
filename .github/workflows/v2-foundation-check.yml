@@ -17,7 +17,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: havana-nice-v2-foundation-check
@@ -296,20 +296,19 @@ jobs:
             | tee /tmp/havana-manifest.json
           grep -q 'HAVANA NICE V2' /tmp/havana-manifest.json
 
-
-      # One-time validated bundle handoff; remove this step and staging file after deployment.
-      - name: Stage verified Worker bundle for controlled Cloudflare version upload
+      - name: Verify uploaded non-deployed V2 Calendar Worker version
         shell: bash
         run: |
           set -euo pipefail
-          SOURCE="$(find /tmp/havana-v2-worker-preview -maxdepth 1 -type f \( -name '*.js' -o -name '*.mjs' \) | head -n 1)"
-          test -n "$SOURCE"
-          test -s "$SOURCE"
-          mkdir -p cloudflare/.worker-release-staging
-          cp "$SOURCE" cloudflare/.worker-release-staging/worker.mjs
-          node --check cloudflare/.worker-release-staging/worker.mjs
-          git config user.name 'HAVANA V2 CI'
-          git config user.email 'actions@users.noreply.github.com'
-          git add cloudflare/.worker-release-staging/worker.mjs
-          git commit -m 'chore(v2): one-time verified Worker release bundle' 
-          git push origin HEAD:havana-nice-v2-foundation
+          BASE="https://40f8eec3-havana-nice-v2-dev.soloaplicaciones97.workers.dev"
+          STATUS="$(curl --silent --show-error --retry 4 --retry-all-errors -o /tmp/hnv2-calendar-preview-health.json -w '%{http_code}' "$BASE/api/health")"
+          test "$STATUS" = "200"
+          grep -q '"app":"havana-nice-v2"' /tmp/hnv2-calendar-preview-health.json
+          for ENDPOINT in /api/calendar/events /api/calendar/admin/events /api/chat/messages; do
+            STATUS="$(curl --silent --show-error -o /tmp/hnv2-calendar-preview-private.json -w '%{http_code}' "$BASE$ENDPOINT")"
+            test "$STATUS" = "401"
+            grep -q 'No autorizado\|error' /tmp/hnv2-calendar-preview-private.json
+          done
+
+
+
