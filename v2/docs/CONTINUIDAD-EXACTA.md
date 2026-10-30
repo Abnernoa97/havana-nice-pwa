@@ -90,11 +90,20 @@
 - `cloudflare/tests/calendar.test.mjs` extendido con ciclo completo **crear para 3 músicos → lectura autorizada por cada uno → editar/reasignar a uno → rechazar DELETE obsoleto → eliminar y confirmar que no quedan destinatarios**, todo en SQLite `:memory:`; no se realiza ninguna mutación de eventos de producción.
 - **No cerrar P02/A03** hasta ver la fecha sin `Invalid Date` en PWA del músico, probar 0.0.13 nativo y editar/eliminar desde el panel real de Administrador. `12/36` hitos cerrados. Nuevos tests en workflow [41104356896](https://github.com/Abnernoa97/havana-nice-pwa/actions/runs/41104356896) **SUCCESS**, commit `a92fc54d0889580fb567aa54d93331232a9bd1bd`. No implica aprobación física de `14dic26` en PWA o Android.
 
+## Regla de entregas — PWA continua / APK solo por lote explícito (30/10/2026)
+
+- El propietario instruyó no producir una actualización nativa por cada cambio. Todo el desarrollo funcional se acumula en la **PWA V2 y su Administrador**, separado por módulo y conectado al Worker/D1, y el Android se actualizará solo cuando haya varias mejoras maduras y el propietario ordene lanzar un paquete.
+- **Protección implementada:** `.github/workflows/v2-android-apk.yml` ya **NO** dispara una APK por cambios en `app.json`, el propio workflow u otros archivos. Un nuevo paquete requiere **manifiesto explícito** `v2/releases/android-batch.json` con `approved:true`, `releaseMode:"explicit-batch"`, notas y versión/versionCode coincidentes. No existe ese manifiesto aprobado en esta fase; **no crearlo por adelantado**. `workflow_dispatch` mantiene la misma validación.
+- `.github/workflows/v2-foundation-check.yml` sigue ejecutando pruebas continuas de Android/PWA/Worker, sin generar APK firmada ni reemplazar la última publicada; `v2/tests/android-batch-policy.test.mjs` detecta reintroducción de disparadores automáticos.
+- **Última APK publicada**: 0.0.13 / versionCode 13, paquete y firma compatibles, rama `havana-nice-v2-apk-downloads` con `LATEST` y `PREVIOUS` conservados. **No afirmar que la APK haya sido instalada en todos los equipos.**
+- **Próximo lote sin fecha ni aprobación aún:** completar Calendario y después módulos siguientes con PWA/Administrador, sumar pruebas y preparar integración nativa en una sola actualización. El Chat React Native, el login, los dispositivos y la rama original `main` siguen fuera de cambios.
+- Hitos oficiales **12/36**, sin tachar módulos por el mero cambio de política. El Plan Maestro es la fuente de verdad, sin tablero paralelo.
+
 ## Próximo trabajo de desarrollo
 
 1. **H02 → H03:** integración segura de los módulos no-Chat en Android. Mantener Chat 100 % React Native, aprovechar PWA solo para presentación y utilizar contratos/backend V2 únicos. Prioridad funcional, no colores/interfaz.
 2. Preparar el camino para P01/P02/P03/P04 en la misma arquitectura, sin duplicar autorización ni almacenar un segundo token en WebView.
 3. **R2 no habilitado:** la API devuelve `403/10042`; cuando el propietario active el servicio, retomar M01/M02/M04 por el contrato del Plan Maestro. No levantar nube ni Worker alternativo.
-4. Publicar otra APK solo cuando exista una función nativa nueva, manteniendo firma, paquete y actualización sobre la versión instalada.
+4. **No publicar APKs al avanzar módulos.** Acumular funcionalidades primero en PWA/Administración y autorizar un único lote Android tras completar varias secciones y su QA; usar únicamente manifiesto de lanzamiento explícito.
 
 **Regla:** nada de ramas de trabajo adicionales, caché reiniciada, nombres desvinculados, nueva base, ni cambios a `main` o HAVANA CLOUD. Q01 se cierra únicamente con toda la funcionalidad pertinente probada.
