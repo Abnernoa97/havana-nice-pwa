@@ -1,5 +1,3 @@
-import {HAVANA_V2_DEV_API_BASE_URL} from './index';
-
 export type CalendarEventStatus='tentative'|'confirmed'|'cancelled';
 export interface CalendarEvent {
  id:string;
@@ -25,7 +23,7 @@ export interface CalendarEventList {events:CalendarEvent[];hasMore:boolean}
 // The caller supplies an existing V2 musician or Admin token; no new login,
 // session store, database or WebView credential is created.
 export async function getCalendarEvents(
- token:string,from:string,to:string,base=HAVANA_V2_DEV_API_BASE_URL
+ token:string,from:string,to:string,base:string
 ):Promise<CalendarEventList>{
  const url=base+'/api/calendar/events?from='+encodeURIComponent(from)+'&to='+encodeURIComponent(to);
  const result=await fetch(url,{headers:{Authorization:'Bearer '+token,Accept:'application/json'},cache:'no-store'});
