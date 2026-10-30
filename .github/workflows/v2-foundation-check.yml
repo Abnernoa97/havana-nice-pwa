@@ -62,6 +62,9 @@ jobs:
       - name: Verify standalone V2 media status before new storage
         run: npm run test:media -w @havana/cloudflare
 
+      - name: Test isolated V2 Calendar without changing live D1
+        run: node --test cloudflare/tests/calendar.test.mjs
+
       - name: Validate independent administrator authentication
         run: npm run test:admin-auth -w @havana/cloudflare
 
