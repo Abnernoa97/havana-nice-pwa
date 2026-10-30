@@ -1,128 +1,111 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {DatabaseSync} from 'node:sqlite';
 import {handleCalendarApi} from '../src/calendar.js';
 
 const BASE='https://havana-nice-v2-dev.soloaplicaciones97.workers.dev';
 const TOKEN='A'.repeat(43);
-const adminSecret='S'.repeat(48);
-async function hash(value){
- return [...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value)))]
-  .map(x=>x.toString(16).padStart(2,'0')).join('');
-}
-function toRow(id,x,version=1){
- return {id,event_date:x.date,time_zone:x.timeZone,title:x.title,venue:x.venue,city:x.city,
-  call_time:x.callTime,arrival_time:x.arrivalTime,show_time:x.showTime,end_time:x.endTime,
-  wardrobe:x.wardrobe,notes:x.notes,status:x.status,version,created_at:new Date().toISOString(),
-  updated_at:new Date().toISOString()};
-}
-class FakeDB {
- constructor(){this.events=new Map();this.adHash='';this.writes=0;}
+const M1='123e4567-e89b-42d3-a456-426614174001';
+const M2='123e4567-e89b-42d3-a456-426614174002';
+async function hash(value){return [...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value)))].map(x=>x.toString(16).padStart(2,'0')).join('');}
+class DB{
+ constructor(){
+  this.raw=new DatabaseSync(':memory:');
+  this.raw.exec('PRAGMA foreign_keys=ON;CREATE TABLE chat_members(actor_id TEXT PRIMARY KEY,display_name TEXT,active INTEGER);'+
+   'CREATE TABLE chat_admin_sessions(token_hash TEXT PRIMARY KEY,expires_at INTEGER,revoked_at INTEGER);');
+  const migration=readFileSync(new URL('../migrations/0018_calendar_events.sql',import.meta.url),'utf8');
+  assert.doesNotMatch(migration,/DROP TABLE|ALTER TABLE chat_|DELETE FROM chat_/i);
+  this.raw.exec(migration);
+  for(const [id,name] of [[M1,'Noa'],[M2,'Fer']])this.raw.prepare('INSERT INTO chat_members VALUES (?,?,1)').run(id,name);
+ }
  prepare(sql){
-  const db=this;
-  return {bind(...args){return {
-   async first(){
-    if(sql.startsWith('SELECT expires_at,revoked_at FROM chat_admin_sessions'))
-     return args[0]===db.adHash?{expires_at:Date.now()+300_000,revoked_at:null}:null;
-    if(sql.startsWith('SELECT id,event_date')&&sql.includes('WHERE id=?'))return db.events.get(args[0])||null;
-    throw Error('Unexpected query: '+sql);
-   },
-   async all(){
-    if(sql.includes('FROM calendar_events WHERE event_date BETWEEN')){
-     const events=[...db.events.values()].filter(e=>e.event_date>=args[0]&&e.event_date<=args[1]);
-     return {results:events.slice(0,args[2])};
-    }
-    throw Error('Unexpected list: '+sql);
-   },
-   async run(){
-    if(sql.startsWith('INSERT INTO calendar_events')){
-     const [id,date,timeZone,title,venue,city,callTime,arrivalTime,showTime,endTime,wardrobe,notes,status]=args;
-     db.events.set(id,toRow(id,{date,timeZone,title,venue,city,callTime,arrivalTime,showTime,endTime,wardrobe,notes,status}));
-     db.writes++;return {meta:{changes:1}};
-    }
-    if(sql.startsWith('UPDATE calendar_events')){
-     const id=args.at(-2),expected=args.at(-1),current=db.events.get(id);
-     if(!current||current.version!==expected)return {meta:{changes:0}};
-     const [date,timeZone,title,venue,city,callTime,arrivalTime,showTime,endTime,wardrobe,notes,status]=args;
-     db.events.set(id,toRow(id,{date,timeZone,title,venue,city,callTime,arrivalTime,showTime,endTime,wardrobe,notes,status},expected+1));
-     db.writes++;return {meta:{changes:1}};
-    }
-    throw Error('Unexpected write: '+sql);
-   }
-  };
+  const db=this.raw;
+  return {bind(...args){
+   const stmt=db.prepare(sql);
+   return {
+    async first(){return stmt.get(...args)||null;},
+    async all(){return {results:stmt.all(...args)};},
+    async run(){const r=stmt.run(...args);return {meta:{changes:r.changes}};}
+   };
   }};
+ }
+ async batch(items){
+  this.raw.exec('BEGIN IMMEDIATE');
+  try{
+   const out=[];
+   for(const item of items)out.push(await item.run());
+   this.raw.exec('COMMIT');
+   return out;
+  }catch(error){this.raw.exec('ROLLBACK');throw error;}
  }
 }
 async function env(){
- const DB=new FakeDB();DB.adHash=await hash(TOKEN);
- return {DB,V2_ADMIN_LOGIN_MODE:'enabled',V2_ADMIN_LOGIN_SECRET:adminSecret};
+ const DB=new DB();
+ DB.raw.prepare('INSERT INTO chat_admin_sessions VALUES (?,?,NULL)').run(await hash(TOKEN),Date.now()+60_000);
+ return {DB,V2_ADMIN_LOGIN_MODE:'enabled',V2_ADMIN_LOGIN_SECRET:'S'.repeat(48)};
 }
-async function call(e,path,{method='GET',token='',body,member=false}={}){
- const request=new Request(BASE+path,{method,
-  headers:{...(token?{authorization:'Bearer '+token}:{}),...(body?{'content-type':'application/json'}:{})},
-  ...(body?{body:JSON.stringify(body)}:{})});
- const response=await handleCalendarApi(request,e,new URL(request.url),'',
-  (body,status=200)=>Response.json(body,{status}),
-  async (_env,credential)=>member&&credential==='musician-token');
- return {status:response.status,body:await response.json()};
+const sample={date:'2026-11-28',timeZone:'America/Mexico_City',title:'Boda de prueba',venue:'Lugar',
+ city:'Ciudad',callTime:'1:00 p.m.',soundcheckTime:'Por definir',arrivalTime:'',showTime:'7:00 p.m.',
+ endTime:'',wardrobe:'Traje negro',details:'Prueba',contactName:'Planner',contactPhone:'+52 55 1111',
+ notes:'Equipo',mapUrl:'https://maps.google.com/?q=Mexico',status:'confirmed',recipientIds:[M1]};
+async function request(env,path,{method='GET',token=TOKEN,body,actorId=M1}={}){
+ const req=new Request(BASE+path,{method,headers:{Authorization:'Bearer '+token,...(body?{'Content-Type':'application/json'}:{})},
+ ...(body?{body:JSON.stringify(body)}:{})});
+ const response=await handleCalendarApi(req,env,new URL(req.url),'',
+  (data,status=200)=>Response.json(data,{status}),
+  async(_env,provided)=>provided==='musician'?{actorId}:null);
+ return {status:response.status,data:await response.json()};
 }
-const event={date:'2026-11-28',timeZone:'America/Mexico_City',title:'Evento de prueba',
- venue:'Lugar',city:'Ciudad',callTime:'16:00',arrivalTime:'17:00',showTime:'19:00',
- endTime:'21:00',wardrobe:'Negro',notes:'Información del equipo',status:'confirmed'};
-
-test('migration only adds one V2 calendar table without changing Chat history',()=>{
- const migration=readFileSync(new URL('../migrations/0018_calendar_events.sql',import.meta.url),'utf8');
- assert.match(migration,/CREATE TABLE IF NOT EXISTS calendar_events/);
- assert.match(migration,/CREATE INDEX IF NOT EXISTS idx_calendar_events_date/);
- assert.doesNotMatch(migration,/DROP|DELETE FROM|ALTER TABLE chat_/i);
-});
-
-test('no musician or admin calendar data is available anonymously',async()=>{
+test('no anonymous access; a musician cannot create or list Admin dates',async()=>{
  const e=await env();
- assert.equal((await call(e,'/api/calendar/events?from=2026-01-01&to=2026-12-31')).status,401);
- assert.equal((await call(e,'/api/calendar/admin/events',{method:'POST',body:event})).status,401);
- assert.equal(e.DB.writes,0);
+ assert.equal((await request(e,'/api/calendar/events',{token:''})).status,401);
+ assert.equal((await request(e,'/api/calendar/admin/events',{token:'musician'})).status,401);
+ assert.equal((await request(e,'/api/calendar/admin/events',{method:'POST',token:'musician',body:sample})).status,401);
 });
-
-test('musicians can only read valid bounded ranges, never create events',async()=>{
+test('Admin sends one date to Noa only, including flexible original time and map fields',async()=>{
  const e=await env();
- assert.equal((await call(e,'/api/calendar/events?from=2026-01-01&to=2026-12-31',{token:'musician-token',member:true})).status,200);
- assert.equal((await call(e,'/api/calendar/events?from=2026-02-30&to=2026-12-31',{token:'musician-token',member:true})).status,400);
- assert.equal((await call(e,'/api/calendar/events?from=2024-01-01&to=2026-12-31',{token:'musician-token',member:true})).status,400);
- assert.equal((await call(e,'/api/calendar/admin/events',{method:'POST',token:'musician-token',member:true,body:event})).status,401);
- assert.equal(e.DB.writes,0);
+ const saved=await request(e,'/api/calendar/admin/events',{method:'POST',body:sample});
+ assert.equal(saved.status,201);
+ const noa=await request(e,'/api/calendar/events',{token:'musician'});
+ const fer=await request(e,'/api/calendar/events',{token:'musician',actorId:M2});
+ assert.equal(noa.data.events.length,1);
+ assert.equal(noa.data.events[0].soundcheckTime,'Por definir');
+ assert.equal(noa.data.events[0].mapUrl,sample.mapUrl);
+ assert.equal(fer.data.events.length,0);
+ assert.equal(fer.data.events[0]?.recipientIds,undefined);
+ const admin=await request(e,'/api/calendar/admin/events');
+ assert.deepEqual(admin.data.events[0].recipientIds,[M1]);
 });
-
-test('Admin creates one real event and musician reads same D1 record',async()=>{
+test('Admin changes recipients atomically, stale versions never overwrite',async()=>{
  const e=await env();
- const result=await call(e,'/api/calendar/admin/events',{method:'POST',token:TOKEN,body:event});
- assert.equal(result.status,201);
- assert.match(result.body.event.id,/^[a-f0-9-]{36}$/);
- const read=await call(e,'/api/calendar/events?from=2026-11-01&to=2026-11-30',{token:'musician-token',member:true});
- assert.equal(read.status,200);
- assert.equal(read.body.events.length,1);
- assert.equal(read.body.events[0].title,event.title);
- assert.equal(read.body.events[0].wardrobe,'Negro');
- assert.equal(e.DB.writes,1);
-});
-
-test('bad time zone, empty event title and invalid time are rejected without DB writes',async()=>{
- const e=await env();
- for(const changed of [{timeZone:'Not/A_Timezone'},{title:' '},{arrivalTime:'27:15'},{date:'2026-02-30'}]){
-  const result=await call(e,'/api/calendar/admin/events',{method:'POST',token:TOKEN,body:{...event,...changed}});
-  assert.equal(result.status,400);
- }
- assert.equal(e.DB.writes,0);
-});
-
-test('optimistic version check prevents overwriting a newer Admin edit',async()=>{
- const e=await env();
- const created=await call(e,'/api/calendar/admin/events',{method:'POST',token:TOKEN,body:event});
- const id=created.body.event.id;
- const first=await call(e,'/api/calendar/admin/events/'+id,{method:'POST',token:TOKEN,body:{...event,version:1,title:'Editado'}});
- assert.equal(first.status,200);
- assert.equal(first.body.event.version,2);
- const stale=await call(e,'/api/calendar/admin/events/'+id,{method:'POST',token:TOKEN,body:{...event,version:1,title:'Cambiar'}});
+ const created=await request(e,'/api/calendar/admin/events',{method:'POST',body:sample});
+ const id=created.data.event.id;
+ const changed=await request(e,'/api/calendar/admin/events/'+id,{method:'POST',body:{...sample,version:1,title:'Cambio',recipientIds:[M2]}});
+ assert.equal(changed.status,200);
+ assert.equal(changed.data.event.version,2);
+ const stale=await request(e,'/api/calendar/admin/events/'+id,{method:'POST',body:{...sample,version:1,recipientIds:[M1]}});
  assert.equal(stale.status,409);
- assert.equal(e.DB.writes,2);
+ const noa=await request(e,'/api/calendar/events',{token:'musician'});
+ const fer=await request(e,'/api/calendar/events',{token:'musician',actorId:M2});
+ assert.equal(noa.data.events.length,0);
+ assert.equal(fer.data.events.length,1);
+ assert.equal(fer.data.events[0].title,'Cambio');
+});
+test('reject invalid/empty recipient lists, invalid dates, links and inactive members',async()=>{
+ const e=await env();
+ for(const change of [{recipientIds:[]},{date:'2026-02-30'},{mapUrl:'javascript:alert(1)'},{recipientIds:['123e4567-e89b-42d3-a456-426614174099']}]) {
+  const res=await request(e,'/api/calendar/admin/events',{method:'POST',body:{...sample,...change}});
+  assert.equal(res.status,400);
+ }
+ assert.equal(e.DB.raw.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n,0);
+});
+test('Admin delete removes event and recipients, preserving Chat-related tables',async()=>{
+ const e=await env();
+ const created=await request(e,'/api/calendar/admin/events',{method:'POST',body:sample});
+ const id=created.data.event.id;
+ assert.equal((await request(e,'/api/calendar/admin/events/'+id,{method:'DELETE',body:{version:1}})).status,200);
+ assert.equal(e.DB.raw.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n,0);
+ assert.equal(e.DB.raw.prepare('SELECT COUNT(*) AS n FROM calendar_event_recipients').get().n,0);
+ assert.equal(e.DB.raw.prepare('SELECT COUNT(*) AS n FROM chat_members').get().n,2);
 });
