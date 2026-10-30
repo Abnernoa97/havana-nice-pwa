@@ -671,7 +671,7 @@ export default function App() {
         <section className="join-panel">
           <span className="overline">ACCESO HAVANA NICE</span>
           <h2>Bienvenido.</h2>
-          <p>Introduce el nombre autorizado por el Administrador para entrar a HAVANA NICE.</p>
+          <p>Introduce el nombre que el Administrador creó y autorizó para ti. Entrarás a Inicio.</p>
           <form onSubmit={event => { event.preventDefault(); void join(); }}>
             <label htmlFor="chat-name">Tu nombre</label>
             <input id="chat-name" maxLength={28} autoComplete="nickname" autoCapitalize="none" value={name} onChange={event => setName(event.target.value)} placeholder="Tu nombre" />
