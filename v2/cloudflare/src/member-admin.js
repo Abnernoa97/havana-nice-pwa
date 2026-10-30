@@ -31,6 +31,14 @@ function deviceDetails(request){
    origin?'Navegador web':'Cliente no identificado';
  return {platform,operatingSystem:system.slice(0,80),deviceName,model};
 }
+/** 
+ * Type contract for optional device metadata, without runtime changes.
+ * @param {any} env
+ * @param {string} actorId
+ * @param {string} eventType
+ * @param {Request} request
+ * @param {{platform:string,operatingSystem:string,deviceName:string,model:string|null}|null} [details]
+ */
 export async function recordMemberEvent(env,actorId,eventType,request,details=null){
  if(!ID.test(actorId)||!['login','connect','disconnect'].includes(eventType))return;
  const meta=details||deviceDetails(request);
