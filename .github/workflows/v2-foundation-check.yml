@@ -83,6 +83,9 @@ jobs:
       - name: Verify visual media UI remains compatible
         run: node --test tests/chat-media-ui.test.mjs
 
+      - name: Protect one authorized HOME and native Chat navigation
+        run: node --test tests/member-home-navigation.test.mjs
+
       - name: Build iPhone PWA
         run: npm run build:pwa
 

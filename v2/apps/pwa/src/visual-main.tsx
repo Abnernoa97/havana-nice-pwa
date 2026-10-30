@@ -6,5 +6,5 @@ import './visual.css';
 // Separate entry point: Android WebView will load only this non-chat shell.
 // It intentionally never mounts the PWA chat component or its WebSocket.
 createRoot(document.getElementById('visual-root')!).render(
-  <React.StrictMode><VisualApp /></React.StrictMode>,
+  <React.StrictMode><VisualApp preview /></React.StrictMode>,
 );

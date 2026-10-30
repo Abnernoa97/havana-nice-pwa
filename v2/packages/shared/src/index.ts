@@ -216,3 +216,6 @@ export function validateChatMediaSelection(
 
 export {getCalendarEvents} from './calendar';
 export type {CalendarEvent,CalendarEventInput,CalendarEventList,CalendarEventStatus} from './calendar';
+
+export {MEMBER_MODULES} from './memberModules';
+export type {MemberModule,MemberScreen} from './memberModules';

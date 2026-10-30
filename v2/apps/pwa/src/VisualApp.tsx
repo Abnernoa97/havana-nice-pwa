@@ -1,78 +1,96 @@
-import { useState } from 'react';
+import {useState} from 'react';
+import {MEMBER_MODULES,type MemberScreen} from '@havana/shared';
 
-type Module = 'home' | 'calendar' | 'repertoire' | 'notices' | 'settings' | 'admin';
-const modules: {id:Module; label:string; glyph:string}[] = [
-  {id:'home',label:'Inicio',glyph:'⌂'},
-  {id:'calendar',label:'Calendario',glyph:'▦'},
-  {id:'repertoire',label:'Repertorio',glyph:'♫'},
-  {id:'notices',label:'Avisos',glyph:'◌'},
-  {id:'settings',label:'Ajustes',glyph:'⚙'},
-];
-function Placeholder({title,description}:{title:string;description:string}) {
-  return <div className="visual-empty">
-    <span className="visual-empty-icon" aria-hidden="true">◇</span>
-    <h3>{title}</h3><p>{description}</p>
-  </div>;
-}
-export default function VisualApp() {
-  const [active,setActive]=useState<Module>('home');
-  const title=active==='home'?'Inicio':active==='calendar'?'Calendario':active==='repertoire'?'Repertorio':active==='notices'?'Avisos':active==='settings'?'Ajustes':'Administración';
+type Props={
+  displayName?:string;
+  active?:Exclude<MemberScreen,'chat'>;
+  onNavigate?:(screen:MemberScreen)=>void;
+  preview?:boolean;
+};
+const notes:Record<Exclude<MemberScreen,'chat'|'home'>,string>={
+  calendar:'El Calendario mostrará los eventos reales y sus horarios al conectar el Administrador.',
+  repertoire:'Las canciones y listas estarán disponibles cuando se conecten los datos reales.',
+  musicians:'La información del equipo estará disponible cuando se implemente este módulo.',
+  notices:'Los avisos se mostrarán cuando exista almacenamiento y permisos para cada músico.',
+  settings:'Las preferencias se habilitarán cuando podamos guardarlas de forma segura.',
+};
+// Reuses the existing visual shell for the member HOME after successful login.
+// /visual.html remains presentation-only; it cannot open Chat or issue a session.
+export default function VisualApp({displayName,active,onNavigate,preview=false}:Props){
+  const [previewScreen,setPreviewScreen]=useState<MemberScreen>('home');
+  const screen=active??previewScreen;
+  const navigate=(target:MemberScreen)=>{
+    if(target==='chat'&&!onNavigate)return; // Public preview never opens private Chat.
+    if(onNavigate)onNavigate(target);
+    else setPreviewScreen(target);
+  };
+  const selected=MEMBER_MODULES.find(item=>item.id===screen);
+  const tabs=MEMBER_MODULES;
   return <div className="visual-shell">
     <header className="visual-header">
-      <div><div className="visual-brand">HAVANA NICE</div><div className="visual-subtitle">PRIVATE MEMBERS · V2</div></div>
-      <span className="visual-preview">Vista preliminar</span>
+      <div><div className="visual-brand">HAVANA NICE</div><div className="visual-subtitle">ESPACIO DEL EQUIPO · V2</div></div>
+      <span className="visual-preview">{preview?'Vista preliminar':displayName||'Mi espacio'}</span>
     </header>
     <div className="visual-layout">
-      <aside className="visual-side" aria-label="Navegación de módulos">
+      <aside className="visual-side" aria-label="Módulos de HAVANA NICE">
         <p className="visual-side-title">MÓDULOS</p>
-        {modules.map(m=><button key={m.id} type="button" className={active===m.id?'visual-nav active':'visual-nav'}
-          aria-current={active===m.id?'page':undefined} onClick={()=>setActive(m.id)}>
-          <span aria-hidden="true">{m.glyph}</span> {m.label}
-        </button>)}
-        <button type="button" className={active==='admin'?'visual-nav active':'visual-nav'}
-          aria-current={active==='admin'?'page':undefined} onClick={()=>setActive('admin')}>
-          <span aria-hidden="true">◇</span> Administración
+        <button className={screen==='home'?'visual-nav active':'visual-nav'}
+          aria-current={screen==='home'?'page':undefined} onClick={()=>navigate('home')} type="button">
+          <span aria-hidden="true">⌂</span> Inicio
         </button>
-        <div className="visual-side-note">El Chat de Android permanece 100 % nativo y no se carga aquí.</div>
+        {tabs.map(item=><button key={item.id} type="button"
+          className={screen===item.id?'visual-nav active':'visual-nav'}
+          aria-current={screen===item.id?'page':undefined}
+          onClick={()=>navigate(item.id)}>
+          <span aria-hidden="true">{item.glyph}</span> {item.label}
+        </button>)}
+        <div className="visual-side-note">Una sola identidad autorizada para HOME y Chat.</div>
       </aside>
       <main className="visual-content" id="visual-content">
-        <div className="visual-section-header">
-          <span className="visual-overline">HAVANA NICE / {title.toUpperCase()}</span>
-          <h1>{title}</h1>
-          <p className="visual-intro">{active==='home'?'Tu espacio de trabajo para cada celebración.':active==='calendar'?'Toda la información de los eventos, en un solo lugar.':active==='repertoire'?'Canciones y listas organizadas para cada evento.':active==='notices'?'Actualizaciones del equipo y comunicaciones importantes.':active==='settings'?'Preferencias de la aplicación y del dispositivo.':'Gestión privada de músicos, eventos y permisos.'}</p>
-        </div>
-        {active==='home'&&<>
-          <div className="visual-welcome"><div><span className="visual-overline">BIENVENIDOS</span><h2>Todo listo para organizarnos.</h2><p>Próximamente verás aquí tus eventos, repertorios y avisos reales.</p></div><span className="visual-mark" aria-hidden="true">HN</span></div>
-          <div className="visual-grid">
-            <button type="button" className="visual-tile" onClick={()=>setActive('calendar')}><span className="visual-overline">01 / AGENDA</span><strong>Calendario</strong><span>Consultar eventos y horarios <span aria-hidden="true">›</span></span></button>
-            <button type="button" className="visual-tile" onClick={()=>setActive('repertoire')}><span className="visual-overline">02 / MÚSICA</span><strong>Repertorio</strong><span>Listas generales y por evento <span aria-hidden="true">›</span></span></button>
-            <button type="button" className="visual-tile" onClick={()=>setActive('notices')}><span className="visual-overline">03 / EQUIPO</span><strong>Avisos</strong><span>Comunicaciones del grupo <span aria-hidden="true">›</span></span></button>
+        {screen==='home'?<>
+          <div className="visual-section-header">
+            <span className="visual-overline">HAVANA NICE / HOME</span>
+            <h1>Inicio</h1>
+            <p className="visual-intro">Accede a las herramientas del equipo.</p>
           </div>
-          <Placeholder title="Próximos eventos" description="El calendario aún no está conectado. No se mostrarán eventos inventados ni datos privados."/>
-        </>}
-        {active==='calendar'&&<>
-          <div className="visual-bar"><span>Eventos programados</span><span>Sin datos conectados</span></div>
-          <Placeholder title="Agenda en preparación" description="Los eventos reales incluirán Llegar, Vestuario, Notas, Llamadas, Show y repertorio asociado, según los permisos."/>
-        </>}
-        {active==='repertoire'&&<>
-          <div className="visual-bar"><span>General · Por evento</span><span>Sin canciones conectadas</span></div>
-          <Placeholder title="Repertorio en preparación" description="La biblioteca de canciones, el checklist, el orden y los enlaces estarán disponibles cuando se conecten los datos reales."/>
-        </>}
-        {active==='notices'&&<Placeholder title="Avisos en preparación" description="Las comunicaciones y los estados leído/no leído se habilitarán con su almacenamiento y permisos."/>}
-        {active==='settings'&&<Placeholder title="Ajustes en preparación" description="Las preferencias se habilitarán cuando puedan guardarse de forma segura para cada integrante."/>}
-        {active==='admin'&&<>
-          <div className="visual-restricted">ADMINISTRACIÓN SEPARADA DE ESTA VISTA PRELIMINAR</div>
-          <Placeholder title="Administración en preparación" description="El Administrador real ya gestiona el acceso de músicos en /admin.html. Esta maqueta no abre una segunda entrada ni muestra información privada."/>
+          <div className="visual-welcome">
+            <div><span className="visual-overline">ACCESO AUTORIZADO</span>
+              <h2>{preview?'Espacio de trabajo':`Bienvenido, ${displayName||'integrante'}.`}</h2>
+              <p>Tu equipo y tus próximos eventos, en un solo lugar.</p></div>
+            <span className="visual-mark" aria-hidden="true">HN</span>
+          </div>
+          <div className="visual-grid">
+            {tabs.map(item=><button key={item.id} className="visual-tile" type="button"
+              disabled={preview&&item.id==='chat'} onClick={()=>navigate(item.id)}>
+              <span className="visual-overline">{item.glyph} · {item.ready?'DISPONIBLE':'EN PREPARACIÓN'}</span>
+              <strong>{item.label}</strong>
+              <span>{item.description}</span>
+            </button>)}
+          </div>
+        </>:<>
+          <div className="visual-section-header">
+            <button className="visual-back" type="button" onClick={()=>navigate('home')}>‹ Inicio</button>
+            <span className="visual-overline">HAVANA NICE / {selected?.label.toUpperCase()}</span>
+            <h1>{selected?.label}</h1>
+            <p className="visual-intro">{selected?.description}</p>
+          </div>
+          <div className="visual-empty">
+            <span className="visual-empty-icon" aria-hidden="true">◇</span>
+            <h3>Módulo en preparación</h3>
+            <p>{screen!=='chat'&&screen!=='home'?notes[screen]:''}</p>
+          </div>
         </>}
       </main>
     </div>
     <nav className="visual-bottom-nav" aria-label="Navegación principal">
-      {modules.slice(0,4).map(m=><button key={m.id} type="button" className={active===m.id?'active':''}
-        aria-current={active===m.id?'page':undefined} onClick={()=>setActive(m.id)}>
-        <span aria-hidden="true">{m.glyph}</span><small>{m.label}</small>
-      </button>)}
-      <button type="button" className={active==='settings'||active==='admin'?'active':''}
-        aria-current={active==='settings'||active==='admin'?'page':undefined} onClick={()=>setActive('settings')}><span aria-hidden="true">⚙</span><small>Ajustes</small></button>
+      {(['home','chat','calendar','repertoire','musicians'] as MemberScreen[]).map(item=>{
+        const module=MEMBER_MODULES.find(module=>module.id===item);
+        return <button key={item} type="button" disabled={preview&&item==='chat'}
+          className={screen===item?'active':''} aria-current={screen===item?'page':undefined}
+          onClick={()=>navigate(item)}>
+          <span aria-hidden="true">{module?.glyph||'⌂'}</span><small>{module?.label||'Inicio'}</small>
+        </button>;
+      })}
     </nav>
   </div>;
 }

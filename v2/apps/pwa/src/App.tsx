@@ -4,12 +4,13 @@ import {
   openChatSocket, reconcileChatMessages, startNamedChatSession, restoreNamedChatSession,
   type BackendHealth, type ChatMessage, type ChatServerEvent, type ChatSession,
   validateChatMediaSelection, CHAT_MEDIA_MAX_PER_SEND, HAVANA_V2_DEV_API_BASE_URL, type ChatMediaSelection, type ChatMediaKind, type ChatMediaSource,
-  reconcileReactions, reconcileUpdatedMessage, reconcileDeletedMessage, reconcileChatSnapshot, type ChatReaction, type ChatEmoji, type ChatReadReceipt,
+  reconcileReactions, reconcileUpdatedMessage, reconcileDeletedMessage, reconcileChatSnapshot, type ChatReaction, type ChatEmoji, type ChatReadReceipt, type MemberScreen,
 } from '@havana/shared';
 import { loadLocalChat, saveLocalChat } from './local';
 import SwipeMessage, {type MessageAnchor} from './SwipeMessage';
 import ComposerIcon from './ChatComposerIcon';
 import ChatMediaView from './ChatMediaView';
+import VisualApp from './VisualApp';
 
 type PwaQueuedMedia={id:string;file:File;selection:ChatMediaSelection};
 
@@ -17,6 +18,8 @@ export default function App() {
   const [health, setHealth] = useState<BackendHealth | null>(null);
   const [name, setName] = useState('');
   const [session, setSession] = useState<ChatSession | null>(null);
+  // Existing approved ChatSession is the APP access; HOME adds no login or storage.
+  const [activeScreen,setActiveScreen]=useState<MemberScreen>('home');
   const [restoringAccess,setRestoringAccess] = useState(true);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState('');
@@ -132,6 +135,7 @@ export default function App() {
   const refreshLatest = useRef<() => void>(() => {});
 
   function revokeCurrentAccess() {
+    setActiveScreen('home');
     const previous = socket.current;
     socket.current = null;
     previous?.close();
@@ -639,6 +643,10 @@ export default function App() {
   const menuLeft=Math.max(12,Math.min(preferredLeft,window.innerWidth-menuWidth-12));
 
   return (
+    <>
+      {session&&activeScreen!=='chat'&&<VisualApp displayName={session.displayName}
+        active={activeScreen} onNavigate={setActiveScreen}/>}
+      <div className={session&&activeScreen!=='chat'?'member-chat-hidden':'member-chat-visible'}>
     <main className="chat-app">
       <header className="chat-header">
         <div>
@@ -650,6 +658,8 @@ export default function App() {
             <span className={connection === 'en vivo' ? 'online-dot' : 'offline-dot'} />
             {session ? `${connection}${connection === 'en vivo' ? ` · ${onlineUsers} en línea` : ''}` : health?.ok ? 'API conectada' : 'Laboratorio'}
           </div>
+          {session&&<button type="button" className="search-toggle" aria-label="Volver a Inicio"
+            onClick={()=>setActiveScreen('home')}>‹ Inicio</button>}
           {session&&<button className="search-toggle" type="button" aria-label="Buscar mensajes"
             aria-expanded={searchOpen} onClick={()=>{
               setSearchOpen(open=>!open);setSearchResults(null);setSearchQuery('');
@@ -661,7 +671,7 @@ export default function App() {
         <section className="join-panel">
           <span className="overline">ACCESO HAVANA NICE</span>
           <h2>Bienvenido.</h2>
-          <p>Introduce el nombre que el Administrador creó y autorizó para ti.</p>
+          <p>Introduce el nombre autorizado por el Administrador para entrar a HAVANA NICE.</p>
           <form onSubmit={event => { event.preventDefault(); void join(); }}>
             <label htmlFor="chat-name">Tu nombre</label>
             <input id="chat-name" maxLength={28} autoComplete="nickname" autoCapitalize="none" value={name} onChange={event => setName(event.target.value)} placeholder="Tu nombre" />
@@ -826,5 +836,7 @@ export default function App() {
         </>
       )}
     </main>
+      </div>
+    </>
   );
 }

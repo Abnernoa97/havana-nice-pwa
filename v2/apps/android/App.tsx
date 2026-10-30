@@ -7,13 +7,14 @@ import {
   HAVANA_V2_DEV_API_BASE_URL, fetchBackendHealth, getChatMediaAvailability, getChatSnapshot, getOlderChatMessages, searchChatMessages, lastReadByOther, messageDeliveryLabel, newClientMessageId,
   reconcileChatMessages, reconcileReactions, reconcileUpdatedMessage, reconcileDeletedMessage, reconcileChatSnapshot, startNamedChatSession, restoreNamedChatSession,
   type ChatMessage, type ChatServerEvent, type ChatSession, type ChatReaction, type ChatEmoji, type ChatReadReceipt,
-  validateChatMediaSelection, CHAT_MEDIA_MAX_PER_SEND, type ChatMediaSelection, type ChatMediaKind, type ChatMediaSource,
+  validateChatMediaSelection, CHAT_MEDIA_MAX_PER_SEND, type ChatMediaSelection, type ChatMediaKind, type ChatMediaSource, type MemberScreen,
 } from '@havana/shared';
 import { loadNativeLocalChat, saveNativeLocalChat } from './chatStorage';
 import * as ImagePicker from 'expo-image-picker';
 import SwipeableBubble, {type BubbleAnchor} from './SwipeableBubble';
 import NativeComposerIcon from './ChatComposerIcon';
 import NativeChatMediaView from './NativeChatMediaView';
+import NativeMemberHome from './NativeMemberHome';
 const newMediaSelectionId=()=>String(Date.now())+'-'+Math.random().toString(36).slice(2);
 
 type NativeQueuedMedia=ChatMediaSelection&{id:string};
@@ -23,6 +24,8 @@ export default function App() {
   const [apiState, setApiState] = useState('conectando…');
   const [name, setName] = useState('');
   const [session, setSession] = useState<ChatSession | null>(null);
+  // Access remains the same ChatSession; only the destination changes to HOME.
+  const [activeScreen,setActiveScreen]=useState<MemberScreen>('home');
   const [restoringAccess,setRestoringAccess] = useState(true);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState('');
@@ -169,6 +172,7 @@ export default function App() {
   }
 
   function revokeCurrentAccess() {
+    setActiveScreen('home');
     const previous = socket.current;
     socket.current = null;
     previous?.close();
@@ -734,7 +738,7 @@ export default function App() {
       {/* Android 16 edge-to-edge can draw the composer behind the IME even with
             adjustResize. Height mode keeps the native chat input and Enviar
             visible above the keyboard without changing the PWA or storage. */}
-      <KeyboardAvoidingView style={styles.flex}
+      <KeyboardAvoidingView style={[styles.flex,session && activeScreen!=='chat' && styles.inactiveChat]}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={0}>
         <View style={styles.header}>
@@ -743,6 +747,10 @@ export default function App() {
             <Text style={styles.title}>Chat V2</Text>
           </View>
           <View style={styles.headerActions}>
+            {session&&<Pressable accessibilityRole="button" accessibilityLabel="Volver a Inicio"
+              onPress={()=>{Keyboard.dismiss();setActiveScreen('home');}} style={styles.headerSearchButton}>
+              <Text style={styles.headerSearchText}>‹ Inicio</Text>
+            </Pressable>}
             <Text style={styles.connection}>
               {session ? `${connection}${connection === 'en vivo' ? ` · ${onlineCount} en línea` : ''}` : `API ${apiState}`}
             </Text>
@@ -765,7 +773,7 @@ export default function App() {
               onChangeText={setName} maxLength={28} autoCapitalize="none" autoCorrect={false} placeholder="Tu nombre"
             />
             <Pressable onPress={() => void join()} disabled={joining || !name.trim()} style={styles.joinButton}>
-              <Text style={styles.joinText}>{joining ? 'Conectando…' : 'Entrar al chat'}</Text>
+              <Text style={styles.joinText}>{joining ? 'Conectando…' : 'Entrar a HAVANA NICE'}</Text>
             </Pressable>
             {error ? <Text style={styles.error}>{error}</Text> : null}
             <Text style={styles.footer}>Si no estás autorizado, consulta al administrador.</Text>
@@ -1003,12 +1011,15 @@ export default function App() {
               }}><Text style={styles.emojiOptionText}>{emoji}</Text></Pressable>)}
         </View>}
       </KeyboardAvoidingView>
+      {session&&activeScreen!=='chat'&&<NativeMemberHome displayName={session.displayName}
+        active={activeScreen} onNavigate={setActiveScreen}/>}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
+  inactiveChat:{display:'none'},
   // RN SafeAreaView does not include Android's bottom navigation safe area.
   // Reserve room for three-button navigation even with Android 16 edge-to-edge.
   screen: { flex: 1, backgroundColor: '#F3EDDF', paddingBottom: Platform.OS === 'android' ? 42 : 0 },
