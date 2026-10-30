@@ -99,6 +99,16 @@
 - **Próximo lote sin fecha ni aprobación aún:** completar Calendario y después módulos siguientes con PWA/Administrador, sumar pruebas y preparar integración nativa en una sola actualización. El Chat React Native, el login, los dispositivos y la rama original `main` siguen fuera de cambios.
 - Hitos oficiales **12/36**, sin tachar módulos por el mero cambio de política. El Plan Maestro es la fuente de verdad, sin tablero paralelo.
 
+## Repertorio modular · entrega PWA/Administrador acumulada (30/10/2026)
+
+- Análisis de Repertorio V1 realizado solo en lectura: catálogo general ENGLISH/ESPAÑOL con artistas y referencias; lista por evento con selección múltiple, canciones especiales, orden y progreso. Se implementó en V2 **sin reutilizar Supabase ni modificar `main`**.
+- Módulo independiente: `cloudflare/src/repertoire.js`, `packages/shared/src/repertoire.ts`, `apps/pwa/src/AdminRepertoire.tsx` y `apps/pwa/src/MemberRepertoire.tsx`. Se conecta por HOME al miembro y por la pestaña Repertorio en el Administrador, reutilizando **sus mismos tokens**. No hay nueva sesión, Worker o app.
+- `0020_repertoire.sql` aplicada en la D1 propia de V2: `repertoire_songs` y `repertoire_event_items`, ambas vacías inicialmente; el evento de Calendario sigue intacto. Los detalles de los eventos solo se muestran al músico que tenga `calendar_event_recipients`; la escritura es exclusivamente Admin. Las listas por evento guardan una copia legible si se borra la canción maestra.
+- CI [41109290868](https://github.com/Abnernoa97/havana-nice-pwa/actions/runs/41109290868) `success` verificó privacidad, canciones generales, listas por evento, especiales, orden, progreso y aislamiento con SQLite aislado. Versión del Worker `4a1cbda7-5365-4746-b679-08a28646d590` probada al 0 % mediante [41110029794](https://github.com/Abnernoa97/havana-nice-pwa/actions/runs/41110029794) `success`, publicada al 100 %, manteniendo Chat y Calendario. Sin datos inventados ni canciones importadas de V1.
+- `v2/cloudflare/.worker-release-staging/worker.mjs` eliminado después del despliegue. CI restaurado a `contents:read`, con comprobación permanente de rutas privadas para Repertorio/Calendario/Chat.
+- **Pendiente:** verificar la PWA con el despliegue web definitivo, crear/editar/borrar canción desde Admin, comprobar desde el músico el repertorio general y su lista de evento y verificar sincronización. **P03/A04 continúan abiertos; 12/36 hitos**.
+- **Regla Android:** no cambiar `app.json`, no crear `android-batch.json`, no generar APK. La publicación de PWA se acumula para la siguiente versión nativa aprobada; 0.0.13 es la última APK.
+
 ## Próximo trabajo de desarrollo
 
 1. **H02 → H03:** integración segura de los módulos no-Chat en Android. Mantener Chat 100 % React Native, aprovechar PWA solo para presentación y utilizar contratos/backend V2 únicos. Prioridad funcional, no colores/interfaz.
