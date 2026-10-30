@@ -36,3 +36,12 @@ test('Visual preview cannot independently open protected Chat',()=>{
  assert.match(visual,/if\(target==='chat'&&!onNavigate\)return/);
  assert.doesNotMatch(visual,/new WebSocket|admin\.html/);
 });
+
+test('PWA and Android availability remain truthful without duplicating HOME',()=>{
+ const data=read('packages/shared/src/memberModules.ts');
+ assert.match(data,/description:string;ready:boolean;nativeReady:boolean/);
+ assert.match(data,/id:'repertoire'[^\n]*ready:true,nativeReady:false/);
+ assert.match(data,/id:'calendar'[^\n]*ready:true,nativeReady:true/);
+ assert.match(read('apps/pwa/src/VisualApp.tsx'),/item\.ready\?'DISPONIBLE':'EN PREPARACIÓN'/);
+ assert.match(read('apps/android/NativeMemberHome.tsx'),/module\.nativeReady\?'Disponible':'En preparación'/);
+});

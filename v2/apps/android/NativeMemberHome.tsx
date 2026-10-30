@@ -33,7 +33,7 @@ export default function NativeMemberHome({displayName,token,active,onNavigate}:P
             <Text style={styles.tileTitle}>{module.label}</Text>
           </View>
           <Text style={styles.tileBody}>{module.description}</Text>
-          <Text style={styles.tileState}>{module.ready?'Disponible':'En preparación'}</Text>
+          <Text style={styles.tileState}>{module.nativeReady?'Disponible':'En preparación'}</Text>
         </Pressable>)}
       </View>
     </>:<>
