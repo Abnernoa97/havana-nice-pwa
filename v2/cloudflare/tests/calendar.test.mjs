@@ -125,6 +125,41 @@ test('freeform date, punctuation, custom status and non-URL map text are preserv
  assert.equal(read.data.events[0].statusText,flexible.statusText);
  assert.equal(read.data.events[0].contactPhone,flexible.contactPhone);
 });
+test('full lifecycle: Admin creates date for three musicians, edits assignment and then deletes safely',async()=>{
+ const e=await env();
+ const third='member:123e4567-e89b-42d3-a456-426614174003';
+ e.DB.raw.prepare('INSERT INTO chat_members VALUES (?,?,1)').run(third,'Andy');
+ const event={...sample,date:'14dic26',title:'Prueba de acordeón',
+  recipientIds:[M1,M2,third],statusText:'LISTO #14'};
+ const created=await request(e,'/api/calendar/admin/events',{method:'POST',body:event});
+ assert.equal(created.status,201,JSON.stringify(created.data));
+ const id=created.data.event.id;
+ for(const actorId of [M1,M2,third]){
+  const memberView=await request(e,'/api/calendar/events',{token:'musician',actorId});
+  assert.equal(memberView.data.events.length,1);
+  assert.equal(memberView.data.events[0].date,'14dic26');
+  assert.equal(memberView.data.events[0].statusText,'LISTO #14');
+  assert.equal('recipientIds' in memberView.data.events[0],false);
+ }
+ const revised=await request(e,'/api/calendar/admin/events/'+id,{
+  method:'POST',body:{...event,version:1,title:'Acordeón actualizado',recipientIds:[M2]}
+ });
+ assert.equal(revised.status,200);
+ assert.equal(revised.data.event.version,2);
+ assert.equal((await request(e,'/api/calendar/events',{token:'musician',actorId:M1})).data.events.length,0);
+ assert.equal((await request(e,'/api/calendar/events',{token:'musician',actorId:third})).data.events.length,0);
+ assert.equal((await request(e,'/api/calendar/events',{token:'musician',actorId:M2})).data.events[0].title,'Acordeón actualizado');
+ const rejectStaleDelete=await request(e,'/api/calendar/admin/events/'+id,{method:'DELETE',body:{version:1}});
+ assert.equal(rejectStaleDelete.status,409);
+ assert.equal((await request(e,'/api/calendar/events',{token:'musician',actorId:M2})).data.events.length,1);
+ assert.equal((await request(e,'/api/calendar/admin/events/'+id,{method:'DELETE',body:{version:2}})).status,200);
+ for(const actorId of [M1,M2,third]){
+  assert.equal((await request(e,'/api/calendar/events',{token:'musician',actorId})).data.events.length,0);
+ }
+ assert.equal(e.DB.raw.prepare('SELECT COUNT(*) AS n FROM calendar_event_recipients').get().n,0);
+ assert.equal(e.DB.raw.prepare('SELECT COUNT(*) AS n FROM chat_members').get().n,3);
+});
+
 test('unrecognized dates remain valid free text and are displayed after dated events',async()=>{
  const e=await env();
  const created=await request(e,'/api/calendar/admin/events',{method:'POST',body:{...sample,date:'Por confirmar / ???'}});
