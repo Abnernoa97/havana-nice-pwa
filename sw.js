@@ -1,15 +1,13 @@
-/* HAVANA NICE — UNIFIED SERVICE WORKER V12
+/* HAVANA NICE — UNIFIED SERVICE WORKER V13
    One worker for musicians + admin + push.
    Every same-origin JavaScript runtime is network-first/no-cache while online.
    Old app caches are purged on activation so devices cannot stay pinned to stale code.
 */
-const CACHE='hn-unified-v12';
+const CACHE='hn-unified-v13';
 const MUSICIAN_SHELL='./index.html';
 const ADMIN_SHELL='./admin.html';
 const MUSICIAN_SHELL_REQUEST=new Request(MUSICIAN_SHELL);
 const ADMIN_SHELL_REQUEST=new Request(ADMIN_SHELL);
-const SUPABASE_CDN='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-const SUPABASE_ESM='https://esm.sh/@supabase/supabase-js@2';
 const IS_IOS=/iPad|iPhone|iPod/.test(self.navigator?.userAgent||'')||((self.navigator?.platform||'')==='MacIntel'&&(self.navigator?.maxTouchPoints||0)>1);
 const FAMILY_IOS_VERSION='ios-family-20260920-profile-picker';
 const APP_ORIGIN='https://havana-nice-pwa.pages.dev';
@@ -40,7 +38,6 @@ function normalizedHtmlResponse(response,text){
 async function normalizeMusicianShell(response){
   if(!response||!response.ok)return response;
   let text=await response.text();
-  text=text.split(SUPABASE_CDN).join(SUPABASE_ESM);
   if(IS_IOS)text=text.replace(/\.\/family-v1\.js\?v=[^"']+/g,'./family-v1.js?v='+FAMILY_IOS_VERSION);
   return normalizedHtmlResponse(response,text);
 }
@@ -48,7 +45,6 @@ async function normalizeMusicianShell(response){
 async function normalizeAdminShell(response){
   if(!response||!response.ok)return response;
   let text=await response.text();
-  text=text.split(SUPABASE_CDN).join(SUPABASE_ESM);
   return normalizedHtmlResponse(response,text);
 }
 
@@ -133,11 +129,6 @@ self.addEventListener('fetch',event=>{
   const url=new URL(event.request.url);
 
   if(IS_IOS&&url.origin!==self.location.origin)return;
-
-  if(url.hostname==='cdn.jsdelivr.net'&&url.pathname==='/npm/@supabase/supabase-js@2/+esm'){
-    event.respondWith(fetch(SUPABASE_ESM).catch(()=>fetch(event.request)));
-    return;
-  }
 
   if(event.request.mode==='navigate'&&url.origin===self.location.origin){
     event.respondWith(networkFirstNavigation(event.request,isAdminUrl(url)));
