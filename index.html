@@ -65,9 +65,28 @@
 </main>
 
 <script type="module">
-  import{createClient}from"https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
   const SUPABASE_URL="https://xzfradccsxonmauinecl.supabase.co",SUPABASE_PUBLISHABLE_KEY="sb_publishable_Ip5rGK0UVXIfOjs_RQ_LhA_c14foHN9";
-  const supabase=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);
+  const SUPABASE_SOURCES=[
+    "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm",
+    "https://esm.sh/@supabase/supabase-js@2"
+  ];
+  const bootMessage=document.getElementById("loginMessage");
+  if(bootMessage)bootMessage.textContent="Cargando acceso...";
+  async function loadSupabaseModule(){
+    const attempts=SUPABASE_SOURCES.map(source=>import(source));
+    const timeout=new Promise((_,reject)=>setTimeout(()=>reject(new Error("Supabase module timeout")),8000));
+    return Promise.race([Promise.any(attempts),timeout]);
+  }
+  let supabase=null;
+  try{
+    const mod=await loadSupabaseModule();
+    if(typeof mod?.createClient!=="function")throw new Error("Supabase module unavailable");
+    supabase=mod.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);
+    if(bootMessage)bootMessage.textContent="";
+  }catch(error){
+    console.error("HAVANA NICE Supabase boot failed:",error);
+    if(bootMessage)bootMessage.textContent="No fue posible conectar. Cierra y vuelve a abrir la app.";
+  }
   const experience=document.getElementById("experience"),backgroundVideo=document.getElementById("backgroundVideo"),loginScreen=document.getElementById("loginScreen"),homeScreen=document.getElementById("homeScreen"),moduleScreen=document.getElementById("moduleScreen"),usernameInput=document.getElementById("username"),loginButton=document.getElementById("loginButton"),loginMessage=document.getElementById("loginMessage"),welcomeName=document.getElementById("welcomeName"),welcomeRole=document.getElementById("welcomeRole"),logoutButton=document.getElementById("logoutButton"),moduleTitle=document.getElementById("moduleTitle"),backButton=document.getElementById("backButton"),soundButton=document.getElementById("soundButton"),soundIcon=document.getElementById("soundIcon"),soundLabel=document.getElementById("soundLabel"),colorButton=document.getElementById("colorButton"),colorLabel=document.getElementById("colorLabel");
   let soundEnabled=true,audioContext=null;
   function createAudioContext(){if(!audioContext){const A=window.AudioContext||window.webkitAudioContext;if(A)audioContext=new A()}return audioContext}
