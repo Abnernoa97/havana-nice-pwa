@@ -1,9 +1,9 @@
-/* HAVANA NICE — UNIFIED SERVICE WORKER V13
+/* HAVANA NICE — UNIFIED SERVICE WORKER V14
    One worker for musicians + admin + push.
    Every same-origin JavaScript runtime is network-first/no-cache while online.
    Old app caches are purged on activation so devices cannot stay pinned to stale code.
 */
-const CACHE='hn-unified-v13';
+const CACHE='hn-unified-v14';
 const MUSICIAN_SHELL='./index.html';
 const ADMIN_SHELL='./admin.html';
 const MUSICIAN_SHELL_REQUEST=new Request(MUSICIAN_SHELL);

@@ -64,6 +64,7 @@
   <div class="controls"><button id="soundButton" class="control-button" type="button" aria-label="Activar o desactivar audio del video"><span id="soundIcon" class="control-icon">♪</span><span id="soundLabel" class="control-label">Sound On</span></button><button id="colorButton" class="control-button" type="button" aria-label="Cambiar entre color y blanco y negro"><span id="colorIcon" class="control-icon">◐</span><span id="colorLabel" class="control-label">Black & White</span></button></div>
 </main>
 
+<script src="./vendor/supabase-js-2.119.2.js?v=20261123"></script>
 <script type="module">
   const SUPABASE_URL="https://xzfradccsxonmauinecl.supabase.co",SUPABASE_PUBLISHABLE_KEY="sb_publishable_Ip5rGK0UVXIfOjs_RQ_LhA_c14foHN9";
   const SUPABASE_SOURCES=[
@@ -73,6 +74,7 @@
   const bootMessage=document.getElementById("loginMessage");
   if(bootMessage)bootMessage.textContent="Cargando acceso...";
   async function loadSupabaseModule(){
+    if(window.supabase&&typeof window.supabase.createClient==="function")return window.supabase;
     const attempts=SUPABASE_SOURCES.map(source=>import(source));
     const timeout=new Promise((_,reject)=>setTimeout(()=>reject(new Error("Supabase module timeout")),8000));
     return Promise.race([Promise.any(attempts),timeout]);

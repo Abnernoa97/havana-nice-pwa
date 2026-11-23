@@ -29,8 +29,9 @@ input,textarea,select,button{font:inherit;border:1px solid #70501d;background:#0
 <section class="card"><div class="card-head"><div><div class="eyebrow">04 · Sistema</div><h1>Resumen</h1><div class="sub">Estado general de la aplicación</div></div></div><div class="stats"><div class="stat"><div id="statMusicians" class="stat-number">—</div><div class="stat-label">Músicos activos</div></div><div class="stat"><div id="statNotifications" class="stat-number">—</div><div class="stat-label">Notificaciones</div></div><div class="stat"><div id="statSongs" class="stat-number">—</div><div class="stat-label">Canciones</div></div><div class="stat"><div id="statEvents" class="stat-number">—</div><div class="stat-label">Eventos</div></div><div class="stat"><div id="statChatWritten" class="stat-number">—</div><div class="stat-label">Chat escrito</div></div><div class="stat"><div id="statChatAudio" class="stat-number">—</div><div class="stat-label">Chat de voz</div></div><div class="stat"><div id="statPhotos" class="stat-number">—</div><div class="stat-label">Fotos</div></div><div class="stat"><div id="statVideos" class="stat-number">—</div><div class="stat-label">Videos</div></div></div><button id="logout" class="logout">Cerrar sesión</button></section>
 </div></div>
 </main>
+<script src="./vendor/supabase-js-2.119.2.js?v=20261123"></script>
 <script type="module">
-import{createClient}from'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+const {createClient}=window.supabase&&typeof window.supabase.createClient==='function'?window.supabase:await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
 const s=createClient('https://xzfradccsxonmauinecl.supabase.co','sb_publishable_Ip5rGK0UVXIfOjs_RQ_LhA_c14foHN9');window.hnAdminSupabase=s;
 const $=x=>document.getElementById(x),esc=v=>String(v??'').replace(/[&<>'\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','\"':'&quot;'}[c])),linkUrl=v=>{v=String(v??'').trim();return /^https?:\/\//i.test(v)?v:''};
 let musicians=[],notifications=[],songs=[],selectedImages=[],calendarEvents=[],chatMessages=[];

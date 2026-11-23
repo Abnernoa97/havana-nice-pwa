@@ -11,7 +11,11 @@ let client=null;
 async function getClient(){
   if(client)return client;
   client=window.hnMusicianSupabase||window.hnSupabase||null;
-  if(client)return client;
+  if(client&&typeof client.rpc==='function')return client;
+  if(window.supabase&&typeof window.supabase.createClient==='function'){
+    client=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+    return client;
+  }
   const m=await import('https://esm.sh/@supabase/supabase-js@2');
   client=m.createClient(SUPABASE_URL,SUPABASE_KEY);
   return client;
